@@ -257,6 +257,17 @@ return () => setPageInfo('', '', '')
     return new Set(migratingVms.map(m => `${m.connId}:${m.vmid}`))
   }, [migratingVms])
 
+  // Set des VMs avec une action en cours (start, stop, etc.)
+  const [pendingActionVmIds, setPendingActionVmIds] = useState<Set<string>>(new Set())
+
+  const onVmActionStart = useCallback((connId: string, vmid: string) => {
+    setPendingActionVmIds(prev => { const next = new Set(prev); next.add(`${connId}:${vmid}`); return next })
+  }, [])
+
+  const onVmActionEnd = useCallback((connId: string, vmid: string) => {
+    setPendingActionVmIds(prev => { const next = new Set(prev); next.delete(`${connId}:${vmid}`); return next })
+  }, [])
+
   // Charger les favoris
   const loadFavorites = useCallback(async () => {
     try {
@@ -524,6 +535,7 @@ return () => setPageInfo('', '', '')
               favorites={favorites}
               onToggleFavorite={toggleFavorite}
               migratingVmIds={migratingVmIds}
+              pendingActionVmIds={pendingActionVmIds}
               onRefresh={() => refreshTree?.()}
               refreshLoading={loading}
               onCollapse={() => setIsTreeCollapsed(!isTreeCollapsed)}
@@ -601,6 +613,9 @@ return () => setPageInfo('', '', '')
             favorites={favorites}
             onToggleFavorite={toggleFavorite}
             migratingVmIds={migratingVmIds}
+            pendingActionVmIds={pendingActionVmIds}
+            onVmActionStart={onVmActionStart}
+            onVmActionEnd={onVmActionEnd}
             onRefresh={async () => {
               if (refreshTree) {
                 refreshTree()

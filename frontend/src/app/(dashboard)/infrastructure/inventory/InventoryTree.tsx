@@ -53,10 +53,19 @@ import { CloneVmDialog } from '@/components/hardware/CloneVmDialog'
 /* Status Icon Component                                              */
 /* ------------------------------------------------------------------ */
 
-function StatusIcon({ status, type, isMigrating, maintenance }: { status?: string; type: 'node' | 'vm'; isMigrating?: boolean; maintenance?: string }) {
+function StatusIcon({ status, type, isMigrating, isPendingAction, maintenance }: { status?: string; type: 'node' | 'vm'; isMigrating?: boolean; isPendingAction?: boolean; maintenance?: string }) {
   // Pour les nodes: online = vert, offline = croix rouge
   // Pour les VMs: running = vert, stopped/autres = gris, migrating = flèche animée
-  
+
+  // Si la VM a une action en cours (start, stop, etc.), afficher un spinner
+  if (type === 'vm' && isPendingAction) {
+    return (
+      <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 14, height: 14 }}>
+        <CircularProgress size={12} thickness={5} sx={{ color: '#ff9800' }} />
+      </Box>
+    )
+  }
+
   // Si la VM est en cours de migration, afficher une icône spéciale
   if (type === 'vm' && isMigrating) {
     return (
@@ -260,6 +269,7 @@ type Props = {
   favorites?: Set<string>  // favoris partagés depuis le parent
   onToggleFavorite?: (vm: { connId: string; node: string; type: string; vmid: string | number; name?: string }) => void
   migratingVmIds?: Set<string>  // Set de vmIds en cours de migration (format: "connId:vmid")
+  pendingActionVmIds?: Set<string>  // Set de vmIds avec action en cours (format: "connId:vmid")
   onRefresh?: () => void  // callback pour refresh l'arbre
   refreshLoading?: boolean  // loading pendant le refresh
   onCollapse?: () => void  // callback pour collapse/expand le panneau
@@ -457,7 +467,7 @@ function safeJson<T>(x: any): T {
   return (x?.data ?? x) as T
 }
 
-export default function InventoryTree({ selected, onSelect, onRefreshRef, viewMode: controlledViewMode, onViewModeChange, onAllVmsChange, onHostsChange, onPoolsChange, onTagsChange, onPbsServersChange, favorites: propFavorites, onToggleFavorite, migratingVmIds, onRefresh, refreshLoading, onCollapse, isCollapsed, allowedViewModes }: Props) {
+export default function InventoryTree({ selected, onSelect, onRefreshRef, viewMode: controlledViewMode, onViewModeChange, onAllVmsChange, onHostsChange, onPoolsChange, onTagsChange, onPbsServersChange, favorites: propFavorites, onToggleFavorite, migratingVmIds, pendingActionVmIds, onRefresh, refreshLoading, onCollapse, isCollapsed, allowedViewModes }: Props) {
   const t = useTranslations()
   const theme = useTheme()
   const { trackTask } = useTaskTracker()
@@ -473,7 +483,13 @@ export default function InventoryTree({ selected, onSelect, onRefreshRef, viewMo
     
 return migratingVmIds.has(`${connId}:${vmid}`)
   }, [migratingVmIds])
-  
+
+  // Helper pour vérifier si une VM a une action en cours
+  const isVmPendingAction = useCallback((connId: string, vmid: string) => {
+    if (!pendingActionVmIds) return false
+    return pendingActionVmIds.has(`${connId}:${vmid}`)
+  }, [pendingActionVmIds])
+
   // Favoris : utiliser les props si fournies, sinon état local
   const [localFavorites, setLocalFavorites] = useState<Set<string>>(new Set())
   const favorites = propFavorites ?? localFavorites
@@ -1617,6 +1633,7 @@ return favorites.has(vmKey)
               const vmKey = `${vm.connId}:${vm.node}:${vm.type}:${vm.vmid}`
               const isFav = favorites.has(vmKey)
               const isMigrating = isVmMigrating(vm.connId, vm.vmid)
+              const isPendingAction = isVmPendingAction(vm.connId, vm.vmid)
 
               
 return (
@@ -1661,7 +1678,7 @@ return (
                 >
                   <i className={isFav ? "ri-star-fill" : "ri-star-line"} style={{ fontSize: 14 }} />
                 </IconButton>
-                <StatusIcon status={vm.status} type="vm" isMigrating={isVmMigrating(vm.connId, vm.vmid)} />
+                <StatusIcon status={vm.status} type="vm" isMigrating={isMigrating} isPendingAction={isPendingAction} />
                 <i className={getVmIcon(vm.type, vm.template)} style={{ opacity: 0.8, fontSize: 14 }} />
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flex: 1, minWidth: 0 }}>
                   <Typography variant="body2" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -1706,6 +1723,7 @@ return (
             favoritesList.map(vm => {
               const vmKey = `${vm.connId}:${vm.node}:${vm.type}:${vm.vmid}`
               const isMigrating = isVmMigrating(vm.connId, vm.vmid)
+              const isPendingAction = isVmPendingAction(vm.connId, vm.vmid)
 
               
 return (
@@ -1746,7 +1764,7 @@ return (
                 >
                   <i className="ri-star-fill" style={{ fontSize: 14 }} />
                 </IconButton>
-                <StatusIcon status={vm.status} type="vm" isMigrating={isMigrating} />
+                <StatusIcon status={vm.status} type="vm" isMigrating={isMigrating} isPendingAction={isPendingAction} />
                 <i className={getVmIcon(vm.type, vm.template)} style={{ opacity: 0.8, fontSize: 14 }} />
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flex: 1, minWidth: 0 }}>
                   <Typography variant="body2" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -1809,6 +1827,7 @@ return (
                   const vmKey = `${vm.connId}:${vm.node}:${vm.type}:${vm.vmid}`
                   const isFav = favorites.has(vmKey)
                   const isMigrating = isVmMigrating(vm.connId, vm.vmid)
+                  const isPendingAction = isVmPendingAction(vm.connId, vm.vmid)
 
                   
 return (
@@ -1851,7 +1870,7 @@ return (
                     >
                       <i className={isFav ? "ri-star-fill" : "ri-star-line"} style={{ fontSize: 14 }} />
                     </IconButton>
-                    <StatusIcon status={vm.status} type="vm" isMigrating={isMigrating} />
+                    <StatusIcon status={vm.status} type="vm" isMigrating={isMigrating} isPendingAction={isPendingAction} />
                     <i className={getVmIcon(vm.type, vm.template)} style={{ opacity: 0.8, fontSize: 14 }} />
                     <Typography variant="body2" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {vm.name}
@@ -1924,6 +1943,7 @@ return (
                   const vmKey = `${vm.connId}:${vm.node}:${vm.type}:${vm.vmid}`
                   const isFav = favorites.has(vmKey)
                   const isMigrating = isVmMigrating(vm.connId, vm.vmid)
+                  const isPendingAction = isVmPendingAction(vm.connId, vm.vmid)
 
                   
 return (
@@ -1966,7 +1986,7 @@ return (
                     >
                       <i className={isFav ? "ri-star-fill" : "ri-star-line"} style={{ fontSize: 14 }} />
                     </IconButton>
-                    <StatusIcon status={vm.status} type="vm" isMigrating={isMigrating} />
+                    <StatusIcon status={vm.status} type="vm" isMigrating={isMigrating} isPendingAction={isPendingAction} />
                     <i className={getVmIcon(vm.type, vm.template)} style={{ opacity: 0.8, fontSize: 14 }} />
                     <Typography variant="body2" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {vm.name}
@@ -2040,6 +2060,7 @@ return (
                   const vmKey = `${vm.connId}:${vm.node}:${vm.type}:${vm.vmid}`
                   const isFav = favorites.has(vmKey)
                   const isMigrating = isVmMigrating(vm.connId, vm.vmid)
+                  const isPendingAction = isVmPendingAction(vm.connId, vm.vmid)
 
                   
 return (
@@ -2082,7 +2103,7 @@ return (
                     >
                       <i className={isFav ? "ri-star-fill" : "ri-star-line"} style={{ fontSize: 14 }} />
                     </IconButton>
-                    <StatusIcon status={vm.status} type="vm" isMigrating={isMigrating} />
+                    <StatusIcon status={vm.status} type="vm" isMigrating={isMigrating} isPendingAction={isPendingAction} />
                     <i className={getVmIcon(vm.type, vm.template)} style={{ opacity: 0.8, fontSize: 14 }} />
                     <Typography variant="body2" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {vm.name}
@@ -2285,7 +2306,8 @@ return (
                   const vmKey = `${clu.connId}:${n.node}:${vm.type}:${vm.vmid}`
                   const isFav = favorites.has(vmKey)
                   const isMigrating = isVmMigrating(clu.connId, vm.vmid)
-                  
+                  const isPendingAction = isVmPendingAction(clu.connId, vm.vmid)
+
                   return (
                   <Tooltip
                     key={`${clu.connId}:${n.node}:${vm.type}:${vm.vmid}`}
@@ -2312,7 +2334,7 @@ return (
                             e.stopPropagation()
                             if (!isMigrating) toggleFavorite(clu.connId, n.node, vm.type, vm.vmid, vm.name)
                           }}
-                          sx={{ 
+                          sx={{
                             cursor: isMigrating ? 'not-allowed' : 'pointer',
                             display: 'flex',
                             alignItems: 'center',
@@ -2322,7 +2344,7 @@ return (
                         >
                           <i className={isFav ? "ri-star-fill" : "ri-star-line"} style={{ fontSize: 14 }} />
                         </Box>
-                        <StatusIcon status={vm.status} type="vm" isMigrating={isMigrating} />
+                        <StatusIcon status={vm.status} type="vm" isMigrating={isMigrating} isPendingAction={isPendingAction} />
                         <i className={getVmIcon(vm.type, vm.template)} style={{ opacity: 0.8, fontSize: 14 }} />
                         <Typography variant="body2" sx={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {vm.name}
@@ -2395,7 +2417,8 @@ return (
                     const vmKey = `${clu.connId}:${n.node}:${vm.type}:${vm.vmid}`
                     const isFav = favorites.has(vmKey)
                     const isMigrating = isVmMigrating(clu.connId, vm.vmid)
-                    
+                    const isPendingAction = isVmPendingAction(clu.connId, vm.vmid)
+
                     return (
                     <Tooltip
                       key={`${clu.connId}:${n.node}:${vm.type}:${vm.vmid}`}
@@ -2421,7 +2444,7 @@ return (
                               e.stopPropagation()
                               if (!isMigrating) toggleFavorite(clu.connId, n.node, vm.type, vm.vmid, vm.name)
                             }}
-                            sx={{ 
+                            sx={{
                               cursor: isMigrating ? 'not-allowed' : 'pointer',
                               display: 'flex',
                               alignItems: 'center',
@@ -2431,7 +2454,7 @@ return (
                           >
                             <i className={isFav ? "ri-star-fill" : "ri-star-line"} style={{ fontSize: 14 }} />
                           </Box>
-                          <StatusIcon status={vm.status} type="vm" isMigrating={isMigrating} />
+                          <StatusIcon status={vm.status} type="vm" isMigrating={isMigrating} isPendingAction={isPendingAction} />
                           <i className={getVmIcon(vm.type, vm.template)} style={{ opacity: 0.8, fontSize: 14 }} />
                           <Typography variant="body2" sx={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {vm.name}

@@ -133,7 +133,10 @@ export default function InventoryDetails({
   onRefresh,
   favorites: propFavorites,
   onToggleFavorite: propToggleFavorite,
-  migratingVmIds
+  migratingVmIds,
+  pendingActionVmIds,
+  onVmActionStart,
+  onVmActionEnd
 }: { 
   selection: InventorySelection | null
   onSelect?: (sel: InventorySelection) => void
@@ -152,6 +155,9 @@ export default function InventoryDetails({
   favorites?: Set<string>  // Favoris partagés depuis le parent
   onToggleFavorite?: (vm: { connId: string; node: string; type: string; vmid: string | number; name?: string }) => void
   migratingVmIds?: Set<string>  // IDs des VMs en cours de migration
+  pendingActionVmIds?: Set<string>  // IDs des VMs avec action en cours
+  onVmActionStart?: (connId: string, vmid: string) => void
+  onVmActionEnd?: (connId: string, vmid: string) => void
 }) {
   const t = useTranslations()
   const dateLocale = getDateLocale(useLocale())
@@ -3568,6 +3574,7 @@ return (
         vmName: data?.title || `VM ${vmid}`,
         onConfirm: async () => {
           setConfirmActionLoading(true)
+          onVmActionStart?.(connId, vmid)
 
           try {
             const url = `/api/v1/connections/${encodeURIComponent(connId)}/guests/${type}/${encodeURIComponent(node)}/${encodeURIComponent(vmid)}/${action}`
@@ -3587,20 +3594,28 @@ return (
                 node,
                 description: `${data?.title || `VM ${vmid}`}: ${t(`vmActions.${action}`)}`,
                 onSuccess: () => {
+                  onVmActionEnd?.(connId, vmid)
+                  onRefresh?.()
                   // Recharger les données après la completion
                   fetchDetails(selection).then(payload => {
                     setData(payload)
                     setLocalTags(payload.tags || [])
                   })
                 },
+                onError: () => {
+                  onVmActionEnd?.(connId, vmid)
+                },
               })
             } else {
               // Pas d'UPID, afficher le toast de succès direct
+              onVmActionEnd?.(connId, vmid)
+              onRefresh?.()
               toast.success(t(`vmActions.${action}Success`))
             }
 
             setConfirmAction(null)
           } catch (e: any) {
+            onVmActionEnd?.(connId, vmid)
             const errorMsg = e?.message || e
             toast.error(`${t('common.error')} (${action}): ${errorMsg}`)
           } finally {
@@ -3614,6 +3629,7 @@ return
 
     // Actions sans confirmation (start, etc.)
     setActionBusy(true)
+    onVmActionStart?.(connId, vmid)
 
     try {
       const url = `/api/v1/connections/${encodeURIComponent(connId)}/guests/${type}/${encodeURIComponent(node)}/${encodeURIComponent(vmid)}/${action}`
@@ -3633,18 +3649,26 @@ return
           node,
           description: `${data?.title || `VM ${vmid}`}: ${t(`vmActions.${action}`)}`,
           onSuccess: () => {
+            onVmActionEnd?.(connId, vmid)
+            onRefresh?.()
             // Recharger les données après la completion
             fetchDetails(selection).then(payload => {
               setData(payload)
               setLocalTags(payload.tags || [])
             })
           },
+          onError: () => {
+            onVmActionEnd?.(connId, vmid)
+          },
         })
       } else {
         // Pas d'UPID, afficher le toast de succès direct
+        onVmActionEnd?.(connId, vmid)
+        onRefresh?.()
         toast.success(t(`vmActions.${action}Success`))
       }
     } catch (e: any) {
+      onVmActionEnd?.(connId, vmid)
       const errorMsg = e?.message || e
       toast.error(`${t('common.error')} (${action}): ${errorMsg}`)
     } finally {
@@ -4354,6 +4378,9 @@ return vm?.isCluster ?? false
                   <Typography variant="subtitle1" fontWeight={900} noWrap sx={{ minWidth: 0, flexShrink: 1 }}>
                     {data.title}
                   </Typography>
+                  {pendingActionVmIds?.has(`${connId}:${vmid}`) && (
+                    <CircularProgress size={16} thickness={5} sx={{ flexShrink: 0 }} />
+                  )}
                   <StatusChip status={data.status} />
                   <Typography variant="body2" noWrap sx={{ color: 'text.secondary', flexShrink: 0 }}>
                     #{vmid} · {data.kindLabel}{vmState ? ` · ${vmState}` : ''} · on{' '}
