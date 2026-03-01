@@ -49,6 +49,10 @@ ENV NODE_ENV=production
 ARG GIT_SHA=""
 ENV NEXT_PUBLIC_GIT_SHA=${GIT_SHA}
 
+# App version for display (injected by CI on tagged releases)
+ARG APP_VERSION=dev
+ENV NEXT_PUBLIC_APP_VERSION=$APP_VERSION
+
 # Create data directory for SQLite (needed during build for page data collection)
 RUN mkdir -p /app/data
 
