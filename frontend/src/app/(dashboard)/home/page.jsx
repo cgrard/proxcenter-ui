@@ -30,7 +30,7 @@ export default function HomePage() {
   const timeAgo = useTimeAgo()
   const { setPageInfo } = usePageTitle()
 
-  const { data: dashboardResponse, error, isLoading, isValidating, mutate } = useDashboard(30000)
+  const { data: dashboardResponse, error, isLoading, isValidating, mutate } = useDashboard()
   const data = dashboardResponse?.data ?? null
   const loading = isLoading
   const lastRefresh = dashboardResponse ? new Date() : null

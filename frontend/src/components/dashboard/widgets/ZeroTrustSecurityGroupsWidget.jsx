@@ -12,7 +12,7 @@ const GROUP_COLORS = [
 
 function ZeroTrustSecurityGroupsWidget({ data, loading, config }) {
   const t = useTranslations()
-  const { data: clustersData = [], isLoading: loadingData } = useClusterSecurityGroups(60000)
+  const { data: clustersData = [], isLoading: loadingData } = useClusterSecurityGroups()
 
   if (loadingData) {
     return (

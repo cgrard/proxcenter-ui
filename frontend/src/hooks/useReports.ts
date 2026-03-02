@@ -1,4 +1,5 @@
 import useSWR from 'swr'
+import { useRefreshInterval } from './useRefreshInterval'
 
 const reportsFetcher = async () => {
   const [typesRes, reportsRes, schedulesRes, langsRes] = await Promise.all([
@@ -33,7 +34,8 @@ const reportsFetcher = async () => {
   return { reportTypes, reports, schedules, languages }
 }
 
-export function useReportsData(isEnterprise: boolean, refreshInterval = 30000) {
+export function useReportsData(isEnterprise: boolean) {
+  const refreshInterval = useRefreshInterval(30000)
   return useSWR(
     isEnterprise ? 'reports/data' : null,
     reportsFetcher,

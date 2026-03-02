@@ -283,17 +283,17 @@ return () => setPageInfo('', '', '')
     error: alertsError,
     isLoading: alertsLoading,
     mutate: mutateAlerts
-  } = useOrchestratorAlerts(isEnterprise, 30000)
+  } = useOrchestratorAlerts(isEnterprise)
 
   const {
     data: summaryData,
     mutate: mutateSummary
-  } = useAlertsSummary(isEnterprise, 30000)
+  } = useAlertsSummary(isEnterprise)
 
   const {
     data: rulesData,
     mutate: mutateRules
-  } = useAlertRules(isEnterprise, 30000)
+  } = useAlertRules(isEnterprise)
 
   const {
     data: thresholdsData

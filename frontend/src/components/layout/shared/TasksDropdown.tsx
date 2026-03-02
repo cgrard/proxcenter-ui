@@ -165,7 +165,7 @@ export default function TasksDropdown() {
   const open = Boolean(anchorEl)
 
   // SWR hook for running tasks - polls faster when menu is open
-  const { data: tasksResponse, isLoading: loading } = useRunningTasks(open ? 5000 : 10000)
+  const { data: tasksResponse, isLoading: loading } = useRunningTasks()
 
   // Sync SWR data to local state and handle notifications
   useEffect(() => {

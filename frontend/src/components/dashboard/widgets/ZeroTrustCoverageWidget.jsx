@@ -9,7 +9,7 @@ import { useVMFirewallCoverage } from '@/hooks/useZeroTrust'
 function ZeroTrustCoverageWidget({ data, loading, config }) {
   const t = useTranslations('firewall')
   const { isEnterprise } = useLicense()
-  const { data: vmData = [], isLoading: loadingData } = useVMFirewallCoverage(isEnterprise, 60000)
+  const { data: vmData = [], isLoading: loadingData } = useVMFirewallCoverage(isEnterprise)
 
   if (loadingData) {
     return (

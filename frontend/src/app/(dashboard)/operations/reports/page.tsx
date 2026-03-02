@@ -77,7 +77,7 @@ export default function ReportsPage() {
   const { showToast } = useToast()
 
   // Data
-  const { data: reportsData, mutate: mutateReports, isLoading: loading } = useReportsData(isEnterprise, 30000)
+  const { data: reportsData, mutate: mutateReports, isLoading: loading } = useReportsData(isEnterprise)
 
   const reportTypes = reportsData?.reportTypes || []
   const reports = reportsData?.reports || []

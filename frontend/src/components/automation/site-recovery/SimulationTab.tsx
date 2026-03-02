@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import useSWR from 'swr'
+import { useRefreshInterval } from '@/hooks/useRefreshInterval'
 
 import {
   Alert,
@@ -730,10 +731,11 @@ export default function SimulationTab({ connections, isEnterprise }: SimulationT
   const [failedNodes, setFailedNodes] = useState<Set<string>>(new Set())
 
   // Fetch inventory data (nodes + guests with resource info)
+  const inventoryRefreshInterval = useRefreshInterval(30000)
   const { data: inventoryData, isLoading: inventoryLoading } = useSWR(
     isEnterprise ? '/api/v1/inventory' : null,
     fetcher,
-    { refreshInterval: 30000 }
+    { refreshInterval: inventoryRefreshInterval }
   )
 
   // Fetch Ceph data for selected cluster (pools with size/min_size + OSD count)

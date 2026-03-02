@@ -204,6 +204,36 @@ return globalThemesConfig.filter(t => t.category === selectedCategory)
         </CardContent>
       </Card>
 
+      {/* Section: Data Refresh */}
+      <Card variant='outlined' sx={{ mb: 3 }}>
+        <CardContent>
+          <Typography variant='subtitle1' fontWeight={700} sx={{ mb: 0.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <i className='ri-refresh-line' style={{ color: theme.palette.primary.main }} />
+            {t('settings.dataRefresh')}
+          </Typography>
+          <Typography variant='caption' color='text.secondary' sx={{ display: 'block', mb: 2 }}>{t('settings.dataRefreshDescription')}</Typography>
+
+          <FormControl size='small' sx={{ minWidth: 200 }}>
+            <InputLabel>{t('settings.dataRefresh')}</InputLabel>
+            <Select
+              value={settings.refreshInterval ?? 30}
+              label={t('settings.dataRefresh')}
+              onChange={(e) => {
+                updateSettings({ refreshInterval: e.target.value })
+                showMessage('success', t('settings.savedSuccess'))
+              }}
+            >
+              <MenuItem value={5}>5s</MenuItem>
+              <MenuItem value={10}>10s</MenuItem>
+              <MenuItem value={30}>30s {t('settings.refreshDefault')}</MenuItem>
+              <MenuItem value={60}>1 min</MenuItem>
+              <MenuItem value={300}>5 min</MenuItem>
+              <MenuItem value={0}>{t('settings.refreshOff')}</MenuItem>
+            </Select>
+          </FormControl>
+        </CardContent>
+      </Card>
+
       {/* Section: Teinte du fond */}
       <Card variant='outlined' sx={{ mb: 3 }}>
         <CardContent>

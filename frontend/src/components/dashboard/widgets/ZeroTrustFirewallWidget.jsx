@@ -5,7 +5,7 @@ import { Box, Typography, Chip, CircularProgress, alpha, Stack } from '@mui/mate
 import { useClusterFirewallOptions } from '@/hooks/useZeroTrust'
 
 function ZeroTrustFirewallWidget({ data, loading, config }) {
-  const { data: firewallData, isLoading: loadingData } = useClusterFirewallOptions(30000)
+  const { data: firewallData, isLoading: loadingData } = useClusterFirewallOptions()
 
   if (loadingData) {
     return (

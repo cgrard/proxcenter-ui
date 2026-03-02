@@ -7,7 +7,7 @@ import { useFirewallScores } from '@/hooks/useZeroTrust'
 
 function ZeroTrustScoreWidget({ data, loading, config }) {
   const t = useTranslations()
-  const { data: clusters = [], isLoading: loadingData } = useFirewallScores(60000)
+  const { data: clusters = [], isLoading: loadingData } = useFirewallScores()
 
   if (loadingData) {
     return (

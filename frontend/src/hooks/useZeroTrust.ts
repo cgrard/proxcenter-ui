@@ -1,5 +1,6 @@
 import useSWR from 'swr'
 import { useSWRFetch } from './useSWRFetch'
+import { useRefreshInterval } from './useRefreshInterval'
 
 // Fetcher that chains connections -> firewall options for a single PVE connection
 const clusterFirewallFetcher = async (url: string) => {
@@ -14,7 +15,8 @@ const clusterFirewallFetcher = async (url: string) => {
   return { ...fwData, connectionId: pveConn.id, connectionName: pveConn.name }
 }
 
-export function useClusterFirewallOptions(refreshInterval = 30000) {
+export function useClusterFirewallOptions() {
+  const refreshInterval = useRefreshInterval(30000)
   return useSWR('zero-trust/firewall-options', clusterFirewallFetcher, { refreshInterval })
 }
 
@@ -48,7 +50,8 @@ const firewallScoresFetcher = async () => {
   )
 }
 
-export function useFirewallScores(refreshInterval = 60000) {
+export function useFirewallScores() {
+  const refreshInterval = useRefreshInterval(60000)
   return useSWR('zero-trust/firewall-scores', firewallScoresFetcher, { refreshInterval })
 }
 
@@ -76,7 +79,8 @@ const securityGroupsFetcher = async () => {
   )
 }
 
-export function useClusterSecurityGroups(refreshInterval = 60000) {
+export function useClusterSecurityGroups() {
+  const refreshInterval = useRefreshInterval(60000)
   return useSWR('zero-trust/security-groups', securityGroupsFetcher, { refreshInterval })
 }
 
@@ -128,7 +132,8 @@ const vmFirewallCoverageFetcher = async () => {
   )
 }
 
-export function useVMFirewallCoverage(isEnterprise: boolean, refreshInterval = 60000) {
+export function useVMFirewallCoverage(isEnterprise: boolean) {
+  const refreshInterval = useRefreshInterval(60000)
   return useSWR(
     isEnterprise ? 'zero-trust/vm-coverage' : null,
     vmFirewallCoverageFetcher,

@@ -152,7 +152,7 @@ export default function TasksFooter({
   }
 
   // SWR hook for task events
-  const { data: tasksRaw, mutate: mutateTasks, isLoading: loading } = useTaskEvents(50, 10000)
+  const { data: tasksRaw, mutate: mutateTasks, isLoading: loading } = useTaskEvents(50)
 
   // Derive tasks from SWR data
   const tasks: TaskEvent[] = (tasksRaw?.data || []).map((e: any) => ({

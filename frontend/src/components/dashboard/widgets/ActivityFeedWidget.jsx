@@ -8,7 +8,7 @@ import { useTaskEvents } from '@/hooks/useTaskEvents'
 
 function ActivityFeedWidget({ data, loading, config }) {
   const t = useTranslations()
-  const { data: eventsData, isLoading: loadingEvents } = useTaskEvents(20, 30000)
+  const { data: eventsData, isLoading: loadingEvents } = useTaskEvents(20)
   const events = Array.isArray(eventsData?.data) ? eventsData.data : []
 
   function timeAgo(ts) {

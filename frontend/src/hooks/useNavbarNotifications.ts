@@ -1,14 +1,17 @@
 import useSWR from 'swr'
 import { useSWRFetch } from './useSWRFetch'
+import { useRefreshInterval } from './useRefreshInterval'
 
-export function useActiveAlerts(isEnterprise: boolean, refreshInterval = 30000) {
+export function useActiveAlerts(isEnterprise: boolean) {
+  const refreshInterval = useRefreshInterval(30000)
   return useSWRFetch(
     isEnterprise ? '/api/v1/orchestrator/alerts?status=active&limit=10' : null,
     { refreshInterval }
   )
 }
 
-export function useDRSRecommendations(isEnterprise: boolean, hasDRS: boolean, refreshInterval = 30000) {
+export function useDRSRecommendations(isEnterprise: boolean, hasDRS: boolean) {
+  const refreshInterval = useRefreshInterval(30000)
   return useSWRFetch(
     isEnterprise && hasDRS ? '/api/v1/orchestrator/drs/recommendations' : null,
     { refreshInterval }
@@ -29,7 +32,8 @@ const healthFetcher = async (url: string) => {
   return { status: 'error', components: null }
 }
 
-export function useOrchestratorHealth(isEnterprise: boolean, refreshInterval = 30000) {
+export function useOrchestratorHealth(isEnterprise: boolean) {
+  const refreshInterval = useRefreshInterval(30000)
   return useSWR(
     isEnterprise ? '/api/v1/orchestrator/health' : null,
     healthFetcher,

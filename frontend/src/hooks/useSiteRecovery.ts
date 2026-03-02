@@ -1,4 +1,5 @@
 import useSWR from 'swr'
+import { useRefreshInterval } from './useRefreshInterval'
 
 const fetcher = (url: string) => fetch(url).then(res => {
   if (!res.ok) throw new Error('Failed to fetch')
@@ -6,15 +7,18 @@ const fetcher = (url: string) => fetch(url).then(res => {
 })
 
 export function useReplicationHealth(isEnterprise: boolean) {
-  return useSWR(isEnterprise ? '/api/v1/orchestrator/replication/status' : null, fetcher, { refreshInterval: 15000 })
+  const refreshInterval = useRefreshInterval(15000)
+  return useSWR(isEnterprise ? '/api/v1/orchestrator/replication/status' : null, fetcher, { refreshInterval })
 }
 
 export function useReplicationJobs(isEnterprise: boolean) {
-  return useSWR(isEnterprise ? '/api/v1/orchestrator/replication/jobs' : null, fetcher, { refreshInterval: 3000 })
+  const refreshInterval = useRefreshInterval(3000)
+  return useSWR(isEnterprise ? '/api/v1/orchestrator/replication/jobs' : null, fetcher, { refreshInterval })
 }
 
 export function useRecoveryPlans(isEnterprise: boolean) {
-  return useSWR(isEnterprise ? '/api/v1/orchestrator/replication/plans' : null, fetcher, { refreshInterval: 30000 })
+  const refreshInterval = useRefreshInterval(30000)
+  return useSWR(isEnterprise ? '/api/v1/orchestrator/replication/plans' : null, fetcher, { refreshInterval })
 }
 
 export function useReplicationJobLogs(jobId: string | null, isActive: boolean) {

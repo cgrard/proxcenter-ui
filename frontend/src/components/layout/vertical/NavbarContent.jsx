@@ -163,10 +163,10 @@ const NavbarContent = () => {
   const canViewDrs = hasPermission('automation.view')
 
   // SWR hooks for notifications — gated by permissions to avoid unnecessary fetches
-  const { data: alertsResponse, mutate: mutateAlerts } = useActiveAlerts(isEnterprise && canViewAlerts, 30000)
-  const { data: drsRecsResponse, mutate: mutateDrsRecs } = useDRSRecommendations(isEnterprise && canViewDrs, hasFeature(Features.DRS), 30000)
+  const { data: alertsResponse, mutate: mutateAlerts } = useActiveAlerts(isEnterprise && canViewAlerts)
+  const { data: drsRecsResponse, mutate: mutateDrsRecs } = useDRSRecommendations(isEnterprise && canViewDrs, hasFeature(Features.DRS))
   const { data: updateInfoData } = useVersionCheck(3600000)
-  const { data: healthData } = useOrchestratorHealth(isEnterprise, 30000)
+  const { data: healthData } = useOrchestratorHealth(isEnterprise)
 
   // Derive notifications from SWR data
   const notifications = useMemo(() => {

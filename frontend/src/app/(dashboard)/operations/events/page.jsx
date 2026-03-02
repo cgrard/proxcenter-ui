@@ -25,6 +25,7 @@ import { DataGrid } from '@mui/x-data-grid'
 import { usePageTitle } from '@/contexts/PageTitleContext'
 import { useLicense } from '@/contexts/LicenseContext'
 import { useSWRFetch } from '@/hooks/useSWRFetch'
+import { useRefreshInterval } from '@/hooks/useRefreshInterval'
 
 import TaskDetailDialog from '@/components/TaskDetailDialog'
 import EmptyState from '@/components/EmptyState'
@@ -151,9 +152,10 @@ export default function EventsPage() {
 
   const { setPageInfo } = usePageTitle()
 
-  // SWR data fetching with 30s polling
+  // SWR data fetching with configurable polling
+  const eventsRefreshInterval = useRefreshInterval(30000)
   const { data: eventsResponse, error, isLoading, mutate } = useSWRFetch('/api/v1/events?limit=500', {
-    refreshInterval: 30000,
+    refreshInterval: eventsRefreshInterval,
     onSuccess: (json) => {
       // Envoyer les événements à l'orchestrator pour analyse (alertes sur événements)
       // Seulement en mode Enterprise

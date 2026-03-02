@@ -3,6 +3,7 @@
 import { useMemo } from 'react'
 
 import { useSWRFetch } from '@/hooks/useSWRFetch'
+import { useRefreshInterval } from '@/hooks/useRefreshInterval'
 
 import type { TopologyFilters, InventoryData, InventoryCluster } from '../types'
 import type { NetworkMap } from './useTopologyNetworks'
@@ -10,8 +11,9 @@ import { buildTopologyGraph } from '../lib/buildTopologyGraph'
 import { layoutGraph } from '../lib/layoutGraph'
 
 export function useTopologyData(filters: TopologyFilters, networkMap?: NetworkMap) {
+  const refreshInterval = useRefreshInterval(30000)
   const { data, isLoading, error } = useSWRFetch<{ data: InventoryData }>('/api/v1/inventory', {
-    refreshInterval: 30000,
+    refreshInterval,
   })
 
   const inventoryData = data?.data
