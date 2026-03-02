@@ -9,6 +9,7 @@ export interface LdapUser {
   email: string
   name: string
   avatar: string | null
+  groups: string[]
 }
 
 export interface LdapConfig {
@@ -21,6 +22,9 @@ export interface LdapConfig {
   emailAttribute: string
   nameAttribute: string
   tlsInsecure: boolean
+  groupAttribute: string
+  groupRoleMapping: Record<string, string>
+  defaultRole: string
 }
 
 // Configuration orchestrator
@@ -62,6 +66,13 @@ export function getLdapConfig(): LdapConfig | null {
     }
   }
 
+  let groupRoleMapping: Record<string, string> = {}
+  try {
+    if (config.group_role_mapping) {
+      groupRoleMapping = JSON.parse(config.group_role_mapping)
+    }
+  } catch {}
+
   return {
     enabled: config.enabled === 1,
     url: config.url,
@@ -72,6 +83,9 @@ export function getLdapConfig(): LdapConfig | null {
     emailAttribute: config.email_attribute,
     nameAttribute: config.name_attribute,
     tlsInsecure: config.tls_insecure === 1,
+    groupAttribute: config.group_attribute || 'memberOf',
+    groupRoleMapping,
+    defaultRole: config.default_role || 'role_viewer',
   }
 }
 
@@ -121,6 +135,7 @@ export async function authenticateLdap(
           email_attribute: config.emailAttribute,
           name_attribute: config.nameAttribute,
           tls_insecure: config.tlsInsecure,
+          group_attribute: config.groupAttribute,
         }
       }),
       signal: AbortSignal.timeout(15000),
@@ -143,9 +158,40 @@ export async function authenticateLdap(
       email: data.user.email,
       name: data.user.name,
       avatar: data.user.avatar || null,
+      groups: data.user.groups || [],
     }
   } catch (error: any) {
     console.error("Erreur orchestrator LDAP auth:", error?.message || error)
     throw new Error("Erreur de communication avec l'orchestrator pour l'authentification LDAP")
   }
+}
+
+/**
+ * Résout le rôle RBAC depuis les groupes LDAP en utilisant le mapping configuré.
+ * - Match exact d'abord (DN complet), puis extraction du CN
+ * - Premier match gagne
+ * - Fallback vers config.defaultRole
+ */
+export function resolveLdapRole(groups: string[], config: LdapConfig): string {
+  if (!groups || groups.length === 0 || !config.groupRoleMapping || Object.keys(config.groupRoleMapping).length === 0) {
+    return config.defaultRole || 'role_viewer'
+  }
+
+  for (const group of groups) {
+    // Match exact (DN complet)
+    if (config.groupRoleMapping[group]) {
+      return config.groupRoleMapping[group]
+    }
+
+    // Extraction du CN pour match simplifié
+    const cnMatch = group.match(/^CN=([^,]+)/i)
+    if (cnMatch) {
+      const cn = cnMatch[1]
+      if (config.groupRoleMapping[cn]) {
+        return config.groupRoleMapping[cn]
+      }
+    }
+  }
+
+  return config.defaultRole || 'role_viewer'
 }

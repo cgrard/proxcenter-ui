@@ -176,7 +176,7 @@ export default function AffinityRulesManager({
   }
 
   const handleToggleEnabled = async (rule: AffinityRule) => {
-    await onUpdateRule(rule.id, { enabled: !rule.enabled })
+    await onUpdateRule(rule.id, { ...rule, enabled: !rule.enabled })
   }
 
   const getTypeIcon = (type: AffinityRule['type']) => {

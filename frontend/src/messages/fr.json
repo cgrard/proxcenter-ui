@@ -1466,6 +1466,8 @@
     "cephHeader": "Ceph",
     "detectCeph": "Re-détecter Ceph",
     "sshHeader": "SSH",
+    "nodesHeader": "Nœuds",
+    "noIp": "IP non résolue",
     "proxmoxVe": "Proxmox VE",
     "proxmoxBackupServer": "Proxmox Backup Server",
     "activationFailed": "Échec de l'activation",
@@ -1669,52 +1671,76 @@
       "operations": "Opérations"
     },
     "permDesc": {
-      "vm.view": "Voir les VMs et leurs détails",
-      "vm.console": "Accéder à la console VNC/SPICE",
-      "vm.start": "Démarrer une VM",
-      "vm.stop": "Arrêter une VM",
-      "vm.restart": "Redémarrer une VM",
-      "vm.suspend": "Suspendre/Reprendre une VM",
-      "vm.snapshot": "Créer/Supprimer des snapshots",
-      "vm.backup": "Sauvegarder/Restaurer une VM",
-      "vm.clone": "Cloner une VM",
-      "vm.migrate": "Migrer une VM",
-      "vm.config": "Modifier la configuration VM",
-      "vm.delete": "Supprimer une VM",
-      "vm.create": "Créer une nouvelle VM",
-      "storage.view": "Voir les stockages",
-      "storage.content": "Parcourir le contenu du stockage",
-      "storage.upload": "Uploader des fichiers ISO/templates",
-      "storage.delete": "Supprimer des fichiers",
-      "storage.admin": "Accès aux pages Storage Overview et Ceph",
-      "node.view": "Voir les nœuds du cluster",
-      "node.console": "Accéder à la console du nœud",
-      "node.services": "Gérer les services",
-      "node.network": "Configurer le réseau",
-      "node.manage": "Gérer les nœuds (mises à jour, redémarrage)",
-      "connection.view": "Voir les connexions PVE/PBS",
-      "connection.manage": "Gérer les connexions",
-      "backup.view": "Voir les sauvegardes",
-      "backup.restore": "Restaurer une sauvegarde",
-      "backup.delete": "Supprimer une sauvegarde",
-      "backup.job.view": "Voir les jobs de sauvegarde planifiés",
-      "backup.job.create": "Créer un job de sauvegarde",
-      "backup.job.edit": "Modifier un job de sauvegarde",
-      "backup.job.delete": "Supprimer un job de sauvegarde",
-      "backup.job.run": "Exécuter manuellement un job de sauvegarde",
-      "automation.view": "Voir les paramètres d'automatisation et DRS",
-      "automation.manage": "Configurer l'automatisation et DRS",
-      "automation.execute": "Exécuter des actions d'automatisation",
-      "events.view": "Voir les événements et logs",
-      "alerts.view": "Voir les alertes",
-      "alerts.manage": "Gérer les alertes (acknowledge, resolve)",
-      "tasks.view": "Voir le task center",
-      "reports.view": "Voir les rapports",
-      "admin.users": "Gérer les utilisateurs",
-      "admin.rbac": "Gérer les rôles et permissions",
-      "admin.settings": "Modifier les paramètres",
-      "admin.audit": "Consulter les logs d'audit",
-      "admin.compliance": "Gérer la conformité et les politiques de sécurité"
+      "vm": {
+        "view": "Voir les VMs et leurs détails",
+        "console": "Accéder à la console VNC/SPICE",
+        "start": "Démarrer une VM",
+        "stop": "Arrêter une VM",
+        "restart": "Redémarrer une VM",
+        "suspend": "Suspendre/Reprendre une VM",
+        "snapshot": "Créer/Supprimer des snapshots",
+        "backup": "Sauvegarder/Restaurer une VM",
+        "clone": "Cloner une VM",
+        "migrate": "Migrer une VM",
+        "config": "Modifier la configuration VM",
+        "delete": "Supprimer une VM",
+        "create": "Créer une nouvelle VM"
+      },
+      "storage": {
+        "view": "Voir les stockages",
+        "content": "Parcourir le contenu du stockage",
+        "upload": "Uploader des fichiers ISO/templates",
+        "delete": "Supprimer des fichiers",
+        "admin": "Accès aux pages Storage Overview et Ceph"
+      },
+      "node": {
+        "view": "Voir les nœuds du cluster",
+        "console": "Accéder à la console du nœud",
+        "services": "Gérer les services",
+        "network": "Configurer le réseau",
+        "manage": "Gérer les nœuds (mises à jour, redémarrage)"
+      },
+      "connection": {
+        "view": "Voir les connexions PVE/PBS",
+        "manage": "Gérer les connexions"
+      },
+      "backup": {
+        "view": "Voir les sauvegardes",
+        "restore": "Restaurer une sauvegarde",
+        "delete": "Supprimer une sauvegarde",
+        "job": {
+          "view": "Voir les jobs de sauvegarde planifiés",
+          "create": "Créer un job de sauvegarde",
+          "edit": "Modifier un job de sauvegarde",
+          "delete": "Supprimer un job de sauvegarde",
+          "run": "Exécuter manuellement un job de sauvegarde"
+        }
+      },
+      "automation": {
+        "view": "Voir les paramètres d'automatisation et DRS",
+        "manage": "Configurer l'automatisation et DRS",
+        "execute": "Exécuter des actions d'automatisation"
+      },
+      "events": {
+        "view": "Voir les événements et logs"
+      },
+      "alerts": {
+        "view": "Voir les alertes",
+        "manage": "Gérer les alertes (acknowledge, resolve)"
+      },
+      "tasks": {
+        "view": "Voir le task center"
+      },
+      "reports": {
+        "view": "Voir les rapports"
+      },
+      "admin": {
+        "users": "Gérer les utilisateurs",
+        "rbac": "Gérer les rôles et permissions",
+        "settings": "Modifier les paramètres",
+        "audit": "Consulter les logs d'audit",
+        "compliance": "Gérer la conformité et les politiques de sécurité"
+      }
     },
     "roles": {
       "role_super_admin": "Super Admin",
@@ -1970,6 +1996,7 @@
       "start": "Début",
       "end": "Fin",
       "node": "Nœud",
+      "target": "Cible",
       "user": "Utilisateur",
       "description": "Description",
       "status": "Statut"
@@ -2959,7 +2986,17 @@
     "save": "Enregistrer",
     "testing": "Test en cours...",
     "testConnection": "Tester la connexion",
-    "reset": "Réinitialiser"
+    "reset": "Réinitialiser",
+    "groupMappingSection": "Mapping Groupe → Rôle",
+    "groupAttribute": "Attribut de groupe",
+    "groupAttributeHelper": "Attribut LDAP contenant les appartenances aux groupes (ex : memberOf)",
+    "defaultRole": "Rôle par défaut",
+    "defaultRoleHelper": "Rôle attribué quand aucun mapping de groupe ne correspond",
+    "groupMapping": "Mappings de groupes",
+    "groupMappingDesc": "Associez les groupes LDAP aux rôles RBAC. À chaque connexion, le rôle global de l'utilisateur est synchronisé depuis ses groupes LDAP.",
+    "groupName": "Groupe LDAP (DN ou CN)",
+    "role": "Rôle RBAC",
+    "addMapping": "Ajouter un mapping"
   },
   "oidc": {
     "description": "Configurez l'authentification OIDC/SSO pour permettre aux utilisateurs de se connecter via leur fournisseur d'identité d'entreprise (Keycloak, Azure AD, Okta, Google, Auth0, etc.).",
@@ -3791,8 +3828,7 @@
       "neumorphism": "Ombres douces et effet embossé",
       "cyberpunk": "Néons, contrastes et style futuriste",
       "minimal": "Ultra clean, bordures fines, pas d'ombres",
-      "corporate": "Style professionnel inspiré vCenter",
-      "vcenter": "Style VMware vSphere Client",
+      "corporate": "Style professionnel entreprise",
       "terminal": "Style console/hacker monospace",
       "rounded": "Coins très arrondis, style friendly",
       "proxmoxClassic": "Interface native Proxmox VE",
@@ -3832,7 +3868,7 @@
       "dracula": "Palette Dracula",
       "ocean": "Profondeurs océaniques",
       "sunset": "Coucher de soleil",
-      "enterprise": "Style professionnel vCenter",
+      "enterprise": "Style professionnel entreprise",
       "matrix": "Code vert sur noir",
       "minimalDark": "Noir élégant",
       "minimalLight": "Blanc épuré",
@@ -3860,7 +3896,6 @@
       "particlesDesc": "Effet réseau/nodes"
     },
     "tags": {
-      "vmware": "VMware",
       "enterprise": "Entreprise",
       "official": "Officiel",
       "familiar": "Familier",

@@ -59,7 +59,7 @@ function HaRuleDialog({ open, onClose, rule, ruleType, connId, availableNodes, a
       if (rule) {
         // Mode édition
         setName(rule.rule || '')
-        setEnabled(rule.state !== 'disabled')
+        setEnabled(!rule.disable)
         setStrict(!!rule.strict)
         setAffinity(rule.affinity === 'negative' ? 'negative' : 'positive')
 
@@ -124,7 +124,7 @@ return
       
       const body: any = {
         resources: resourcesString,
-        state: enabled ? 'enabled' : 'disabled',
+        disable: !enabled,
         comment: comment || undefined
       }
       

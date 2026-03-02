@@ -110,7 +110,7 @@ async function fetchJson(url, init) {
 
 /* ==================== ConnectionStatus Component ==================== */
 
-function ConnectionStatus({ connection, autoTest = false }) {
+function ConnectionStatus({ connection, autoTest = false, onNodesLoaded }) {
   const t = useTranslations()
   const [status, setStatus] = useState(null)
   const [error, setError] = useState(null)
@@ -128,6 +128,7 @@ function ConnectionStatus({ connection, autoTest = false }) {
 
       if (res.ok) {
         setStatus('ok')
+        if (onNodesLoaded) onNodesLoaded()
       } else {
         const json = await res.json().catch(() => ({}))
 
@@ -349,8 +350,40 @@ function ConnectionsTab() {
         headerName: t('common.status'),
         width: 160,
         renderCell: params => (
-          <ConnectionStatus connection={params.row} autoTest={true} />
+          <ConnectionStatus connection={params.row} autoTest={true} onNodesLoaded={loadPveConnections} />
         )
+      },
+      {
+        field: 'hosts',
+        headerName: t('settings.nodesHeader'),
+        width: 200,
+        sortable: false,
+        renderCell: params => {
+          const hosts = params.value
+          if (!hosts || hosts.length === 0) {
+            return (
+              <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
+                <Typography variant='caption' sx={{ opacity: 0.4 }}>--</Typography>
+              </Box>
+            )
+          }
+          return (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, height: '100%', flexWrap: 'wrap' }}>
+              {hosts.map(host => (
+                <Tooltip key={host.id} title={host.ip || t('settings.noIp')} arrow>
+                  <Chip
+                    size='small'
+                    label={host.node}
+                    icon={<i className='ri-server-line' style={{ fontSize: 14 }} />}
+                    variant='outlined'
+                    color={host.enabled ? 'default' : 'warning'}
+                    sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.75rem' }}
+                  />
+                </Tooltip>
+              ))}
+            </Box>
+          )
+        }
       },
       {
         field: 'hasCeph',
@@ -433,7 +466,7 @@ function ConnectionsTab() {
         )
       }
     ],
-    [t]
+    [t, loadPveConnections]
   )
 
   // PBS Columns

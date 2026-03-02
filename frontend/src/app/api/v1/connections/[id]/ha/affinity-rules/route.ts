@@ -91,8 +91,8 @@ export async function POST(
       }
     }
     
-    if (body.state !== undefined) {
-      params.append('state', body.state) // "enabled" ou "disabled"
+    if (body.disable !== undefined) {
+      params.append('disable', body.disable ? '1' : '0')
     }
 
     if (body.comment) {

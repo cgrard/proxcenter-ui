@@ -7,6 +7,9 @@ const nextConfig = {
     output: 'standalone',
     basePath: process.env.BASEPATH,
     serverExternalPackages: ['ssh2'],
+    turbopack: {
+        root: '.',
+    },
     redirects: async () => {
         return [
             {

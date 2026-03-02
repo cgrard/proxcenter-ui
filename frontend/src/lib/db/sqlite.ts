@@ -62,6 +62,28 @@ export function getDb() {
     // Ignore si erreur
   }
 
+  // Migration pour ajouter la colonne start_tls sur ldap_config
+  try {
+    const ldapColsTls = db.pragma('table_info(ldap_config)') as any[]
+    if (!ldapColsTls.some((c: any) => c.name === 'start_tls')) {
+      db.exec(`ALTER TABLE ldap_config ADD COLUMN start_tls INTEGER NOT NULL DEFAULT 0`)
+    }
+  } catch {}
+
+  // Migration pour ajouter les colonnes de group mapping LDAP
+  try {
+    const ldapCols = db.pragma('table_info(ldap_config)') as any[]
+    if (!ldapCols.some((c: any) => c.name === 'group_attribute')) {
+      db.exec(`ALTER TABLE ldap_config ADD COLUMN group_attribute TEXT DEFAULT 'memberOf'`)
+    }
+    if (!ldapCols.some((c: any) => c.name === 'group_role_mapping')) {
+      db.exec(`ALTER TABLE ldap_config ADD COLUMN group_role_mapping TEXT DEFAULT '{}'`)
+    }
+    if (!ldapCols.some((c: any) => c.name === 'default_role')) {
+      db.exec(`ALTER TABLE ldap_config ADD COLUMN default_role TEXT DEFAULT 'role_viewer'`)
+    }
+  } catch {}
+
   db.exec(`
     -- Table des sessions
     CREATE TABLE IF NOT EXISTS sessions (

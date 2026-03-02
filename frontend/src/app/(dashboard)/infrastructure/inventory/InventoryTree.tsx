@@ -1600,7 +1600,7 @@ return favorites.has(vmKey)
         </ToggleButtonGroup>
       </Box>
     ),
-    [loading, search, viewMode, displayVms.length, hostsList.length, poolsList.length, tagsList.length, templatesCount, favoritesList.length, onRefresh, refreshLoading, onCollapse, isCollapsed, allowedViewModes]
+    [loading, search, viewMode, displayVms.length, hostsList.length, poolsList.length, tagsList.length, templatesCount, favoritesList.length, onRefresh, refreshLoading, onCollapse, isCollapsed, allowedViewModes, theme.palette.mode]
   )
 
   return (
@@ -1654,7 +1654,9 @@ return (
                   py: 0.75,
                   cursor: isMigrating ? 'not-allowed' : 'pointer',
                   borderRadius: 1,
-                  bgcolor: selected?.id === vmKey ? 'action.selected' : 'transparent',
+                  bgcolor: selected?.id === vmKey
+                    ? 'action.selected'
+                    : 'transparent',
                   opacity: isMigrating ? 0.5 : 1,
                   '&:hover': { bgcolor: isMigrating ? 'transparent' : 'action.hover' },
                   '&:hover .favorite-star': { opacity: isMigrating ? 0 : 1 }
@@ -1744,7 +1746,9 @@ return (
                   py: 0.75,
                   cursor: isMigrating ? 'not-allowed' : 'pointer',
                   borderRadius: 1,
-                  bgcolor: selected?.id === vmKey ? 'action.selected' : 'transparent',
+                  bgcolor: selected?.id === vmKey
+                    ? 'action.selected'
+                    : 'transparent',
                   opacity: isMigrating ? 0.5 : 1,
                   '&:hover': { bgcolor: isMigrating ? 'transparent' : 'action.hover' }
                 }}
@@ -1804,11 +1808,11 @@ return (
                       if (isInHost) onSelect(null)
                     }
                   }}
-                  sx={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: 1, 
-                    px: 1.5, 
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1,
+                    px: 1.5,
                     py: 0.75,
                     bgcolor: 'background.paper',
                     borderBottom: '1px solid',
@@ -1848,6 +1852,9 @@ return (
                       pl: 3,
                       py: 0.5,
                       cursor: isMigrating ? 'not-allowed' : 'pointer',
+                      bgcolor: selected?.id === vmKey
+                        ? undefined
+                        : 'transparent',
                       opacity: isMigrating ? 0.5 : 1,
                       '&:hover': { bgcolor: isMigrating ? 'transparent' : 'action.hover' },
                       '&:hover .favorite-star': { opacity: isMigrating ? 0 : 1 }
@@ -1921,11 +1928,11 @@ return (
                       if (isInPool) onSelect(null)
                     }
                   }}
-                  sx={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: 1, 
-                    px: 1.5, 
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1,
+                    px: 1.5,
                     py: 0.75,
                     bgcolor: 'background.paper',
                     borderBottom: '1px solid',
@@ -1964,6 +1971,9 @@ return (
                       pl: 3,
                       py: 0.5,
                       cursor: isMigrating ? 'not-allowed' : 'pointer',
+                      bgcolor: selected?.id === vmKey
+                        ? undefined
+                        : 'transparent',
                       opacity: isMigrating ? 0.5 : 1,
                       '&:hover': { bgcolor: isMigrating ? 'transparent' : 'action.hover' },
                       '&:hover .favorite-star': { opacity: isMigrating ? 0 : 1 }
@@ -2038,11 +2048,11 @@ return (
                       if (isInTag) onSelect(null)
                     }
                   }}
-                  sx={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: 1, 
-                    px: 1.5, 
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1,
+                    px: 1.5,
                     py: 0.75,
                     bgcolor: 'background.paper',
                     borderBottom: '1px solid',
@@ -2081,6 +2091,9 @@ return (
                       pl: 3,
                       py: 0.5,
                       cursor: isMigrating ? 'not-allowed' : 'pointer',
+                      bgcolor: selected?.id === vmKey
+                        ? undefined
+                        : 'transparent',
                       opacity: isMigrating ? 0.5 : 1,
                       '&:hover': { bgcolor: isMigrating ? 'transparent' : 'action.hover' },
                       '&:hover .favorite-star': { opacity: isMigrating ? 0 : 1 }
@@ -2162,7 +2175,9 @@ return (
                   py: 0.75,
                   cursor: isMigrating ? 'not-allowed' : 'pointer',
                   borderRadius: 1,
-                  bgcolor: selected?.id === vmKey ? 'action.selected' : 'transparent',
+                  bgcolor: selected?.id === vmKey
+                    ? 'action.selected'
+                    : 'transparent',
                   opacity: isMigrating ? 0.5 : 1,
                   '&:hover': { bgcolor: isMigrating ? 'transparent' : 'action.hover' },
                   '&:hover .favorite-star': { opacity: isMigrating ? 0 : 1 }

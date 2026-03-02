@@ -6,6 +6,7 @@ import { checkPermission, PERMISSIONS } from "@/lib/rbac"
 import { resolveManagementIp } from "@/lib/proxmox/resolveManagementIp"
 import { extractHostFromUrl, extractPortFromUrl } from "@/lib/proxmox/urlUtils"
 import { setNodeIps } from "@/lib/cache/nodeIpCache"
+import { prisma } from "@/lib/db/prisma"
 
 export const runtime = "nodejs"
 
@@ -89,6 +90,23 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
     } catch {
       // Invalid baseUrl — skip cache population
     }
+  }
+
+  // Persist node IPs in DB for failover after restart
+  try {
+    await Promise.all(
+      enrichedNodes.map((n: any) => {
+        const nodeName = n.node || n.name
+        if (!nodeName) return Promise.resolve()
+        return prisma.managedHost.upsert({
+          where: { connectionId_node: { connectionId: id, node: nodeName } },
+          update: { ip: n.ip || null },
+          create: { connectionId: id, node: nodeName, ip: n.ip || null },
+        })
+      })
+    )
+  } catch {
+    // Non-blocking — don't break the API response
   }
 
   return NextResponse.json({ data: enrichedNodes, connectedNode })

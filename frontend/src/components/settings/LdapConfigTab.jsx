@@ -12,9 +12,13 @@ import {
   CardContent,
   CircularProgress,
   Divider,
+  FormControl,
   FormControlLabel,
   IconButton,
   InputAdornment,
+  InputLabel,
+  MenuItem,
+  Select,
   Switch,
   TextField,
   Tooltip,
@@ -42,7 +46,12 @@ export default function LdapConfigTab() {
     email_attribute: 'mail',
     name_attribute: 'cn',
     tls_insecure: false,
+    group_attribute: 'memberOf',
+    default_role: 'role_viewer',
   })
+
+  const [groupMappings, setGroupMappings] = useState([])
+  const [availableRoles, setAvailableRoles] = useState([])
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -72,6 +81,16 @@ export default function LdapConfigTab() {
       const data = await res.json()
 
       if (data.data) {
+        // Parse group_role_mapping JSON into array
+        let mappings = []
+        try {
+          const mappingObj = typeof data.data.group_role_mapping === 'string'
+            ? JSON.parse(data.data.group_role_mapping || '{}')
+            : (data.data.group_role_mapping || {})
+          mappings = Object.entries(mappingObj).map(([group, role]) => ({ group, role }))
+        } catch {}
+        setGroupMappings(mappings)
+
         setConfig(prev => ({
           ...prev,
           ...data.data,
@@ -79,6 +98,15 @@ export default function LdapConfigTab() {
         }))
         setHasBindPassword(data.data.hasBindPassword || false)
       }
+
+      // Fetch available RBAC roles
+      try {
+        const rolesRes = await fetch('/api/v1/rbac/roles')
+        if (rolesRes.ok) {
+          const rolesData = await rolesRes.json()
+          setAvailableRoles(rolesData.data || [])
+        }
+      } catch {}
     } catch (e) {
       console.error('Error loading LDAP config:', e)
       setError(t('ldap.loadError'))
@@ -94,10 +122,19 @@ export default function LdapConfigTab() {
     setTestResult(null)
 
     try {
+      // Build group_role_mapping JSON from array
+      const mappingObj = {}
+      for (const m of groupMappings) {
+        if (m.group && m.role) mappingObj[m.group] = m.role
+      }
+
       const res = await fetch('/api/v1/auth/ldap', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(config),
+        body: JSON.stringify({
+          ...config,
+          group_role_mapping: JSON.stringify(mappingObj),
+        }),
       })
 
       const data = await res.json()
@@ -266,17 +303,18 @@ export default function LdapConfigTab() {
             helperText={t('ldap.baseDnHelper')}
           />
 
-          <FormControlLabel
-            control={
-              <Switch
-                checked={config.tls_insecure}
-                onChange={e => setConfig({ ...config, tls_insecure: e.target.checked })}
-                disabled={!config.enabled}
-              />
-            }
-            label={t('ldap.tlsInsecure')}
-            sx={{ mt: 2 }}
-          />
+          <Box sx={{ display: 'flex', flexDirection: 'column', mt: 2, gap: 0.5 }}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={config.tls_insecure}
+                  onChange={e => setConfig({ ...config, tls_insecure: e.target.checked })}
+                  disabled={!config.enabled}
+                />
+              }
+              label={t('ldap.tlsInsecure')}
+            />
+          </Box>
         </CardContent>
       </Card>
 
@@ -323,6 +361,106 @@ export default function LdapConfigTab() {
         </CardContent>
       </Card>
 
+      {/* Group → Role Mapping */}
+      <Card variant='outlined'>
+        <CardContent>
+          <Typography variant='subtitle1' fontWeight={700} sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <i className='ri-team-line' style={{ color: '#8b5cf6' }} />
+            {t('ldap.groupMappingSection')}
+          </Typography>
+          <Typography variant='body2' sx={{ opacity: 0.6, mb: 2 }}>
+            {t('ldap.groupMappingDesc')}
+          </Typography>
+
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mb: 3 }}>
+            <TextField
+              fullWidth
+              label={t('ldap.groupAttribute')}
+              value={config.group_attribute}
+              onChange={e => setConfig({ ...config, group_attribute: e.target.value })}
+              placeholder='memberOf'
+              disabled={!config.enabled}
+              helperText={t('ldap.groupAttributeHelper')}
+            />
+
+            <FormControl fullWidth disabled={!config.enabled}>
+              <InputLabel>{t('ldap.defaultRole')}</InputLabel>
+              <Select
+                value={config.default_role}
+                onChange={e => setConfig({ ...config, default_role: e.target.value })}
+                label={t('ldap.defaultRole')}
+              >
+                {availableRoles.map(role => (
+                  <MenuItem key={role.id} value={role.id}>{role.name}</MenuItem>
+                ))}
+              </Select>
+              <Typography variant='caption' sx={{ mt: 0.5, ml: 1.5, opacity: 0.6 }}>
+                {t('ldap.defaultRoleHelper')}
+              </Typography>
+            </FormControl>
+          </Box>
+
+          <Divider sx={{ mb: 2 }} />
+
+          <Typography variant='body2' fontWeight={600} sx={{ mb: 1.5 }}>
+            {t('ldap.groupMapping')}
+          </Typography>
+
+          {groupMappings.map((mapping, index) => (
+            <Box key={index} sx={{ display: 'flex', gap: 1.5, mb: 1.5, alignItems: 'center' }}>
+              <TextField
+                size='small'
+                label={t('ldap.groupName')}
+                value={mapping.group}
+                onChange={e => {
+                  const updated = [...groupMappings]
+                  updated[index] = { ...updated[index], group: e.target.value }
+                  setGroupMappings(updated)
+                }}
+                disabled={!config.enabled}
+                placeholder='CN=Admins,OU=Groups,DC=...'
+                sx={{ flex: 2 }}
+              />
+              <FormControl size='small' sx={{ flex: 1 }} disabled={!config.enabled}>
+                <InputLabel>{t('ldap.role')}</InputLabel>
+                <Select
+                  value={mapping.role}
+                  onChange={e => {
+                    const updated = [...groupMappings]
+                    updated[index] = { ...updated[index], role: e.target.value }
+                    setGroupMappings(updated)
+                  }}
+                  label={t('ldap.role')}
+                >
+                  {availableRoles.map(role => (
+                    <MenuItem key={role.id} value={role.id}>{role.name}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <IconButton
+                size='small'
+                color='error'
+                disabled={!config.enabled}
+                onClick={() => setGroupMappings(groupMappings.filter((_, i) => i !== index))}
+              >
+                <i className='ri-delete-bin-line' />
+              </IconButton>
+            </Box>
+          ))}
+
+          <Button
+            size='small'
+            variant='outlined'
+            startIcon={<i className='ri-add-line' />}
+            disabled={!config.enabled}
+            onClick={() => setGroupMappings([...groupMappings, { group: '', role: 'role_viewer' }])}
+            sx={{ mt: 1 }}
+          >
+            {t('ldap.addMapping')}
+          </Button>
+        </CardContent>
+      </Card>
+
       {/* Aide Active Directory */}
       <Card variant='outlined' sx={{ bgcolor: 'action.hover' }}>
         <CardContent>
@@ -364,6 +502,11 @@ export default function LdapConfigTab() {
             <li>
               <Typography variant='body2'>
                 <strong>Attribut nom :</strong> <code>displayName</code>
+              </Typography>
+            </li>
+            <li>
+              <Typography variant='body2'>
+                <strong>Group Attribute :</strong> <code>memberOf</code>
               </Typography>
             </li>
           </Box>

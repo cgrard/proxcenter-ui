@@ -74,8 +74,8 @@ export async function PUT(
       params.append('affinity', body.affinity)
     }
     
-    if (body.state !== undefined) {
-      params.append('state', body.state)
+    if (body.disable !== undefined) {
+      params.append('disable', body.disable ? '1' : '0')
     }
 
     if (body.comment !== undefined) {

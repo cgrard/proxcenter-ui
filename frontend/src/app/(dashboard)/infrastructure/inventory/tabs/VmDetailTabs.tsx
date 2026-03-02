@@ -62,7 +62,7 @@ const EditScsiControllerDialog = dynamic(() => import('@/components/HardwareModa
 import type { InventorySelection, DetailsPayload, RrdTimeframe, SeriesPoint, Status } from '../types'
 import { formatBps, formatTime, formatUptime, parseMarkdown, parseNodeId, parseVmId, cpuPct, pct, buildSeriesFromRrd, fetchRrd, tagColor } from '../helpers'
 import { AreaPctChart, AreaBpsChart2 } from '../components/RrdCharts'
-import VCenterSummary from '../components/VCenterSummary'
+import InventorySummary from '../components/InventorySummary'
 import { SaveIcon, AddIcon, CloseIcon } from '../components/IconWrappers'
 
 export default function VmDetailTabs(props: any) {

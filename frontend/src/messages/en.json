@@ -1461,6 +1461,8 @@
     "cephHeader": "Ceph",
     "detectCeph": "Re-detect Ceph",
     "sshHeader": "SSH",
+    "nodesHeader": "Nodes",
+    "noIp": "IP not resolved",
     "proxmoxVe": "Proxmox VE",
     "proxmoxBackupServer": "Proxmox Backup Server",
     "activationFailed": "Activation failed",
@@ -1664,52 +1666,76 @@
       "operations": "Operations"
     },
     "permDesc": {
-      "vm.view": "View VMs and their details",
-      "vm.console": "Access VNC/SPICE console",
-      "vm.start": "Start a VM",
-      "vm.stop": "Stop a VM",
-      "vm.restart": "Restart a VM",
-      "vm.suspend": "Suspend/Resume a VM",
-      "vm.snapshot": "Create/Delete snapshots",
-      "vm.backup": "Backup/Restore a VM",
-      "vm.clone": "Clone a VM",
-      "vm.migrate": "Migrate a VM",
-      "vm.config": "Modify VM configuration",
-      "vm.delete": "Delete a VM",
-      "vm.create": "Create a new VM",
-      "storage.view": "View storages",
-      "storage.content": "Browse storage content",
-      "storage.upload": "Upload ISO files/templates",
-      "storage.delete": "Delete files",
-      "storage.admin": "Access Storage Overview and Ceph pages",
-      "node.view": "View cluster nodes",
-      "node.console": "Access node console",
-      "node.services": "Manage services",
-      "node.network": "Configure network",
-      "node.manage": "Manage nodes (updates, restart)",
-      "connection.view": "View PVE/PBS connections",
-      "connection.manage": "Manage connections",
-      "backup.view": "View backups",
-      "backup.restore": "Restore a backup",
-      "backup.delete": "Delete a backup",
-      "backup.job.view": "View scheduled backup jobs",
-      "backup.job.create": "Create a backup job",
-      "backup.job.edit": "Edit a backup job",
-      "backup.job.delete": "Delete a backup job",
-      "backup.job.run": "Manually run a backup job",
-      "automation.view": "View automation and DRS settings",
-      "automation.manage": "Configure automation and DRS",
-      "automation.execute": "Execute automation actions",
-      "events.view": "View events and logs",
-      "alerts.view": "View alerts",
-      "alerts.manage": "Manage alerts (acknowledge, resolve)",
-      "tasks.view": "View task center",
-      "reports.view": "View reports",
-      "admin.users": "Manage users",
-      "admin.rbac": "Manage roles and permissions",
-      "admin.settings": "Modify settings",
-      "admin.audit": "View audit logs",
-      "admin.compliance": "Manage compliance and security policies"
+      "vm": {
+        "view": "View VMs and their details",
+        "console": "Access VNC/SPICE console",
+        "start": "Start a VM",
+        "stop": "Stop a VM",
+        "restart": "Restart a VM",
+        "suspend": "Suspend/Resume a VM",
+        "snapshot": "Create/Delete snapshots",
+        "backup": "Backup/Restore a VM",
+        "clone": "Clone a VM",
+        "migrate": "Migrate a VM",
+        "config": "Modify VM configuration",
+        "delete": "Delete a VM",
+        "create": "Create a new VM"
+      },
+      "storage": {
+        "view": "View storages",
+        "content": "Browse storage content",
+        "upload": "Upload ISO files/templates",
+        "delete": "Delete files",
+        "admin": "Access Storage Overview and Ceph pages"
+      },
+      "node": {
+        "view": "View cluster nodes",
+        "console": "Access node console",
+        "services": "Manage services",
+        "network": "Configure network",
+        "manage": "Manage nodes (updates, restart)"
+      },
+      "connection": {
+        "view": "View PVE/PBS connections",
+        "manage": "Manage connections"
+      },
+      "backup": {
+        "view": "View backups",
+        "restore": "Restore a backup",
+        "delete": "Delete a backup",
+        "job": {
+          "view": "View scheduled backup jobs",
+          "create": "Create a backup job",
+          "edit": "Edit a backup job",
+          "delete": "Delete a backup job",
+          "run": "Manually run a backup job"
+        }
+      },
+      "automation": {
+        "view": "View automation and DRS settings",
+        "manage": "Configure automation and DRS",
+        "execute": "Execute automation actions"
+      },
+      "events": {
+        "view": "View events and logs"
+      },
+      "alerts": {
+        "view": "View alerts",
+        "manage": "Manage alerts (acknowledge, resolve)"
+      },
+      "tasks": {
+        "view": "View task center"
+      },
+      "reports": {
+        "view": "View reports"
+      },
+      "admin": {
+        "users": "Manage users",
+        "rbac": "Manage roles and permissions",
+        "settings": "Modify settings",
+        "audit": "View audit logs",
+        "compliance": "Manage compliance and security policies"
+      }
     },
     "roles": {
       "role_super_admin": "Super Admin",
@@ -1965,6 +1991,7 @@
       "start": "Start",
       "end": "End",
       "node": "Node",
+      "target": "Target",
       "user": "User",
       "description": "Description",
       "status": "Status"
@@ -2954,7 +2981,17 @@
     "save": "Save",
     "testing": "Testing...",
     "testConnection": "Test connection",
-    "reset": "Reset"
+    "reset": "Reset",
+    "groupMappingSection": "Group → Role Mapping",
+    "groupAttribute": "Group attribute",
+    "groupAttributeHelper": "LDAP attribute containing group memberships (e.g. memberOf)",
+    "defaultRole": "Default role",
+    "defaultRoleHelper": "Role assigned when no group mapping matches",
+    "groupMapping": "Group mappings",
+    "groupMappingDesc": "Map LDAP groups to RBAC roles. At each login, the user's global role is synchronized from their LDAP groups.",
+    "groupName": "LDAP group (DN or CN)",
+    "role": "RBAC Role",
+    "addMapping": "Add mapping"
   },
   "oidc": {
     "description": "Configure OIDC/SSO authentication to allow users to sign in with their corporate identity provider (Keycloak, Azure AD, Okta, Google, Auth0, etc.).",
@@ -3786,8 +3823,7 @@
       "neumorphism": "Soft shadows and embossed effect",
       "cyberpunk": "Neons, contrasts and futuristic style",
       "minimal": "Ultra clean, thin borders, no shadows",
-      "corporate": "Professional vCenter-inspired style",
-      "vcenter": "VMware vSphere Client style",
+      "corporate": "Professional enterprise style",
       "terminal": "Console/hacker monospace style",
       "rounded": "Very rounded corners, friendly style",
       "proxmoxClassic": "Native Proxmox VE interface",
@@ -3827,7 +3863,7 @@
       "dracula": "Dracula palette",
       "ocean": "Ocean depths",
       "sunset": "Sunset",
-      "enterprise": "Professional vCenter style",
+      "enterprise": "Professional enterprise style",
       "matrix": "Green code on black",
       "minimalDark": "Elegant black",
       "minimalLight": "Clean white",
@@ -3855,7 +3891,6 @@
       "particlesDesc": "Network/nodes effect"
     },
     "tags": {
-      "vmware": "VMware",
       "enterprise": "Enterprise",
       "official": "Official",
       "familiar": "Familiar",

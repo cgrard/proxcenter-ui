@@ -13,9 +13,9 @@
 const globalThemesConfig = [
   {
     id: 'default',
-    name: 'Default',
+    name: 'ProxCenter',
     descriptionKey: 'themes.global.default',
-    icon: 'ri-layout-4-line',
+    icon: 'proxcenter-logo',
     category: 'standard',
     preview: {
       cardBg: 'linear-gradient(135deg, #1e1e2d 0%, #252536 100%)',
@@ -85,12 +85,28 @@ const globalThemesConfig = [
       dark: {
         '--glass-bg': 'rgba(30, 30, 45, 0.75)',
         '--glass-border': 'rgba(255, 255, 255, 0.08)',
-        '--glass-shadow': '0 8px 32px 0 rgba(0, 0, 0, 0.37)'
+        '--glass-shadow': '0 8px 32px 0 rgba(0, 0, 0, 0.37)',
+        '--glass-body': '#0f0f1a',
+        '--glass-card': 'rgba(30,30,45,0.7)',
+        '--glass-surface': 'rgba(30,30,45,0.6)',
+        '--glass-dialog': 'rgba(30,30,45,0.85)',
+        '--glass-text': '#e0e0e0',
+        '--glass-text-secondary': '#999999',
+        '--glass-accent': '#06B6D4',
+        '--glass-hover': 'rgba(6,182,212,0.08)'
       },
       light: {
         '--glass-bg': 'rgba(255, 255, 255, 0.7)',
         '--glass-border': 'rgba(0, 0, 0, 0.08)',
-        '--glass-shadow': '0 8px 32px 0 rgba(0, 0, 0, 0.1)'
+        '--glass-shadow': '0 8px 32px 0 rgba(0, 0, 0, 0.1)',
+        '--glass-body': '#f0f4f8',
+        '--glass-card': 'rgba(255,255,255,0.7)',
+        '--glass-surface': 'rgba(255,255,255,0.5)',
+        '--glass-dialog': 'rgba(255,255,255,0.85)',
+        '--glass-text': '#1a1a2e',
+        '--glass-text-secondary': '#555555',
+        '--glass-accent': '#0891B2',
+        '--glass-hover': 'rgba(6,182,212,0.06)'
       }
     }
   },
@@ -130,13 +146,41 @@ const globalThemesConfig = [
         '--neu-shadow-dark': 'rgba(0,0,0,0.4)',
         '--neu-shadow-light': 'rgba(255,255,255,0.03)',
         '--neu-inset-dark': 'rgba(0,0,0,0.2)',
-        '--neu-inset-light': 'rgba(255,255,255,0.02)'
+        '--neu-inset-light': 'rgba(255,255,255,0.02)',
+        '--neu-bg': '#1e1e2d',
+        '--neu-surface': '#1e1e2d',
+        '--neu-surface-alt': '#1a1a28',
+        '--neu-border': '#2a2a3d',
+        '--neu-text': '#d0d0d0',
+        '--neu-text-secondary': '#888888',
+        '--neu-accent': '#8B5CF6',
+        '--neu-accent-hover': '#7c3aed',
+        '--neu-hover': '#252538',
+        '--neu-card-shadow': '6px 6px 12px rgba(0,0,0,0.4), -6px -6px 12px rgba(255,255,255,0.03)',
+        '--neu-input-shadow': 'inset 3px 3px 6px rgba(0,0,0,0.3), inset -3px -3px 6px rgba(255,255,255,0.02)',
+        '--neu-button-shadow': '4px 4px 8px rgba(0,0,0,0.4), -4px -4px 8px rgba(255,255,255,0.03)',
+        '--neu-dialog-shadow': '8px 8px 16px rgba(0,0,0,0.4), -8px -8px 16px rgba(255,255,255,0.03)',
+        '--neu-chip-shadow': '2px 2px 4px rgba(0,0,0,0.3), -2px -2px 4px rgba(255,255,255,0.02)'
       },
       light: {
         '--neu-shadow-dark': 'rgba(0,0,0,0.15)',
         '--neu-shadow-light': 'rgba(255,255,255,0.8)',
         '--neu-inset-dark': 'rgba(0,0,0,0.1)',
-        '--neu-inset-light': 'rgba(255,255,255,0.7)'
+        '--neu-inset-light': 'rgba(255,255,255,0.7)',
+        '--neu-bg': '#e0e5ec',
+        '--neu-surface': '#e0e5ec',
+        '--neu-surface-alt': '#d5dae1',
+        '--neu-border': '#c8cdd4',
+        '--neu-text': '#2d3436',
+        '--neu-text-secondary': '#636e72',
+        '--neu-accent': '#7c3aed',
+        '--neu-accent-hover': '#6d28d9',
+        '--neu-hover': '#d8dde4',
+        '--neu-card-shadow': '6px 6px 12px rgba(0,0,0,0.15), -6px -6px 12px rgba(255,255,255,0.8)',
+        '--neu-input-shadow': 'inset 3px 3px 6px rgba(0,0,0,0.1), inset -3px -3px 6px rgba(255,255,255,0.7)',
+        '--neu-button-shadow': '4px 4px 8px rgba(0,0,0,0.15), -4px -4px 8px rgba(255,255,255,0.8)',
+        '--neu-dialog-shadow': '8px 8px 16px rgba(0,0,0,0.15), -8px -8px 16px rgba(255,255,255,0.8)',
+        '--neu-chip-shadow': '2px 2px 4px rgba(0,0,0,0.1), -2px -2px 4px rgba(255,255,255,0.7)'
       }
     }
   },
@@ -216,6 +260,30 @@ const globalThemesConfig = [
       },
       density: 'compact',
       transitions: 'subtle'
+    },
+    cssOverrides: {
+      dark: {
+        '--min-bg': '#121212',
+        '--min-surface': '#1e1e1e',
+        '--min-surface-alt': '#1a1a1a',
+        '--min-border': '#333333',
+        '--min-text': '#e0e0e0',
+        '--min-text-secondary': '#999999',
+        '--min-accent': '#64748B',
+        '--min-accent-hover': '#475569',
+        '--min-hover': '#252525'
+      },
+      light: {
+        '--min-bg': '#fafafa',
+        '--min-surface': '#ffffff',
+        '--min-surface-alt': '#fafafa',
+        '--min-border': '#e5e5e5',
+        '--min-text': '#333333',
+        '--min-text-secondary': '#888888',
+        '--min-accent': '#64748B',
+        '--min-accent-hover': '#475569',
+        '--min-hover': '#f5f5f5'
+      }
     }
   },
   {
@@ -246,109 +314,41 @@ const globalThemesConfig = [
       },
       density: 'comfortable',
       transitions: 'subtle'
-    }
-  },
-
-  // vCenter - VMware vSphere Client style
-  {
-    id: 'vcenter',
-    name: 'vCenter',
-    descriptionKey: 'themes.global.vcenter',
-    icon: 'ri-cloud-line',
-    category: 'standard',
-    tagKeys: ['themes.tags.vmware', 'themes.tags.enterprise'],
-    preferredLayout: 'horizontal',
-    preview: {
-      cardBg: 'linear-gradient(180deg, #1e1e2d 0%, #14142a 100%)',
-      accent: '#0079b8'
-    },
-    styles: {
-      card: {
-        borderRadius: 3,
-        boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
-        backdropFilter: 'none',
-        background: 'var(--mui-palette-background-paper)',
-        border: '1px solid var(--mui-palette-divider)'
-      },
-      button: {
-        borderRadius: 3,
-        textTransform: 'none',
-        fontWeight: 500,
-        letterSpacing: '0.01em'
-      },
-      input: {
-        borderRadius: 3
-      },
-      density: 'compact',
-      transitions: 'subtle'
-    },
-
-    // VMware font - Clarity City / Metropolis style
-    fontOverride: {
-      body: '"Clarity City", "Segoe UI", -apple-system, BlinkMacSystemFont, "Roboto", sans-serif',
-      heading: '"Clarity City", "Segoe UI", -apple-system, BlinkMacSystemFont, "Roboto", sans-serif'
-    },
-    palette: {
-      // VMware brand colors (exact)
-      primary: '#0079b8',
-      primaryDark: '#005d91',
-      primaryLight: '#49afd9',
-
-      // Navigation — vSphere Client 8 charcoal header
-      navBg: '#1e1e2d',
-      navBgDark: '#14142a',
-      navText: '#ffffff',
-      navHover: '#3a3a52',
-
-      // Status colors (VMware style)
-      success: '#62a420',
-      warning: '#efc006',
-      error: '#c92100',
-      info: '#0079b8'
     },
     cssOverrides: {
       dark: {
-        // Header — vSphere Client 8 charcoal/indigo
-        '--vcenter-header-bg': '#1e1e2d',
-        '--vcenter-nav-bg': '#14142a',
-        '--vcenter-nav-hover': '#3a3a52',
-        '--vcenter-nav-active': '#0079b8',
-        '--vcenter-nav-border': '#333348',
-
-        // Content
-        '--vcenter-content-bg': '#14142a',
-        '--vcenter-card-bg': '#1e1e2d',
-        '--vcenter-card-border': '#333348',
-
-        // Accent
-        '--vcenter-accent': '#0079b8',
-        '--vcenter-accent-hover': '#49afd9',
-
-        // Text
-        '--vcenter-text-primary': '#fafafa',
-        '--vcenter-text-secondary': '#9a9a9a'
+        '--corp-bg': '#1a202c',
+        '--corp-surface': '#2d3748',
+        '--corp-surface-alt': '#283141',
+        '--corp-border': '#4a5568',
+        '--corp-text': '#e2e8f0',
+        '--corp-text-secondary': '#a0aec0',
+        '--corp-accent': '#3182CE',
+        '--corp-accent-hover': '#2b6cb0',
+        '--corp-hover': '#353f50',
+        '--corp-success': '#68d391',
+        '--corp-error': '#fc8181',
+        '--corp-warning': '#ecc94b',
+        '--corp-info': '#63b3ed'
       },
       light: {
-        // Header stays dark like vCenter
-        '--vcenter-header-bg': '#1e1e2d',
-        '--vcenter-nav-bg': '#14142a',
-        '--vcenter-nav-hover': '#3a3a52',
-        '--vcenter-nav-active': '#0079b8',
-
-        // Content — white like vSphere Client
-        '--vcenter-content-bg': '#ffffff',
-        '--vcenter-card-bg': '#ffffff',
-        '--vcenter-card-border': '#e0e0e0',
-
-        // Accent
-        '--vcenter-accent': '#0079b8',
-
-        // Text
-        '--vcenter-text-primary': '#313131',
-        '--vcenter-text-secondary': '#737373'
+        '--corp-bg': '#f7fafc',
+        '--corp-surface': '#ffffff',
+        '--corp-surface-alt': '#f7fafc',
+        '--corp-border': '#e2e8f0',
+        '--corp-text': '#2d3748',
+        '--corp-text-secondary': '#718096',
+        '--corp-accent': '#3182CE',
+        '--corp-accent-hover': '#2b6cb0',
+        '--corp-hover': '#ebf4ff',
+        '--corp-success': '#276749',
+        '--corp-error': '#c53030',
+        '--corp-warning': '#975a16',
+        '--corp-info': '#2b6cb0'
       }
     }
   },
+
   {
     id: 'terminal',
     name: 'Terminal',
@@ -428,6 +428,38 @@ const globalThemesConfig = [
       },
       density: 'spacious',
       transitions: 'playful'
+    },
+    cssOverrides: {
+      dark: {
+        '--round-bg': '#1a1520',
+        '--round-surface': '#251e2b',
+        '--round-surface-alt': '#201a26',
+        '--round-border': '#3d3345',
+        '--round-text': '#f0e6ff',
+        '--round-text-secondary': '#a090b0',
+        '--round-accent': '#F59E0B',
+        '--round-accent-hover': '#d97706',
+        '--round-hover': '#2d2535',
+        '--round-success': '#34d399',
+        '--round-error': '#f87171',
+        '--round-warning': '#fbbf24',
+        '--round-info': '#60a5fa'
+      },
+      light: {
+        '--round-bg': '#fef8f0',
+        '--round-surface': '#ffffff',
+        '--round-surface-alt': '#fef8f0',
+        '--round-border': '#f0e0d0',
+        '--round-text': '#3d2815',
+        '--round-text-secondary': '#8a6d50',
+        '--round-accent': '#F59E0B',
+        '--round-accent-hover': '#d97706',
+        '--round-hover': '#fef3e0',
+        '--round-success': '#047857',
+        '--round-error': '#dc2626',
+        '--round-warning': '#b45309',
+        '--round-info': '#2563eb'
+      }
     }
   },
 
@@ -531,7 +563,9 @@ const globalThemesConfig = [
         '--hc-link': '#00ffff',
         '--hc-success': '#00ff00',
         '--hc-error': '#ff0000',
-        '--hc-warning': '#ffff00'
+        '--hc-warning': '#ffff00',
+        '--hc-hover': '#1a1a1a',
+        '--hc-surface-alt': '#111111'
       },
       light: {
         '--hc-bg': '#ffffff',
@@ -542,7 +576,9 @@ const globalThemesConfig = [
         '--hc-link': '#0000ff',
         '--hc-success': '#006400',
         '--hc-error': '#8b0000',
-        '--hc-warning': '#8b8b00'
+        '--hc-warning': '#8b8b00',
+        '--hc-hover': '#e0e0e0',
+        '--hc-surface-alt': '#f0f0f0'
       }
     },
     a11yEnhancements: {
@@ -683,7 +719,9 @@ const globalThemesConfig = [
         '--dracula-orange': '#ffb86c',
         '--dracula-red': '#ff5555',
         '--dracula-yellow': '#f1fa8c',
-        '--dracula-glow': '0 0 20px rgba(189, 147, 249, 0.3)'
+        '--dracula-glow': '0 0 20px rgba(189, 147, 249, 0.3)',
+        '--dracula-surface': '#21222c',
+        '--dracula-hover': '#2d2e3a'
       },
       light: {
         '--dracula-bg': '#f8f8f2',
@@ -698,7 +736,9 @@ const globalThemesConfig = [
         '--dracula-orange': '#d19a66',
         '--dracula-red': '#e05252',
         '--dracula-yellow': '#c9c57b',
-        '--dracula-glow': '0 0 20px rgba(157, 121, 210, 0.2)'
+        '--dracula-glow': '0 0 20px rgba(157, 121, 210, 0.2)',
+        '--dracula-surface': '#e8e8e2',
+        '--dracula-hover': '#d8d8d2'
       }
     }
   },
@@ -761,7 +801,8 @@ const globalThemesConfig = [
         '--onedark-yellow': '#e5c07b',
         '--onedark-green': '#98c379',
         '--onedark-cyan': '#56b6c2',
-        '--onedark-purple': '#c678dd'
+        '--onedark-purple': '#c678dd',
+        '--onedark-hover': '#333842'
       },
       light: {
         '--onedark-bg': '#fafafa',
@@ -776,7 +817,8 @@ const globalThemesConfig = [
         '--onedark-yellow': '#986801',
         '--onedark-green': '#50a14f',
         '--onedark-cyan': '#0184bc',
-        '--onedark-purple': '#a626a4'
+        '--onedark-purple': '#a626a4',
+        '--onedark-hover': '#e5e5e5'
       }
     }
   }

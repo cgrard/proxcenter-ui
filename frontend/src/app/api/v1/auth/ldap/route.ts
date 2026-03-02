@@ -18,7 +18,7 @@ export async function GET() {
 
     const config = db
       .prepare(
-        `SELECT id, enabled, url, bind_dn, bind_password_enc, base_dn, user_filter, email_attribute, name_attribute, tls_insecure, created_at, updated_at
+        `SELECT id, enabled, url, bind_dn, bind_password_enc, base_dn, user_filter, email_attribute, name_attribute, tls_insecure, group_attribute, group_role_mapping, default_role, created_at, updated_at
          FROM ldap_config WHERE id = 'default'`
       )
       .get() as any
@@ -34,6 +34,9 @@ export async function GET() {
           email_attribute: "mail",
           name_attribute: "cn",
           tls_insecure: false,
+          group_attribute: "memberOf",
+          group_role_mapping: "{}",
+          default_role: "role_viewer",
         },
       })
     }
@@ -49,6 +52,9 @@ export async function GET() {
         name_attribute: config.name_attribute,
         tls_insecure: config.tls_insecure === 1,
         hasBindPassword: !!config.bind_password_enc,
+        group_attribute: config.group_attribute || "memberOf",
+        group_role_mapping: config.group_role_mapping || "{}",
+        default_role: config.default_role || "role_viewer",
       },
     })
   } catch (error: any) {
@@ -77,6 +83,9 @@ export async function PUT(req: Request) {
       email_attribute,
       name_attribute,
       tls_insecure,
+      group_attribute,
+      group_role_mapping,
+      default_role,
     } = body
 
     // Validation
@@ -114,6 +123,9 @@ export async function PUT(req: Request) {
         "email_attribute = ?",
         "name_attribute = ?",
         "tls_insecure = ?",
+        "group_attribute = ?",
+        "group_role_mapping = ?",
+        "default_role = ?",
         "updated_at = ?",
       ]
 
@@ -126,6 +138,9 @@ export async function PUT(req: Request) {
         email_attribute || "mail",
         name_attribute || "cn",
         tls_insecure ? 1 : 0,
+        group_attribute || "memberOf",
+        group_role_mapping || "{}",
+        default_role || "role_viewer",
         now,
       ]
 
@@ -140,8 +155,8 @@ export async function PUT(req: Request) {
     } else {
       // Création
       db.prepare(
-        `INSERT INTO ldap_config (id, enabled, url, bind_dn, bind_password_enc, base_dn, user_filter, email_attribute, name_attribute, tls_insecure, created_at, updated_at)
-         VALUES ('default', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO ldap_config (id, enabled, url, bind_dn, bind_password_enc, base_dn, user_filter, email_attribute, name_attribute, tls_insecure, group_attribute, group_role_mapping, default_role, created_at, updated_at)
+         VALUES ('default', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         enabled ? 1 : 0,
         url || "",
@@ -152,6 +167,9 @@ export async function PUT(req: Request) {
         email_attribute || "mail",
         name_attribute || "cn",
         tls_insecure ? 1 : 0,
+        group_attribute || "memberOf",
+        group_role_mapping || "{}",
+        default_role || "role_viewer",
         now,
         now
       )

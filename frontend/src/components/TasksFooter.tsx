@@ -36,6 +36,8 @@ interface TaskEvent {
   node: string
   user: string
   description: string
+  entity: string | null
+  entityName: string | null
   connectionId: string
   connectionName: string
 }
@@ -164,6 +166,8 @@ export default function TasksFooter({
     node: e.node,
     user: e.user,
     description: e.typeLabel || e.message,
+    entity: e.entity || null,
+    entityName: e.entityName || null,
     connectionId: e.connectionId,
     connectionName: e.connectionName
   }))
@@ -270,12 +274,31 @@ export default function TasksFooter({
     {
       field: 'node',
       headerName: t('tasks.columns.node'),
-      width: 140,
+      width: 120,
       renderCell: (params) => (
         <Typography variant="caption" noWrap title={params.value}>
           {params.value}
         </Typography>
       )
+    },
+    {
+      field: 'entity',
+      headerName: t('tasks.columns.target'),
+      width: 150,
+      renderCell: (params) => {
+        const name = params.row.entityName
+        const vmid = params.value
+
+        if (!vmid || vmid === params.row.node) return <Typography variant="caption" sx={{ opacity: 0.3 }}>—</Typography>
+
+        return (
+          <Typography variant="caption" noWrap title={name ? `${name} (${vmid})` : vmid}>
+            {name ? (
+              <>{name} <span style={{ opacity: 0.5 }}>({vmid})</span></>
+            ) : vmid}
+          </Typography>
+        )
+      }
     },
     {
       field: 'user',
@@ -591,6 +614,9 @@ return ''
             status: selectedTask.status,
             node: selectedTask.node,
             user: selectedTask.user,
+            entity: selectedTask.entityName
+              ? `${selectedTask.entityName} (${selectedTask.entity})`
+              : selectedTask.entity,
             startTime: selectedTask.startTime,
             endTime: selectedTask.endTime,
             duration: selectedTask.duration,

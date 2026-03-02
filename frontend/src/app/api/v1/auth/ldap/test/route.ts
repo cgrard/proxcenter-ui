@@ -2,6 +2,8 @@
 import { NextResponse } from "next/server"
 
 import { checkPermission, PERMISSIONS } from "@/lib/rbac"
+import { getDb } from "@/lib/db/sqlite"
+import { decryptSecret } from "@/lib/crypto/secret"
 
 export const runtime = "nodejs"
 
@@ -23,7 +25,7 @@ export async function POST(req: Request) {
 
     const body = await req.json()
 
-    const {
+    let {
       url,
       bind_dn,
       bind_password,
@@ -34,10 +36,23 @@ export async function POST(req: Request) {
 
     // Validation basique
     if (!url) {
-      return NextResponse.json({ 
-        success: false, 
-        error: "URL LDAP requise" 
+      return NextResponse.json({
+        success: false,
+        error: "URL LDAP requise"
       }, { status: 400 })
+    }
+
+    // If bind_password is empty but a saved password exists in DB, use it
+    if (bind_dn && !bind_password) {
+      try {
+        const db = getDb()
+        const config = db
+          .prepare("SELECT bind_password_enc FROM ldap_config WHERE id = 'default'")
+          .get() as any
+        if (config?.bind_password_enc) {
+          bind_password = decryptSecret(config.bind_password_enc)
+        }
+      } catch {}
     }
 
     // Toujours utiliser l'orchestrator pour le test LDAP

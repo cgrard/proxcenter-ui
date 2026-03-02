@@ -7,7 +7,7 @@ import { nanoid } from "nanoid"
 
 import { getDb } from "@/lib/db/sqlite"
 import { verifyPassword, hashPassword } from "./password"
-import { authenticateLdap, isLdapEnabled } from "./ldap"
+import { authenticateLdap, isLdapEnabled, getLdapConfig, resolveLdapRole } from "./ldap"
 import { getOidcConfig, resolveOidcRole } from "./oidc"
 
 export type UserRole = "super_admin" | "admin" | "operator" | "viewer"
@@ -205,6 +205,21 @@ export const authOptions: NextAuthOptions = {
           db.prepare(
             "UPDATE users SET name = ?, avatar = ?, ldap_dn = ?, last_login_at = ?, updated_at = ? WHERE id = ?"
           ).run(ldapUser.name, ldapUser.avatar, ldapUser.dn, now, now, user.id)
+        }
+
+        // Sync RBAC role from LDAP groups
+        const ldapConfig = getLdapConfig()
+        if (ldapConfig) {
+          const resolvedRoleId = resolveLdapRole(ldapUser.groups, ldapConfig)
+          const roleExists = db.prepare("SELECT id FROM rbac_roles WHERE id = ?").get(resolvedRoleId)
+          const finalRoleId = roleExists ? resolvedRoleId : 'role_viewer'
+
+          // Replace only the global scope assignment
+          db.prepare("DELETE FROM rbac_user_roles WHERE user_id = ? AND scope_type = 'global'").run(user.id)
+          db.prepare(
+            `INSERT INTO rbac_user_roles (id, user_id, role_id, scope_type, granted_by, granted_at)
+             VALUES (?, ?, ?, 'global', NULL, ?)`
+          ).run(`ldap_${nanoid(12)}`, user.id, finalRoleId, now)
         }
 
         return {

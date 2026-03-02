@@ -54,6 +54,10 @@ export async function GET(req: Request) {
         sshPassEnc: true,
         createdAt: true,
         updatedAt: true,
+        hosts: {
+          select: { id: true, node: true, ip: true, enabled: true },
+          orderBy: { node: 'asc' },
+        },
       },
     })
 

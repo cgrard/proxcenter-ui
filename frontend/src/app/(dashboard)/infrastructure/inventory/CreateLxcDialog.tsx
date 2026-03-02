@@ -56,6 +56,7 @@ function CreateLxcDialog({
   const [nodes, setNodes] = useState<any[]>([])
   const [storages, setStorages] = useState<any[]>([])
   const [templates, setTemplates] = useState<any[]>([])
+  const [pools, setPools] = useState<any[]>([])
   const [loadingData, setLoadingData] = useState(false)
   
   // Formulaire - Général
@@ -299,6 +300,30 @@ return
       loadStorages(selectedConnection)
     }
   }, [selectedConnection, selectedNode])
+
+  // Charger les pools de ressources quand la connexion change
+  useEffect(() => {
+    if (!open || !selectedConnection) {
+      setPools([])
+      return
+    }
+
+    const loadPools = async () => {
+      try {
+        const res = await fetch(`/api/v1/connections/${encodeURIComponent(selectedConnection)}/pools`)
+        const json = await res.json()
+
+        if (json.data && Array.isArray(json.data)) {
+          setPools(json.data.map((p: any) => ({ poolid: p.poolid, comment: p.comment })))
+        }
+      } catch (e) {
+        console.error('Error loading pools:', e)
+        setPools([])
+      }
+    }
+
+    loadPools()
+  }, [open, selectedConnection])
 
   // Quand on sélectionne un node ou cluster
   const handleNodeChange = (value: string) => {
@@ -559,6 +584,21 @@ return
               <InputLabel>{t('inventory.createLxc.resourcePool')}</InputLabel>
               <Select value={resourcePool} onChange={(e) => setResourcePool(e.target.value)} label={t('inventory.createLxc.resourcePool')}>
                 <MenuItem value="">({t('common.none')})</MenuItem>
+                {pools.map((p) => (
+                  <MenuItem key={p.poolid} value={p.poolid}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <i className="ri-folder-line" style={{ fontSize: 14, opacity: 0.7 }} />
+                      <Box>
+                        <Typography variant="body2">{p.poolid}</Typography>
+                        {p.comment && (
+                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', fontSize: '0.65rem' }}>
+                            {p.comment}
+                          </Typography>
+                        )}
+                      </Box>
+                    </Box>
+                  </MenuItem>
+                ))}
               </Select>
             </FormControl>
             

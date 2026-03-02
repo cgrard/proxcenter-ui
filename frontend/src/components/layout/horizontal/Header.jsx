@@ -11,7 +11,6 @@ import NavbarContent from './NavbarContent'
 import BurgerMenu from './BurgerMenu'
 import Navbar from '@layouts/components/horizontal/Navbar'
 import LayoutHeader from '@layouts/components/horizontal/Header'
-import VCenterHeader from '@components/layout/vcenter/VCenterHeader'
 import { LogoIcon } from '@components/layout/shared/Logo'
 
 // Hook Imports
@@ -74,11 +73,6 @@ const Header = () => {
     if (isDark) return undefined
     return buildDarkOverrideCSS(theme)
   }, [isDark, theme])
-
-  // vCenter theme: render dedicated header instead of standard horizontal layout
-  if (settings.globalTheme === 'vcenter') {
-    return <VCenterHeader />
-  }
 
   const accentColor = theme.palette.primary.main
 

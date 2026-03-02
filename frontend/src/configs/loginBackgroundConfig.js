@@ -248,7 +248,6 @@ export const themeToBackgroundMap = {
   cyberpunk: 'cyberpunk',
   minimal: 'minimal-dark',
   corporate: 'enterprise',
-  vcenter: 'enterprise',
   terminal: 'terminal',
   nord: 'nord',
   dracula: 'dracula',

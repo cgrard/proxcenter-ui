@@ -35,7 +35,7 @@ import ConsolePreview from './ConsolePreview'
 import StatusChip from './StatusChip'
 import NodeUpdateDialog from '@/components/NodeUpdateDialog'
 
-function VCenterSummary({
+function InventorySummary({
   kindLabel,
   status,
   subtitle,
@@ -84,7 +84,7 @@ function VCenterSummary({
   const theme = useTheme()
   const primaryColor = theme.palette.primary.main
   const primaryColorLight = lighten(primaryColor, 0.3)
-  
+
   const state = (vmState || '').toLowerCase()
 
   const stateColor =
@@ -99,7 +99,7 @@ function VCenterSummary({
   const swapCap = metrics?.swap?.max ?? 0
 
   const consoleWidth = { xs: '100%', md: 360 }
-  
+
   // État pour les blocs collapsibles dans la vue host
   const [hostBlocksCollapsed, setHostBlocksCollapsed] = useState<{
     updates: boolean
@@ -118,7 +118,7 @@ function VCenterSummary({
   const handleCheckSubscription = async () => {
     if (!connId || !nodeName) return
     setCheckingSubscription(true)
-    
+
     try {
       // Appel API pour rafraîchir la subscription
       await fetch(`/api/v1/connections/${encodeURIComponent(connId)}/nodes/${encodeURIComponent(nodeName)}/subscription`, {
@@ -132,7 +132,7 @@ function VCenterSummary({
       setCheckingSubscription(false)
     }
   }
-  
+
   // Formater l'uptime
   const formatUptime = (secs?: number) => {
     if (!secs) return null
@@ -142,7 +142,7 @@ function VCenterSummary({
 
     if (days > 0) return `${days}d ${hours}h ${mins}m`
     if (hours > 0) return `${hours}h ${mins}m`
-    
+
 return `${mins}m`
   }
 
@@ -239,12 +239,12 @@ return `${mins}m`
                   {guestInfoLoading ? (
                     <CircularProgress size={12} />
                   ) : guestInfo?.ip ? (
-                    <Chip 
-                      size="small" 
-                      label={guestInfo.ip} 
-                      sx={{ 
-                        height: 20, 
-                        fontSize: '0.75rem', 
+                    <Chip
+                      size="small"
+                      label={guestInfo.ip}
+                      sx={{
+                        height: 20,
+                        fontSize: '0.75rem',
                         fontFamily: 'monospace',
                         cursor: 'pointer',
                         '&:hover': { bgcolor: 'action.hover' }
@@ -273,8 +273,8 @@ return `${mins}m`
             </Box>
 
             <Box sx={{ width: consoleWidth, flex: '0 0 auto' }}>
-              <ConsolePreview 
-                height={210} 
+              <ConsolePreview
+                height={210}
                 connId={vmInfo?.connId}
                 node={vmInfo?.node}
                 type={vmInfo?.type}
@@ -413,9 +413,9 @@ return `${mins}m`
               >
                 {hostBlocksCollapsed.updates ? (
                   // Mode collapsé vertical - juste une icône cliquable
-                  <Box 
+                  <Box
                     onClick={() => setHostBlocksCollapsed(prev => ({ ...prev, updates: false }))}
-                    sx={{ 
+                    sx={{
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
@@ -427,9 +427,9 @@ return `${mins}m`
                     }}
                   >
                     <i className="ri-download-cloud-line" style={{ fontSize: 20, color: '#ff9800' }} />
-                    <Chip 
-                      size="small" 
-                      label={hostInfo.updates.length} 
+                    <Chip
+                      size="small"
+                      label={hostInfo.updates.length}
                       color="warning"
                       sx={{ height: 18, fontSize: 11, fontWeight: 700, mt: 1 }}
                     />
@@ -438,11 +438,11 @@ return `${mins}m`
                 ) : (
                   // Mode étendu
                   <>
-                    <Box 
+                    <Box
                       onClick={() => setHostBlocksCollapsed(prev => ({ ...prev, updates: true }))}
-                      sx={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
                         justifyContent: 'space-between',
                         p: 1.25,
                         pb: 0.75,
@@ -455,24 +455,24 @@ return `${mins}m`
                         <Typography variant="body2" sx={{ fontWeight: 700, color: 'warning.main' }}>
                           {t('updates.availableUpdates')}
                         </Typography>
-                        <Chip 
-                          size="small" 
-                          label={hostInfo.updates.length} 
+                        <Chip
+                          size="small"
+                          label={hostInfo.updates.length}
                           color="warning"
                           sx={{ height: 18, fontSize: 11, fontWeight: 700 }}
                         />
                       </Box>
                       <i className="ri-arrow-left-s-line" style={{ fontSize: 18, opacity: 0.5 }} />
                     </Box>
-                    
+
                     <Box sx={{ px: 1.25, pb: 1.25 }}>
                       <Box sx={{ maxHeight: 120, overflow: 'auto', mb: 1.5 }}>
                         {hostInfo.updates.slice(0, 5).map((update: any, idx: number) => (
-                          <Box 
-                            key={idx} 
-                            sx={{ 
-                              display: 'flex', 
-                              justifyContent: 'space-between', 
+                          <Box
+                            key={idx}
+                            sx={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
                               alignItems: 'center',
                               py: 0.5,
                               borderBottom: idx < Math.min(hostInfo.updates.length, 5) - 1 ? '1px solid' : 'none',
@@ -495,7 +495,7 @@ return `${mins}m`
                           </Typography>
                         )}
                       </Box>
-                      
+
                       <Stack direction="row" spacing={1}>
                         <Button
                           size="small"
@@ -507,9 +507,9 @@ return `${mins}m`
                         >
                           {t('updates.upgrade')}
                         </Button>
-                        <Button 
-                          size="small" 
-                          variant="outlined" 
+                        <Button
+                          size="small"
+                          variant="outlined"
                           color="warning"
                           startIcon={<i className="ri-file-list-line" />}
                           sx={{ fontSize: '0.7rem' }}
@@ -532,13 +532,13 @@ return `${mins}m`
               const daysUntilDue = nextDueDate ? Math.ceil((nextDueDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null
               const isExpiringSoon = isActive && daysUntilDue !== null && daysUntilDue <= 30 && daysUntilDue > 0
               const isExpired = !isActive || (daysUntilDue !== null && daysUntilDue <= 0)
-              
+
               // Déterminer la couleur selon le statut
               const statusColor = isExpired ? '#f44336' : isExpiringSoon ? '#ff9800' : '#4caf50'
               const statusBgColor = isExpired ? 'rgba(244, 67, 54, 0.05)' : isExpiringSoon ? 'rgba(255, 152, 0, 0.05)' : 'rgba(76, 175, 80, 0.05)'
               const statusHoverBgColor = isExpired ? 'rgba(244, 67, 54, 0.1)' : isExpiringSoon ? 'rgba(255, 152, 0, 0.1)' : 'rgba(76, 175, 80, 0.1)'
               const chipColor = isExpired ? 'error' : isExpiringSoon ? 'warning' : 'success'
-              
+
               return (
               <Box
                 sx={{
@@ -555,9 +555,9 @@ return `${mins}m`
               >
                 {hostBlocksCollapsed.subscription ? (
                   // Mode collapsé vertical - juste une icône cliquable
-                  <Box 
+                  <Box
                     onClick={() => setHostBlocksCollapsed(prev => ({ ...prev, subscription: false }))}
-                    sx={{ 
+                    sx={{
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
@@ -569,8 +569,8 @@ return `${mins}m`
                     }}
                   >
                     <i className="ri-vip-crown-line" style={{ fontSize: 20, color: statusColor }} />
-                    <Chip 
-                      size="small" 
+                    <Chip
+                      size="small"
                       label={isExpired ? '✗' : isExpiringSoon ? '!' : '✓'}
                       color={chipColor}
                       sx={{ height: 18, fontSize: 11, fontWeight: 700, mt: 1 }}
@@ -580,11 +580,11 @@ return `${mins}m`
                 ) : (
                   // Mode étendu
                   <>
-                    <Box 
+                    <Box
                       onClick={() => setHostBlocksCollapsed(prev => ({ ...prev, subscription: true }))}
-                      sx={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
                         justifyContent: 'space-between',
                         p: 1.25,
                         pb: 0.75,
@@ -597,8 +597,8 @@ return `${mins}m`
                         <Typography variant="body2" sx={{ fontWeight: 700, color: statusColor }}>
                           Subscription
                         </Typography>
-                        <Chip 
-                          size="small" 
+                        <Chip
+                          size="small"
                           label={isExpired ? t('subscription.inactive') : isExpiringSoon ? t('subscription.expiringSoon') : t('subscription.active')}
                           color={chipColor}
                           sx={{ height: 18, fontSize: 11, fontWeight: 700 }}
@@ -606,7 +606,7 @@ return `${mins}m`
                       </Box>
                       <i className="ri-arrow-left-s-line" style={{ fontSize: 18, opacity: 0.5 }} />
                     </Box>
-                    
+
                     <Box sx={{ px: 1.25, pb: 1.25 }}>
                       <Stack spacing={1}>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -641,10 +641,10 @@ return `${mins}m`
                           </Box>
                         </Box>
                       </Stack>
-                      
+
                       <Box sx={{ mt: 1.5 }}>
-                        <Button 
-                          size="small" 
+                        <Button
+                          size="small"
                           variant="outlined"
                           fullWidth
                           startIcon={checkingSubscription ? <CircularProgress size={12} /> : <i className="ri-refresh-line" />}
@@ -726,8 +726,8 @@ return `${mins}m`
       )}
 
       {/* Modal Changelog */}
-      <Dialog 
-        open={changelogDialogOpen} 
+      <Dialog
+        open={changelogDialogOpen}
         onClose={() => setChangelogDialogOpen(false)}
         maxWidth="md"
         fullWidth
@@ -740,19 +740,19 @@ return `${mins}m`
           {/* Liste des paquets avec changelog */}
           <Box sx={{ maxHeight: 500, overflow: 'auto' }}>
             {hostInfo?.updates?.map((update: any, idx: number) => (
-              <Accordion 
-                key={idx} 
+              <Accordion
+                key={idx}
                 disableGutters
                 elevation={0}
                 square
-                sx={{ 
+                sx={{
                   '&:before': { display: 'none' },
                   borderBottom: '1px solid',
                   borderColor: 'divider',
                   '&:last-child': { borderBottom: 'none' }
                 }}
               >
-                <AccordionSummary 
+                <AccordionSummary
                   expandIcon={<i className="ri-arrow-down-s-line" />}
                   sx={{ minHeight: 44, '& .MuiAccordionSummary-content': { my: 0 } }}
                 >
@@ -760,8 +760,8 @@ return `${mins}m`
                     <Typography variant="body2" fontWeight={600} sx={{ flex: 1 }}>
                       {update.package}
                     </Typography>
-                    <Chip 
-                      size="small" 
+                    <Chip
+                      size="small"
                       label={`${update.currentVersion || 'null'} → ${update.newVersion}`}
                       sx={{ height: 20, fontSize: 10, fontFamily: 'monospace' }}
                     />
@@ -790,4 +790,4 @@ return `${mins}m`
 
 /* ---------------------- Charts (filled areas) ---------------------- */
 
-export default VCenterSummary
+export default InventorySummary

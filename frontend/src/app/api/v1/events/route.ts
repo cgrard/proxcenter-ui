@@ -163,14 +163,29 @@ export async function GET(req: Request) {
               }
             }
 
+            // Build VMID → name lookup from cluster resources
+            const vmNameMap: Record<string, string> = {}
+            try {
+              const resources = await pveFetch<any[]>(connection, '/cluster/resources?type=vm')
+              if (Array.isArray(resources)) {
+                for (const r of resources) {
+                  if (r.vmid != null && r.name) {
+                    vmNameMap[String(r.vmid)] = r.name
+                  }
+                }
+              }
+            } catch {}
+
             // Traiter les tâches - trier par date décroissante d'abord
             tasks.sort((a, b) => (b.starttime || 0) - (a.starttime || 0))
             const limitedTasks = tasks.slice(0, limit)
 
             for (const task of limitedTasks) {
-              const duration = task.endtime 
-                ? task.endtime - task.starttime 
+              const duration = task.endtime
+                ? task.endtime - task.starttime
                 : Math.floor(Date.now() / 1000) - task.starttime
+
+              const vmName = task.id ? vmNameMap[task.id] || null : null
 
               allEvents.push({
                 id: task.upid,
@@ -181,12 +196,13 @@ export async function GET(req: Request) {
                 type: task.type,
                 typeLabel: formatTaskType(task.type),
                 entity: task.id || task.node,
+                entityName: vmName,
                 node: task.node,
                 user: task.user,
                 status: task.status || 'running',
                 duration: formatUptime(duration),
                 durationSec: duration,
-                message: `${formatTaskType(task.type)}${task.id ? ` (${task.id})` : ''} - ${task.status || 'En cours...'}`,
+                message: `${formatTaskType(task.type)}${task.id ? ` (${vmName || task.id})` : ''} - ${task.status || 'En cours...'}`,
                 connectionId: conn.id,
                 connectionName: conn.name,
                 source: 'proxmox-task'

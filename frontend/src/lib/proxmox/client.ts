@@ -1,8 +1,8 @@
 // src/lib/proxmox/client.ts
 import { Agent, request } from "undici"
 
-import { extractHostFromUrl, replaceHostInUrl } from "./urlUtils"
-import { getNodeIps, getFailoverLock, setFailoverLock } from "../cache/nodeIpCache"
+import { extractHostFromUrl, extractPortFromUrl, replaceHostInUrl } from "./urlUtils"
+import { getNodeIps, setNodeIps, getFailoverLock, setFailoverLock } from "../cache/nodeIpCache"
 import { invalidateConnectionCache } from "../connections/getConnection"
 
 let insecureAgent: Agent | null = null
@@ -128,8 +128,29 @@ export async function pveFetch<T>(
       throw err // other failover also failed
     }
 
-    // Look up cached node IPs
-    const cached = getNodeIps(connId)
+    // Look up cached node IPs, fall back to DB if cache is empty
+    let cached = getNodeIps(connId)
+
+    if (!cached || cached.ips.length === 0) {
+      try {
+        const { prisma } = await import("../db/prisma")
+        const hosts = await prisma.managedHost.findMany({
+          where: { connectionId: connId, enabled: true, ip: { not: null } },
+          select: { ip: true },
+        })
+        const dbIps = hosts.map(h => h.ip!).filter(Boolean)
+
+        if (dbIps.length > 0) {
+          const port = extractPortFromUrl(opts.baseUrl)
+          const protocol = new URL(opts.baseUrl).protocol.replace(":", "")
+          setNodeIps(connId, dbIps, port, protocol)
+          cached = { ips: dbIps, port, protocol }
+        }
+      } catch {
+        // DB unavailable — continue without failover
+      }
+    }
+
     if (!cached || cached.ips.length === 0) throw err
 
     const currentHost = extractHostFromUrl(opts.baseUrl)

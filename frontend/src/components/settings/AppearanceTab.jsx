@@ -29,11 +29,12 @@ import {
 } from '@mui/material'
 
 import { useSettings } from '@core/hooks/useSettings'
-import globalThemesConfig, { 
-  themeCategories, 
-  densityConfig, 
+import { LogoIcon } from '@components/layout/shared/Logo'
+import globalThemesConfig, {
+  themeCategories,
+  densityConfig,
   borderRadiusPresets,
-  getGlobalTheme 
+  getGlobalTheme
 } from '@configs/globalThemesConfig'
 import lightBackgroundConfig from '@configs/lightBackgroundConfig'
 
@@ -92,7 +93,11 @@ function ThemePreviewCard({ themeConfig, selected, onSelect, t }) {
       <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
           <Box sx={{ width: 40, height: 40, borderRadius: 2, backgroundColor: alpha(themeConfig.preview.accent, 0.15), display: 'flex', alignItems: 'center', justifyContent: 'center', color: themeConfig.preview.accent }}>
-            <i className={themeConfig.icon} style={{ fontSize: 20 }} />
+            {themeConfig.icon === 'proxcenter-logo' ? (
+              <LogoIcon size={22} accentColor={themeConfig.preview.accent} />
+            ) : (
+              <i className={themeConfig.icon} style={{ fontSize: 20 }} />
+            )}
           </Box>
           <Box sx={{ flex: 1 }}>
             <Typography variant='subtitle2' fontWeight={600}>{themeConfig.name}</Typography>
@@ -190,15 +195,7 @@ return globalThemesConfig.filter(t => t.category === selectedCategory)
   }
 
   const handleGlobalThemeChange = (themeId) => {
-    const updates = { globalTheme: themeId }
-
-    if (themeId === 'vcenter') {
-      updates.layout = 'horizontal'
-    } else if (settings.globalTheme === 'vcenter') {
-      updates.layout = 'collapsed'
-    }
-
-    updateSettings(updates)
+    updateSettings({ globalTheme: themeId })
     showMessage('success', t('settings.savedSuccess'))
   }
 

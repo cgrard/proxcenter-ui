@@ -13,16 +13,19 @@ const menuSectionStyles = (verticalNavOptions, theme) => {
         color: 'var(--mui-palette-text-disabled)',
         paddingInline: '0 !important',
         paddingBlock: `${theme.spacing(collapsedNotHovered ? 3.875 : 1.75)} !important`,
-        gap: theme.spacing(2.5),
+        gap: collapsedNotHovered ? 0 : theme.spacing(2.5),
         ...(collapsedNotHovered && {
-          paddingInlineStart: `${theme.spacing((collapsedWidth - 22) / 8)} !important`,
-          paddingInlineEnd: `${theme.spacing(((collapsedWidth - 22) / 2 - 5) / 4)} !important`
+          paddingInlineStart: `${theme.spacing((collapsedWidth - 25) / 8)} !important`,
+          paddingInlineEnd: `${theme.spacing((collapsedWidth - 25) / 8 - 1.25)} !important`
         }),
         '&:before': {
           content: '""',
           blockSize: 1,
           inlineSize: collapsedNotHovered ? '1.3125rem' : '0.875rem',
-          backgroundColor: 'var(--mui-palette-divider)'
+          backgroundColor: 'var(--mui-palette-divider)',
+          ...(collapsedNotHovered && {
+            display: 'none'
+          })
         },
         ...(!collapsedNotHovered && {
           '&:after': {
@@ -39,6 +42,12 @@ const menuSectionStyles = (verticalNavOptions, theme) => {
         lineHeight: 1.38462,
         ...(collapsedNotHovered && {
           display: 'none'
+        })
+      },
+      [`& .${menuClasses.icon}`]: {
+        ...(collapsedNotHovered && {
+          fontSize: '1.375rem',
+          marginInlineEnd: 0
         })
       }
     }

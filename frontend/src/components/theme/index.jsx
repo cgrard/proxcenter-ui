@@ -28,6 +28,98 @@ import { useSettings } from '@core/hooks/useSettings'
 // Core Theme Imports
 import defaultCoreTheme from '@core/theme'
 
+// Helper: generates 17-group content area overrides from CSS variable names
+// Each theme provides a mapping of semantic names to its own CSS variable names
+const createContentOverrides = (vars) => ({
+  'main, .ts-vertical-layout-content': {
+    backgroundColor: `var(${vars.bg}) !important`
+  },
+  '.MuiCard-root': {
+    backgroundColor: `var(${vars.surface}) !important`,
+    borderColor: `var(${vars.border}) !important`
+  },
+  '.MuiTableHead-root .MuiTableCell-root': {
+    backgroundColor: `var(${vars.surfaceAlt || vars.surface}) !important`,
+    borderBottom: `1px solid var(${vars.border}) !important`,
+    color: `var(${vars.text}) !important`,
+    fontWeight: '600 !important'
+  },
+  '.MuiTableBody-root .MuiTableRow-root': {
+    backgroundColor: `var(${vars.surface}) !important`,
+    '&:hover': {
+      backgroundColor: `var(${vars.hover}) !important`
+    }
+  },
+  '.MuiTableBody-root .MuiTableRow-root:nth-of-type(even)': {
+    backgroundColor: `var(${vars.bg}) !important`
+  },
+  '.MuiTableBody-root .MuiTableCell-root': {
+    borderBottom: `1px solid var(${vars.border}) !important`,
+    color: `var(${vars.text}) !important`
+  },
+  '.MuiOutlinedInput-root': {
+    backgroundColor: `var(${vars.surface}) !important`,
+    '& .MuiOutlinedInput-notchedOutline': {
+      borderColor: `var(${vars.border}) !important`
+    },
+    '&:hover .MuiOutlinedInput-notchedOutline': {
+      borderColor: `var(${vars.accent}) !important`
+    },
+    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+      borderColor: `var(${vars.accent}) !important`
+    }
+  },
+  '.MuiInputBase-input': {
+    color: `var(${vars.text}) !important`
+  },
+  '.MuiInputLabel-root': {
+    color: `var(${vars.textSecondary || vars.text}) !important`
+  },
+  '.MuiButton-containedPrimary': {
+    backgroundColor: `var(${vars.accent}) !important`,
+    color: `var(${vars.accentText || vars.bg}) !important`,
+    '&:hover': {
+      backgroundColor: `var(${vars.accentHover || vars.accent}) !important`
+    }
+  },
+  '.MuiTab-root.Mui-selected': {
+    color: `var(${vars.accent}) !important`
+  },
+  '.MuiTabs-indicator': {
+    backgroundColor: `var(${vars.accent}) !important`
+  },
+  '.MuiDialog-paper, .MuiPopover-paper, .MuiMenu-paper': {
+    backgroundColor: `var(${vars.surface}) !important`,
+    border: `1px solid var(${vars.border}) !important`
+  },
+  '.MuiMenuItem-root': {
+    color: `var(${vars.text}) !important`,
+    '&:hover': {
+      backgroundColor: `var(${vars.hover}) !important`
+    }
+  },
+  '.MuiDivider-root': {
+    borderColor: `var(${vars.border}) !important`
+  },
+  '*::-webkit-scrollbar-track': {
+    backgroundColor: `var(${vars.bg}) !important`
+  },
+  '*::-webkit-scrollbar-thumb': {
+    backgroundColor: `var(${vars.border}) !important`,
+    '&:hover': {
+      backgroundColor: `var(${vars.accent}) !important`
+    }
+  },
+  '.MuiLinearProgress-bar': {
+    backgroundColor: `var(${vars.accent}) !important`
+  },
+  '.MuiTreeItem-root, .MuiListItem-root': {
+    '&:hover': {
+      backgroundColor: `var(${vars.hover}) !important`
+    }
+  }
+})
+
 // Generate global CSS based on theme
 const getGlobalThemeStyles = (globalTheme, mode, customBorderRadius, blurIntensity, fontSize, uiScale) => {
   const themeStyles = globalTheme.styles
@@ -62,12 +154,11 @@ const getGlobalThemeStyles = (globalTheme, mode, customBorderRadius, blurIntensi
   const shouldApplyCustomBackground = !isLightMode && themeStyles.card.background !== 'var(--mui-palette-background-paper)'
 
   // Thèmes avec header/sidebar toujours sombres (même en mode clair)
-  const themesWithDarkChrome = ['vcenter', 'proxmoxClassic', 'terminal', 'cyberpunk', 'nord', 'dracula', 'oneDark']
+  const themesWithDarkChrome = ['proxmoxClassic', 'terminal', 'cyberpunk', 'nord', 'dracula', 'oneDark']
   const hasDarkChrome = themesWithDarkChrome.includes(globalTheme.id)
 
   // Font families par thème
   const themeFonts = {
-    vcenter: '"Clarity City", "Segoe UI", -apple-system, BlinkMacSystemFont, "Roboto", sans-serif',
     proxmoxClassic: '"Lato", "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif',
     terminal: '"JetBrains Mono", "Fira Code", "Consolas", "Monaco", monospace',
     cyberpunk: '"Orbitron", "Rajdhani", "Share Tech", "Segoe UI", sans-serif',
@@ -263,350 +354,6 @@ const getGlobalThemeStyles = (globalTheme, mode, customBorderRadius, blurIntensi
     // THEME-SPECIFIC STYLES - Header, Sidebar, and accent colors
     // ============================================================
     
-    // vCenter Theme - VMware vSphere Client style (exact reproduction)
-    ...(globalTheme.id === 'vcenter' && {
-      // Header - VMware dark blue-grey (toujours sombre, même en light mode)
-      '.ts-vertical-layout-header, .ts-horizontal-layout-header': {
-        backgroundColor: '#1e1e2d !important',
-        borderBottom: '1px solid #333348 !important'
-      },
-      '.ts-vertical-layout-navbar, .ts-horizontal-layout-navbar': {
-        backgroundColor: '#1e1e2d !important'
-      },
-      '.ts-vertical-layout-navbar *, .ts-horizontal-layout-navbar *': {
-        color: '#fafafa !important'
-      },
-      '.ts-vertical-layout-navbar .MuiIconButton-root, .ts-horizontal-layout-navbar .MuiIconButton-root': {
-        color: '#fafafa !important'
-      },
-
-      // Sidebar - VMware dark (toujours sombre)
-      '.ts-vertical-nav-root, .ts-vertical-nav-container, .ts-vertical-nav-bg-color-container': {
-        backgroundColor: '#14142a !important'
-      },
-
-      // Sidebar text - VMware style
-      '.ts-vertical-nav-root .ts-menu-button': {
-        color: '#fafafa !important',
-        fontFamily: '"Clarity City", "Segoe UI", -apple-system, BlinkMacSystemFont, "Roboto", sans-serif !important',
-        fontSize: '13px !important',
-        fontWeight: '400 !important'
-      },
-      '.ts-vertical-nav-root .ts-menu-icon': {
-        color: '#49afd9 !important'
-      },
-      '.ts-vertical-nav-root .ts-menu-section-label': {
-        color: '#9a9a9a !important',
-        fontFamily: '"Clarity City", "Segoe UI", -apple-system, sans-serif !important',
-        fontSize: '11px !important',
-        fontWeight: '600 !important',
-        textTransform: 'uppercase !important',
-        letterSpacing: '0.05em !important'
-      },
-
-      // Menu hover - VMware blue highlight
-      '.ts-vertical-nav-root .ts-menuitem-root > .ts-menu-button:hover': {
-        backgroundColor: '#333348 !important',
-        color: '#ffffff !important'
-      },
-      '.ts-vertical-nav-root .ts-menuitem-root > .ts-menu-button:hover .ts-menu-icon': {
-        color: '#49afd9 !important'
-      },
-
-      // Menu active - VMware cyan accent
-      '.ts-vertical-nav-root .ts-menuitem-root.ts-active > .ts-menu-button': {
-        backgroundColor: 'rgba(0, 121, 184, 0.25) !important',
-        color: '#49afd9 !important',
-        borderLeft: '3px solid #0079b8 !important'
-      },
-      '.ts-vertical-nav-root .ts-menuitem-root.ts-active > .ts-menu-button .ts-menu-icon': {
-        color: '#49afd9 !important'
-      },
-
-      // vCenter horizontal header (VCenterHeader component)
-      '.vcenter-header': {
-        boxShadow: 'none !important'
-      },
-      // Force white icons/buttons inside the dark vCenter header (overrides generic .MuiIconButton-root light-mode color)
-      '.vcenter-header .MuiIconButton-root': {
-        color: 'rgba(255,255,255,0.75) !important',
-        '&:hover': {
-          color: '#fff !important',
-          backgroundColor: '#3a3a52 !important'
-        }
-      },
-      '.vcenter-header .MuiButton-root': {
-        color: 'rgba(255,255,255,0.75) !important',
-        '&:hover': {
-          color: '#fff !important',
-          backgroundColor: '#3a3a52 !important'
-        }
-      },
-      // Burger menu popover — always dark regardless of light/dark mode
-      '.vcenter-burger-menu > .MuiPaper-root': {
-        backgroundColor: '#1e1e2d !important',
-        color: '#fff !important',
-        border: '1px solid #333348 !important'
-      },
-      '.vcenter-burger-menu .MuiTypography-root': {
-        color: 'inherit !important'
-      },
-      // Hide the standard horizontal navigation bar shadow when vCenter header is active
-      '.ts-horizontal-layout-header': {
-        boxShadow: 'none !important'
-      },
-
-      // Content area background
-      'main, .ts-vertical-layout-content, .ts-vertical-layout-content-wrapper, .ts-horizontal-layout-content-wrapper': {
-        backgroundColor: `${isLightMode ? '#ffffff' : '#14142a'} !important`
-      },
-      'body': {
-        backgroundColor: `${isLightMode ? '#ffffff' : '#14142a'} !important`
-      },
-
-      // Cards VMware style
-      '.MuiCard-root, .MuiPaper-root:not(.no-theme-override)': {
-        backgroundColor: `${isLightMode ? '#ffffff' : '#1e1e2d'} !important`,
-        borderColor: `${isLightMode ? '#e0e0e0' : '#333348'} !important`
-      },
-      '.MuiCardContent-root, .MuiCardHeader-root': {
-        backgroundColor: 'transparent !important'
-      },
-
-      // ============================================================
-      // TABLES - VMware style - TOUS les tableaux
-      // ============================================================
-      '.MuiTable-root, .MuiTableContainer-root, table': {
-        backgroundColor: `${isLightMode ? '#ffffff' : '#1e1e2d'} !important`
-      },
-      '.MuiTableHead-root, thead': {
-        backgroundColor: `${isLightMode ? '#f4f6f8' : '#14142a'} !important`
-      },
-      '.MuiTableHead-root .MuiTableCell-root, thead th, thead td': {
-        backgroundColor: `${isLightMode ? '#f4f6f8' : '#14142a'} !important`,
-        borderBottom: `1px solid ${isLightMode ? '#e0e0e0' : '#333348'} !important`,
-        color: `${isLightMode ? '#313131' : '#9a9a9a'} !important`,
-        fontWeight: '600 !important',
-        fontSize: '11px !important',
-        textTransform: 'uppercase !important',
-        letterSpacing: '0.03em !important'
-      },
-      '.MuiTableBody-root, tbody': {
-        backgroundColor: `${isLightMode ? '#ffffff' : '#1e1e2d'} !important`
-      },
-      '.MuiTableBody-root .MuiTableRow-root, tbody tr': {
-        backgroundColor: `${isLightMode ? '#ffffff' : '#1e1e2d'} !important`,
-        '&:hover': {
-          backgroundColor: `${isLightMode ? '#f0f7ff' : '#2a2a42'} !important`
-        }
-      },
-      '.MuiTableBody-root .MuiTableRow-root:nth-of-type(even), tbody tr:nth-of-type(even)': {
-        backgroundColor: `${isLightMode ? '#f9fafb' : '#252538'} !important`
-      },
-      '.MuiTableBody-root .MuiTableCell-root, tbody td': {
-        borderBottom: `1px solid ${isLightMode ? '#e8e8e8' : '#333348'} !important`,
-        color: `${isLightMode ? '#313131' : '#fafafa'} !important`
-      },
-
-      // DataGrid (si utilisé)
-      '.MuiDataGrid-root': {
-        backgroundColor: `${isLightMode ? '#ffffff' : '#1e1e2d'} !important`,
-        borderColor: `${isLightMode ? '#e0e0e0' : '#333348'} !important`
-      },
-      '.MuiDataGrid-columnHeaders': {
-        backgroundColor: `${isLightMode ? '#f4f6f8' : '#14142a'} !important`,
-        borderColor: `${isLightMode ? '#e0e0e0' : '#333348'} !important`
-      },
-      '.MuiDataGrid-row': {
-        backgroundColor: `${isLightMode ? '#ffffff' : '#1e1e2d'} !important`,
-        '&:hover': {
-          backgroundColor: `${isLightMode ? '#f0f7ff' : '#2a2a42'} !important`
-        }
-      },
-      '.MuiDataGrid-row:nth-of-type(even)': {
-        backgroundColor: `${isLightMode ? '#f9fafb' : '#252538'} !important`
-      },
-      '.MuiDataGrid-cell': {
-        borderColor: `${isLightMode ? '#e8e8e8' : '#333348'} !important`,
-        color: `${isLightMode ? '#313131' : '#fafafa'} !important`
-      },
-      '.MuiDataGrid-columnSeparator': {
-        visibility: 'hidden !important'
-      },
-      '.MuiDataGrid-columnHeader:hover .MuiDataGrid-columnSeparator': {
-        visibility: 'visible !important',
-        color: `${isLightMode ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.08)'} !important`
-      },
-
-      // Virtualized tables / custom tables (only target actual table components, not MuiGrid)
-      '.MuiTableContainer-root table, [class*="VirtualTable"], [class*="virtualTable"]': {
-        backgroundColor: `${isLightMode ? '#ffffff' : '#1e1e2d'} !important`
-      },
-
-      // ============================================================
-      // INPUTS & FORM CONTROLS - VMware style
-      // ============================================================
-      '.MuiOutlinedInput-root': {
-        backgroundColor: `${isLightMode ? '#ffffff' : '#1e1e2d'} !important`,
-        '& .MuiOutlinedInput-notchedOutline': {
-          borderColor: `${isLightMode ? '#e0e0e0' : '#333348'} !important`
-        },
-        '&:hover .MuiOutlinedInput-notchedOutline': {
-          borderColor: `${isLightMode ? '#0079b8' : '#49afd9'} !important`
-        },
-        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-          borderColor: '#0079b8 !important',
-          borderWidth: '2px !important'
-        }
-      },
-      '.MuiInputBase-input': {
-        color: `${isLightMode ? '#313131' : '#fafafa'} !important`
-      },
-      '.MuiInputLabel-root': {
-        color: `${isLightMode ? '#737373' : '#9a9a9a'} !important`
-      },
-      '.MuiSelect-select': {
-        backgroundColor: `${isLightMode ? '#ffffff' : '#1e1e2d'} !important`
-      },
-
-      // ============================================================
-      // CHIPS & BADGES - VMware style
-      // ============================================================
-      '.MuiChip-root': {
-        fontWeight: '500 !important',
-        fontSize: '11px !important'
-      },
-      '.MuiChip-colorSuccess': {
-        backgroundColor: `${isLightMode ? '#e8f5e9' : 'rgba(98, 164, 32, 0.2)'} !important`,
-        color: `${isLightMode ? '#2e7d32' : '#62a420'} !important`
-      },
-      '.MuiChip-colorError': {
-        backgroundColor: `${isLightMode ? '#ffebee' : 'rgba(201, 33, 0, 0.2)'} !important`,
-        color: `${isLightMode ? '#c62828' : '#ff6b6b'} !important`
-      },
-      '.MuiChip-colorWarning': {
-        backgroundColor: `${isLightMode ? '#fff3e0' : 'rgba(239, 192, 6, 0.2)'} !important`,
-        color: `${isLightMode ? '#e65100' : '#efc006'} !important`
-      },
-      '.MuiChip-colorInfo': {
-        backgroundColor: `${isLightMode ? '#e3f2fd' : 'rgba(0, 121, 184, 0.2)'} !important`,
-        color: `${isLightMode ? '#0079b8' : '#49afd9'} !important`
-      },
-
-      // ============================================================
-      // TABS - VMware style
-      // ============================================================
-      '.MuiTabs-root': {
-        borderBottom: `1px solid ${isLightMode ? '#e0e0e0' : '#333348'} !important`
-      },
-      '.MuiTab-root': {
-        color: `${isLightMode ? '#737373' : '#9a9a9a'} !important`,
-        fontWeight: '500 !important',
-        textTransform: 'none !important',
-        '&.Mui-selected': {
-          color: '#0079b8 !important'
-        }
-      },
-      '.MuiTabs-indicator': {
-        backgroundColor: '#0079b8 !important'
-      },
-
-      // ============================================================
-      // BUTTONS - VMware style
-      // ============================================================
-      '.MuiButton-root': {
-        fontFamily: '"Clarity City", "Segoe UI", sans-serif !important',
-        textTransform: 'none !important',
-        fontWeight: '500 !important'
-      },
-      '.MuiButton-containedPrimary': {
-        backgroundColor: '#0079b8 !important',
-        '&:hover': {
-          backgroundColor: '#005d91 !important'
-        }
-      },
-      '.MuiButton-outlinedPrimary': {
-        borderColor: '#0079b8 !important',
-        color: '#0079b8 !important',
-        '&:hover': {
-          backgroundColor: 'rgba(0, 121, 184, 0.08) !important'
-        }
-      },
-      '.MuiIconButton-root': {
-        color: `${isLightMode ? '#737373' : '#9a9a9a'} !important`,
-        '&:hover': {
-          backgroundColor: `${isLightMode ? 'rgba(0, 121, 184, 0.08)' : 'rgba(73, 175, 217, 0.15)'} !important`,
-          color: '#0079b8 !important'
-        }
-      },
-
-      // ============================================================
-      // DIALOGS & MENUS - VMware style
-      // ============================================================
-      '.MuiDialog-paper, .MuiPopover-paper:not(.no-theme-override), .MuiMenu-paper': {
-        backgroundColor: `${isLightMode ? '#ffffff' : '#1e1e2d'} !important`,
-        border: `1px solid ${isLightMode ? '#e0e0e0' : '#333348'} !important`
-      },
-      '.MuiMenuItem-root': {
-        '&:hover': {
-          backgroundColor: `${isLightMode ? '#f0f7ff' : '#2a2a42'} !important`
-        },
-        '&.Mui-selected': {
-          backgroundColor: `${isLightMode ? '#e3f2fd' : 'rgba(0, 121, 184, 0.2)'} !important`
-        }
-      },
-
-      // ============================================================
-      // DIVIDERS & BORDERS - VMware style
-      // ============================================================
-      '.MuiDivider-root': {
-        borderColor: `${isLightMode ? '#e0e0e0' : '#333348'} !important`
-      },
-
-      // ============================================================
-      // SCROLLBARS - VMware style
-      // ============================================================
-      '*::-webkit-scrollbar': {
-        width: '8px !important',
-        height: '8px !important'
-      },
-      '*::-webkit-scrollbar-track': {
-        backgroundColor: `${isLightMode ? '#f4f6f8' : '#14142a'} !important`
-      },
-      '*::-webkit-scrollbar-thumb': {
-        backgroundColor: `${isLightMode ? '#c4c4c4' : '#333348'} !important`,
-        borderRadius: '4px !important',
-        '&:hover': {
-          backgroundColor: `${isLightMode ? '#a0a0a0' : '#49afd9'} !important`
-        }
-      },
-
-      // ============================================================
-      // TOOLTIPS - VMware style
-      // ============================================================
-      '.MuiTooltip-tooltip': {
-        backgroundColor: `${isLightMode ? '#313131' : '#1e1e2d'} !important`,
-        color: '#fafafa !important',
-        border: `1px solid ${isLightMode ? '#313131' : '#333348'} !important`,
-        fontSize: '12px !important'
-      },
-
-      // ============================================================
-      // PROGRESS BARS - VMware style
-      // ============================================================
-      '.MuiLinearProgress-root': {
-        backgroundColor: `${isLightMode ? '#e0e0e0' : '#333348'} !important`
-      },
-      '.MuiLinearProgress-bar': {
-        backgroundColor: '#0079b8 !important'
-      },
-
-      // Typography
-      'body, .MuiTypography-root': {
-        fontFamily: '"Clarity City", "Segoe UI", -apple-system, BlinkMacSystemFont, "Roboto", sans-serif !important'
-      }
-    }),
-
     // Proxmox Classic Theme
     ...(globalTheme.id === 'proxmoxClassic' && {
       // Header - Proxmox blue-grey
@@ -1347,12 +1094,23 @@ const getGlobalThemeStyles = (globalTheme, mode, customBorderRadius, blurIntensi
         color: '#88c0d0 !important'
       },
 
-      // Content area in light mode
-      ...(isLightMode && {
-        'main, .ts-vertical-layout-content': {
-          backgroundColor: '#eceff4 !important'
-        }
-      })
+      // Content area overrides via CSS vars
+      ...createContentOverrides({
+        bg: '--nord-bg-primary',
+        surface: '--nord-bg-secondary',
+        surfaceAlt: '--nord-bg-secondary',
+        border: '--nord-border',
+        text: '--nord-text',
+        textSecondary: '--nord-text-secondary',
+        accent: '--nord-accent',
+        accentHover: '--nord-accent-secondary',
+        accentText: '--nord-bg-primary',
+        hover: '--nord-bg-tertiary'
+      }),
+      '.MuiChip-colorSuccess': { color: 'var(--nord-success) !important', border: '1px solid var(--nord-success) !important' },
+      '.MuiChip-colorError': { color: 'var(--nord-error) !important', border: '1px solid var(--nord-error) !important' },
+      '.MuiChip-colorWarning': { color: 'var(--nord-warning) !important', border: '1px solid var(--nord-warning) !important' },
+      '.MuiChip-colorInfo': { color: 'var(--nord-info) !important', border: '1px solid var(--nord-info) !important' }
     }),
 
     // Dracula Theme
@@ -1395,12 +1153,22 @@ const getGlobalThemeStyles = (globalTheme, mode, customBorderRadius, blurIntensi
         color: '#ff79c6 !important'
       },
 
-      // Content area in light mode
-      ...(isLightMode && {
-        'main, .ts-vertical-layout-content': {
-          backgroundColor: '#f8f8f2 !important'
-        }
-      })
+      // Content area overrides via CSS vars
+      ...createContentOverrides({
+        bg: '--dracula-bg',
+        surface: '--dracula-surface',
+        surfaceAlt: '--dracula-surface',
+        border: '--dracula-border',
+        text: '--dracula-text',
+        textSecondary: '--dracula-comment',
+        accent: '--dracula-accent',
+        accentText: '--dracula-bg',
+        hover: '--dracula-hover'
+      }),
+      '.MuiChip-colorSuccess': { color: 'var(--dracula-green) !important', border: '1px solid var(--dracula-green) !important' },
+      '.MuiChip-colorError': { color: 'var(--dracula-red) !important', border: '1px solid var(--dracula-red) !important' },
+      '.MuiChip-colorWarning': { color: 'var(--dracula-orange) !important', border: '1px solid var(--dracula-orange) !important' },
+      '.MuiChip-colorInfo': { color: 'var(--dracula-cyan) !important', border: '1px solid var(--dracula-cyan) !important' }
     }),
 
     // One Dark Theme (Atom/VS Code)
@@ -1443,12 +1211,22 @@ const getGlobalThemeStyles = (globalTheme, mode, customBorderRadius, blurIntensi
         color: '#61afef !important'
       },
 
-      // Content area in light mode  
-      ...(isLightMode && {
-        'main, .ts-vertical-layout-content': {
-          backgroundColor: '#fafafa !important'
-        }
-      })
+      // Content area overrides via CSS vars
+      ...createContentOverrides({
+        bg: '--onedark-bg',
+        surface: '--onedark-bg-secondary',
+        surfaceAlt: '--onedark-bg-secondary',
+        border: '--onedark-border',
+        text: '--onedark-text',
+        textSecondary: '--onedark-text-secondary',
+        accent: '--onedark-accent',
+        accentText: '--onedark-bg',
+        hover: '--onedark-hover'
+      }),
+      '.MuiChip-colorSuccess': { color: 'var(--onedark-green) !important', border: '1px solid var(--onedark-green) !important' },
+      '.MuiChip-colorError': { color: 'var(--onedark-red) !important', border: '1px solid var(--onedark-red) !important' },
+      '.MuiChip-colorWarning': { color: 'var(--onedark-yellow) !important', border: '1px solid var(--onedark-yellow) !important' },
+      '.MuiChip-colorInfo': { color: 'var(--onedark-cyan) !important', border: '1px solid var(--onedark-cyan) !important' }
     }),
 
     // Glassmorphism Theme - special glass effects on sidebar too
@@ -1469,11 +1247,329 @@ const getGlobalThemeStyles = (globalTheme, mode, customBorderRadius, blurIntensi
       }
     }),
 
-    // Neumorphism Theme - soft shadows
+    // Neumorphism Theme - soft shadows (sidebar only, dark mode)
     ...(globalTheme.id === 'neumorphism' && !isLightMode && {
       '.ts-vertical-nav-root, .ts-vertical-nav-container, .ts-vertical-nav-bg-color-container': {
         backgroundColor: '#1e1e2d !important',
         boxShadow: 'inset -4px 0 8px rgba(0,0,0,0.3), inset 4px 0 8px rgba(255,255,255,0.02) !important'
+      }
+    }),
+
+    // ============================================================
+    // GLASSMORPHISM CONTENT OVERRIDES - via CSS vars + backdrop-blur
+    // ============================================================
+    ...(globalTheme.id === 'glassmorphism' && {
+      ...createContentOverrides({
+        bg: '--glass-body',
+        surface: '--glass-card',
+        surfaceAlt: '--glass-surface',
+        border: '--glass-border',
+        text: '--glass-text',
+        textSecondary: '--glass-text-secondary',
+        accent: '--glass-accent',
+        hover: '--glass-hover'
+      }),
+      // Override selectors that need backdrop-filter
+      '.MuiCard-root': {
+        backgroundColor: 'var(--glass-card) !important',
+        borderColor: 'var(--glass-border) !important',
+        backdropFilter: `${effectiveBlur} !important`
+      },
+      '.MuiTableHead-root .MuiTableCell-root': {
+        backgroundColor: 'var(--glass-surface) !important',
+        borderBottom: '1px solid var(--glass-border) !important',
+        color: 'var(--glass-text) !important',
+        fontWeight: '600 !important',
+        backdropFilter: 'blur(8px) !important'
+      },
+      '.MuiOutlinedInput-root': {
+        backgroundColor: 'var(--glass-surface) !important',
+        backdropFilter: 'blur(8px) !important',
+        '& .MuiOutlinedInput-notchedOutline': {
+          borderColor: 'var(--glass-border) !important'
+        },
+        '&:hover .MuiOutlinedInput-notchedOutline': {
+          borderColor: 'var(--glass-accent) !important'
+        },
+        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+          borderColor: 'var(--glass-accent) !important'
+        }
+      },
+      '.MuiButton-containedPrimary': {
+        backgroundColor: 'var(--glass-accent) !important',
+        color: '#ffffff !important',
+        backdropFilter: 'blur(8px) !important',
+        '&:hover': {
+          filter: 'brightness(1.1) !important'
+        }
+      },
+      '.MuiChip-root': {
+        backdropFilter: 'blur(4px) !important'
+      },
+      '.MuiDialog-paper, .MuiPopover-paper, .MuiMenu-paper': {
+        backgroundColor: 'var(--glass-dialog) !important',
+        backdropFilter: `${effectiveBlur} !important`,
+        border: '1px solid var(--glass-border) !important'
+      }
+    }),
+
+    // ============================================================
+    // NEUMORPHISM CONTENT OVERRIDES - via CSS vars + neumorphic shadows
+    // ============================================================
+    ...(globalTheme.id === 'neumorphism' && {
+      ...createContentOverrides({
+        bg: '--neu-bg',
+        surface: '--neu-surface',
+        surfaceAlt: '--neu-surface-alt',
+        border: '--neu-border',
+        text: '--neu-text',
+        textSecondary: '--neu-text-secondary',
+        accent: '--neu-accent',
+        accentHover: '--neu-accent-hover',
+        hover: '--neu-hover'
+      }),
+      // Override with neumorphic shadows
+      '.MuiCard-root': {
+        backgroundColor: 'var(--neu-surface) !important',
+        border: 'none !important',
+        boxShadow: 'var(--neu-card-shadow) !important'
+      },
+      '.MuiOutlinedInput-root': {
+        backgroundColor: 'var(--neu-surface) !important',
+        boxShadow: 'var(--neu-input-shadow) !important',
+        '& .MuiOutlinedInput-notchedOutline': {
+          borderColor: 'transparent !important'
+        },
+        '&:hover .MuiOutlinedInput-notchedOutline': {
+          borderColor: 'var(--neu-accent) !important'
+        },
+        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+          borderColor: 'var(--neu-accent) !important'
+        }
+      },
+      '.MuiButton-containedPrimary': {
+        backgroundColor: 'var(--neu-accent) !important',
+        color: '#ffffff !important',
+        boxShadow: 'var(--neu-button-shadow) !important',
+        '&:hover': {
+          backgroundColor: 'var(--neu-accent-hover) !important'
+        }
+      },
+      '.MuiChip-root': {
+        boxShadow: 'var(--neu-chip-shadow) !important',
+        border: 'none !important'
+      },
+      '.MuiDialog-paper, .MuiPopover-paper, .MuiMenu-paper': {
+        backgroundColor: 'var(--neu-surface) !important',
+        boxShadow: 'var(--neu-dialog-shadow) !important',
+        border: 'none !important'
+      },
+      '*::-webkit-scrollbar-thumb': {
+        backgroundColor: 'var(--neu-border) !important',
+        borderRadius: '10px !important',
+        '&:hover': {
+          backgroundColor: 'var(--neu-accent) !important'
+        }
+      }
+    }),
+
+    // ============================================================
+    // CORPORATE THEME - via CSS vars
+    // ============================================================
+    ...(globalTheme.id === 'corporate' && {
+      ...createContentOverrides({
+        bg: '--corp-bg',
+        surface: '--corp-surface',
+        surfaceAlt: '--corp-surface-alt',
+        border: '--corp-border',
+        text: '--corp-text',
+        textSecondary: '--corp-text-secondary',
+        accent: '--corp-accent',
+        accentHover: '--corp-accent-hover',
+        hover: '--corp-hover'
+      }),
+      '.MuiChip-colorSuccess': { color: 'var(--corp-success) !important' },
+      '.MuiChip-colorError': { color: 'var(--corp-error) !important' },
+      '.MuiChip-colorWarning': { color: 'var(--corp-warning) !important' },
+      '.MuiChip-colorInfo': { color: 'var(--corp-info) !important' },
+      '.MuiButton-containedPrimary': {
+        backgroundColor: 'var(--corp-accent) !important',
+        color: '#ffffff !important',
+        '&:hover': {
+          backgroundColor: 'var(--corp-accent-hover) !important'
+        }
+      }
+    }),
+
+    // ============================================================
+    // MINIMAL THEME - via CSS vars
+    // ============================================================
+    ...(globalTheme.id === 'minimal' && {
+      ...createContentOverrides({
+        bg: '--min-bg',
+        surface: '--min-surface',
+        surfaceAlt: '--min-surface-alt',
+        border: '--min-border',
+        text: '--min-text',
+        textSecondary: '--min-text-secondary',
+        accent: '--min-accent',
+        accentHover: '--min-accent-hover',
+        hover: '--min-hover'
+      }),
+      '.MuiCard-root': {
+        backgroundColor: 'var(--min-surface) !important',
+        borderColor: 'var(--min-border) !important',
+        boxShadow: 'none !important'
+      },
+      '.MuiButton-containedPrimary': {
+        backgroundColor: 'var(--min-accent) !important',
+        color: '#ffffff !important',
+        boxShadow: 'none !important',
+        '&:hover': {
+          backgroundColor: 'var(--min-accent-hover) !important',
+          boxShadow: 'none !important'
+        }
+      },
+      '.MuiDialog-paper, .MuiPopover-paper, .MuiMenu-paper': {
+        backgroundColor: 'var(--min-surface) !important',
+        border: '1px solid var(--min-border) !important',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.15) !important'
+      }
+    }),
+
+    // ============================================================
+    // ROUNDED THEME - via CSS vars
+    // ============================================================
+    ...(globalTheme.id === 'rounded' && {
+      ...createContentOverrides({
+        bg: '--round-bg',
+        surface: '--round-surface',
+        surfaceAlt: '--round-surface-alt',
+        border: '--round-border',
+        text: '--round-text',
+        textSecondary: '--round-text-secondary',
+        accent: '--round-accent',
+        accentHover: '--round-accent-hover',
+        hover: '--round-hover'
+      }),
+      '.MuiChip-colorSuccess': { color: 'var(--round-success) !important' },
+      '.MuiChip-colorError': { color: 'var(--round-error) !important' },
+      '.MuiChip-colorWarning': { color: 'var(--round-warning) !important' },
+      '.MuiChip-colorInfo': { color: 'var(--round-info) !important' },
+      '.MuiButton-containedPrimary': {
+        backgroundColor: 'var(--round-accent) !important',
+        color: 'var(--round-bg) !important',
+        '&:hover': {
+          backgroundColor: 'var(--round-accent-hover) !important'
+        }
+      }
+    }),
+
+    // ============================================================
+    // HIGH CONTRAST THEME - via CSS vars, WCAG AAA
+    // ============================================================
+    ...(globalTheme.id === 'highContrast' && {
+      ...createContentOverrides({
+        bg: '--hc-bg',
+        surface: '--hc-surface',
+        surfaceAlt: '--hc-surface-alt',
+        border: '--hc-border',
+        text: '--hc-text',
+        accent: '--hc-focus',
+        hover: '--hc-hover'
+      }),
+      // Override with thick borders and no shadows
+      '.MuiCard-root': {
+        backgroundColor: 'var(--hc-surface) !important',
+        border: '2px solid var(--hc-border) !important',
+        boxShadow: 'none !important'
+      },
+      '.MuiTableHead-root .MuiTableCell-root': {
+        backgroundColor: 'var(--hc-hover) !important',
+        borderBottom: '2px solid var(--hc-border) !important',
+        color: 'var(--hc-text) !important',
+        fontWeight: '700 !important'
+      },
+      '.MuiTableBody-root .MuiTableCell-root': {
+        borderBottom: '2px solid var(--hc-border) !important',
+        color: 'var(--hc-text) !important'
+      },
+      '.MuiOutlinedInput-root': {
+        backgroundColor: 'var(--hc-surface) !important',
+        '& .MuiOutlinedInput-notchedOutline': {
+          borderColor: 'var(--hc-border) !important',
+          borderWidth: '2px !important'
+        },
+        '&:hover .MuiOutlinedInput-notchedOutline': {
+          borderColor: 'var(--hc-focus) !important'
+        },
+        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+          borderColor: 'var(--hc-focus) !important',
+          borderWidth: '3px !important'
+        }
+      },
+      '.MuiButton-containedPrimary': {
+        backgroundColor: 'var(--hc-focus) !important',
+        color: 'var(--hc-bg) !important',
+        fontWeight: '700 !important',
+        boxShadow: 'none !important',
+        border: '2px solid var(--hc-border) !important',
+        '&:hover': {
+          filter: 'brightness(0.85) !important'
+        }
+      },
+      '.MuiButton-root:focus-visible': {
+        outline: '3px solid var(--hc-focus) !important',
+        outlineOffset: '2px !important'
+      },
+      '.MuiChip-root': {
+        border: '2px solid var(--hc-border) !important',
+        fontWeight: '600 !important',
+        boxShadow: 'none !important'
+      },
+      '.MuiChip-colorSuccess': {
+        backgroundColor: 'var(--hc-success) !important',
+        color: 'var(--hc-bg) !important'
+      },
+      '.MuiChip-colorError': {
+        backgroundColor: 'var(--hc-error) !important',
+        color: '#ffffff !important'
+      },
+      '.MuiChip-colorWarning': {
+        backgroundColor: 'var(--hc-warning) !important',
+        color: 'var(--hc-bg) !important'
+      },
+      '.MuiTabs-indicator': {
+        backgroundColor: 'var(--hc-focus) !important',
+        height: '3px !important'
+      },
+      '.MuiTab-root.Mui-selected': {
+        color: 'var(--hc-focus) !important',
+        fontWeight: '700 !important'
+      },
+      '.MuiDialog-paper, .MuiPopover-paper, .MuiMenu-paper': {
+        backgroundColor: 'var(--hc-surface) !important',
+        border: '2px solid var(--hc-border) !important',
+        boxShadow: 'none !important'
+      },
+      '.MuiDivider-root': {
+        borderColor: 'var(--hc-border) !important',
+        borderWidth: '1px !important'
+      },
+      'a, .MuiLink-root': {
+        color: 'var(--hc-link) !important',
+        textDecoration: 'underline !important'
+      },
+      '*::-webkit-scrollbar-thumb': {
+        backgroundColor: 'var(--hc-text) !important',
+        border: '2px solid var(--hc-border) !important',
+        '&:hover': {
+          backgroundColor: 'var(--hc-focus) !important'
+        }
+      },
+      '*:focus-visible': {
+        outline: '3px solid var(--hc-focus) !important',
+        outlineOffset: '2px !important'
       }
     })
   }

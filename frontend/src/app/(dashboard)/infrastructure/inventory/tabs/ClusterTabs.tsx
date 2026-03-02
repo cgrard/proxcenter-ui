@@ -56,7 +56,7 @@ import RollingUpdateWizard from '@/components/RollingUpdateWizard'
 import type { InventorySelection, DetailsPayload, RrdTimeframe, SeriesPoint, Status } from '../types'
 import { formatBps, formatTime, formatUptime, parseMarkdown, parseNodeId, parseVmId, cpuPct, pct, buildSeriesFromRrd, fetchRrd, tagColor } from '../helpers'
 import { AreaPctChart, AreaBpsChart2 } from '../components/RrdCharts'
-import VCenterSummary from '../components/VCenterSummary'
+import InventorySummary from '../components/InventorySummary'
 import HaGroupDialog from '../HaGroupDialog'
 import HaRuleDialog from '../HaRuleDialog'
 import { AddIcon } from '../components/IconWrappers'
@@ -1490,13 +1490,13 @@ export default function ClusterTabs(props: any) {
                                       <Box>
                                         <Chip 
                                           size="small" 
-                                          label={rule.state === 'disabled' ? t('common.no') : t('common.yes')}
-                                          color={rule.state === 'disabled' ? 'default' : 'success'}
+                                          label={rule.disable ? t('common.no') : t('common.yes')}
+                                          color={rule.disable ? 'default' : 'success'}
                                           sx={{ height: 20, fontSize: 11 }}
                                         />
                                       </Box>
                                       <Typography variant="body2" sx={{ opacity: 0.8 }}>
-                                        {rule.state || t('common.enabled')}
+                                        {rule.disable ? t('common.disabled') : t('common.enabled')}
                                       </Typography>
                                       <Typography variant="body2">
                                         {rule.strict ? t('common.yes') : t('common.no')}
@@ -1605,13 +1605,13 @@ export default function ClusterTabs(props: any) {
                                       <Box>
                                         <Chip 
                                           size="small" 
-                                          label={rule.state === 'disabled' ? t('common.no') : t('common.yes')}
-                                          color={rule.state === 'disabled' ? 'default' : 'success'}
+                                          label={rule.disable ? t('common.no') : t('common.yes')}
+                                          color={rule.disable ? 'default' : 'success'}
                                           sx={{ height: 20, fontSize: 11 }}
                                         />
                                       </Box>
                                       <Typography variant="body2" sx={{ opacity: 0.8 }}>
-                                        {rule.state || t('common.enabled')}
+                                        {rule.disable ? t('common.disabled') : t('common.enabled')}
                                       </Typography>
                                       <Chip
                                         size="small"

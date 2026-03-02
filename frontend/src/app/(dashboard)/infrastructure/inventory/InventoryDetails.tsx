@@ -100,7 +100,7 @@ import ConsolePreview from './components/ConsolePreview'
 import StatusChip from './components/StatusChip'
 import { AreaPctChart, AreaBpsChart2 } from './components/RrdCharts'
 import GroupedVmsView from './components/GroupedVmsView'
-import VCenterSummary from './components/VCenterSummary'
+import InventorySummary from './components/InventorySummary'
 import { PlayArrowIcon, StopIcon, PowerSettingsNewIcon, MoveUpIcon, AddIcon, CloseIcon, SaveIcon } from './components/IconWrappers'
 import { useCephPerf } from './hooks/useCephPerf'
 import { useSyslogLive, useCephLogLive } from './hooks/useSyslogLive'
@@ -136,8 +136,8 @@ export default function InventoryDetails({
   migratingVmIds,
   pendingActionVmIds,
   onVmActionStart,
-  onVmActionEnd
-}: { 
+  onVmActionEnd,
+}: {
   selection: InventorySelection | null
   onSelect?: (sel: InventorySelection) => void
   onBack?: () => void
@@ -4463,10 +4463,10 @@ return vm?.isCluster ?? false
             <Box sx={{ display: 'flex', gap: 1.25, alignItems: 'center', flexWrap: 'wrap' }}>
               {/* Bouton retour */}
               {onBack && (
-                <IconButton 
+                <IconButton
                   onClick={onBack}
                   size="small"
-                  sx={{ 
+                  sx={{
                     mr: 0.5,
                     bgcolor: 'action.hover',
                     '&:hover': { bgcolor: 'action.selected' }
@@ -4476,9 +4476,9 @@ return vm?.isCluster ?? false
                 </IconButton>
               )}
               
-              <Chip 
-                size="small" 
-                label={data.kindLabel} 
+              <Chip
+                size="small"
+                label={data.kindLabel}
                 variant="filled"
                 icon={
                   data.kindLabel === 'HOST' ? (
@@ -4650,7 +4650,7 @@ return vm?.isCluster ?? false
 
           <Divider />
 
-          <VCenterSummary
+          <InventorySummary
             kindLabel={data.kindLabel}
             status={data.status}
             subtitle={data.subtitle}

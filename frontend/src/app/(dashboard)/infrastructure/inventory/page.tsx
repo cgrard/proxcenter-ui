@@ -460,7 +460,7 @@ return () => setPageInfo('', '', '')
         // IMPORTANT: permettre aux enfants de scroller
         minHeight: 0,
 
-        // Layout vCenter-like : 2 panneaux côte à côte (sur desktop)
+        // Layout : 2 panneaux côte à côte (sur desktop)
         display: 'flex',
         flexDirection: { xs: 'column', lg: 'row' },
 
@@ -596,8 +596,8 @@ return () => setPageInfo('', '', '')
       >
         {/* Contenu scrollable */}
         <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
-          <InventoryDetails 
-            selection={selection} 
+          <InventoryDetails
+            selection={selection}
             onSelect={setSelection}
             onBack={() => setSelection(null)}
             viewMode={viewMode}

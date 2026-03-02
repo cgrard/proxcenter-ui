@@ -179,9 +179,7 @@ export const GenerateHorizontalMenu = ({ menuData }) => {
 
         const Icon = icon ? <i className={icon} /> : null
         const subMenuPrefix = prefix && prefix.label ? <Chip size='small' {...prefix} /> : prefix
-        const subMenuSuffix = !featureAvailable ? (
-          <i className='ri-vip-crown-fill' style={{ color: 'var(--mui-palette-warning-main)', fontSize: '1rem' }} />
-        ) : (suffix && suffix.label ? <Chip size='small' {...suffix} /> : suffix)
+        const subMenuSuffix = suffix && suffix.label ? <Chip size='small' {...suffix} /> : suffix
 
         return (
           <HorizontalSubMenu

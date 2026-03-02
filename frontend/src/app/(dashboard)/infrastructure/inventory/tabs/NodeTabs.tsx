@@ -54,7 +54,7 @@ import NodeFirewallTab from '@/components/NodeFirewallTab'
 import type { InventorySelection, DetailsPayload, RrdTimeframe, SeriesPoint, Status } from '../types'
 import { formatBps, formatTime, formatUptime, parseMarkdown, parseNodeId, parseVmId, cpuPct, pct, buildSeriesFromRrd, fetchRrd, tagColor } from '../helpers'
 import { AreaPctChart, AreaBpsChart2 } from '../components/RrdCharts'
-import VCenterSummary from '../components/VCenterSummary'
+import InventorySummary from '../components/InventorySummary'
 
 export default function NodeTabs(props: any) {
   const t = useTranslations()
