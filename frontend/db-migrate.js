@@ -43,6 +43,7 @@ try {
       "id"           TEXT NOT NULL PRIMARY KEY,
       "connectionId" TEXT,
       "node"         TEXT NOT NULL,
+      "ip"           TEXT,
       "displayName"  TEXT,
       "enabled"      INTEGER NOT NULL DEFAULT 1,
       "notes"        TEXT,
@@ -146,6 +147,10 @@ try {
     { table: 'Connection', column: 'locationLabel', type: 'TEXT' },
     // Deployment config for retry (2026-02-23)
     { table: 'deployments', column: 'config',       type: 'TEXT' },
+    // ManagedHost new columns (2026-03-02)
+    { table: 'ManagedHost', column: 'ip',          type: 'TEXT' },
+    { table: 'ManagedHost', column: 'description', type: 'TEXT' },
+    { table: 'ManagedHost', column: 'tags',        type: 'TEXT' },
   ]
 
   let applied = 0
