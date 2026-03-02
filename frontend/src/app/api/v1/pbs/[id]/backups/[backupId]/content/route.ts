@@ -33,15 +33,23 @@ export async function GET(
     const url = new URL(req.url)
     const filepath = url.searchParams.get('filepath') || '/' // Chemin à explorer
     const archiveName = url.searchParams.get('archive') // Nom de l'archive (ex: "root.pxar.didx")
+    const ns = url.searchParams.get('ns') || '' // PBS namespace
 
     const conn = await getPbsConnectionById(id)
 
     // Si pas d'archive spécifiée, lister les fichiers/archives du backup
     if (!archiveName) {
       // Récupérer les infos du snapshot pour avoir la liste des fichiers
+      const snapshotParams = new URLSearchParams({
+        'backup-type': backupType,
+        'backup-id': vmid,
+      })
+
+      if (ns) snapshotParams.set('ns', ns)
+
       const snapshots = await pbsFetch<any[]>(
         conn,
-        `/admin/datastore/${encodeURIComponent(datastore)}/snapshots?backup-type=${encodeURIComponent(backupType)}&backup-id=${encodeURIComponent(vmid)}`
+        `/admin/datastore/${encodeURIComponent(datastore)}/snapshots?${snapshotParams}`
       )
 
       const snapshot = snapshots?.find(s => String(s['backup-time']) === timestamp)
@@ -71,6 +79,7 @@ export async function GET(
           files,
           snapshot: {
             datastore,
+            namespace: ns,
             backupType,
             backupId: vmid,
             backupTime: timestamp,
@@ -90,6 +99,8 @@ export async function GET(
         'backup-time': timestamp,
         'filepath': archiveName + filepath, // ex: "root.pxar.didx/etc"
       })
+
+      if (ns) catalogParams.set('ns', ns)
 
       const catalog = await pbsFetch<any[]>(conn, `${catalogPath}?${catalogParams}`)
 
@@ -126,6 +137,7 @@ return (a.name || '').localeCompare(b.name || '')
           files: entries,
           snapshot: {
             datastore,
+            namespace: ns,
             backupType,
             backupId: vmid,
             backupTime: timestamp,
@@ -135,7 +147,7 @@ return (a.name || '').localeCompare(b.name || '')
     } catch (catalogError: any) {
       console.error("Catalog error:", catalogError)
       
-return NextResponse.json({ 
+return NextResponse.json({
         error: `Cannot browse archive: ${catalogError.message}`,
         data: {
           path: filepath,
@@ -143,6 +155,7 @@ return NextResponse.json({
           files: [],
           snapshot: {
             datastore,
+            namespace: ns,
             backupType,
             backupId: vmid,
             backupTime: timestamp,

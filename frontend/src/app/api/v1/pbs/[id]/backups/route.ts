@@ -41,54 +41,77 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> |
       if (!storeName) return []
 
       try {
-        // Récupérer tous les snapshots du datastore en une seule requête
-        const snapshots = await pbsFetch<any[]>(
-          conn, 
-          `/admin/datastore/${encodeURIComponent(storeName)}/snapshots`
-        )
+        // List all namespaces (empty string = root, plus any sub-namespaces)
+        let namespaces: string[] = ['']
 
-        return (snapshots || []).map(snap => {
-          const backupTime = snap['backup-time'] 
-            ? new Date(snap['backup-time'] * 1000)
-            : null
+        try {
+          const nsData = await pbsFetch<any[]>(
+            conn,
+            `/admin/datastore/${encodeURIComponent(storeName)}/namespace`
+          )
 
-          // Extraire le nom de la VM depuis le comment ou backup-id
-          // PBS stocke souvent le nom dans le format "VM Name (VMID)" ou juste dans comment
-          const vmName = snap.comment || ''
-
-          return {
-            id: `${storeName}/${snap['backup-type']}/${snap['backup-id']}/${snap['backup-time']}`,
-            datastore: storeName,
-            backupType: snap['backup-type'],
-            backupId: snap['backup-id'],
-            vmName: vmName,
-            backupTime: snap['backup-time'] || 0,
-            backupTimeFormatted: backupTime?.toLocaleString('fr-FR') || '-',
-            backupTimeIso: backupTime?.toISOString() || '',
-
-            // Taille
-            size: snap.size || 0,
-            sizeFormatted: formatBytes(snap.size || 0),
-
-            // Fichiers
-            files: snap.files || [],
-            fileCount: snap.files?.length || 0,
-
-            // Vérification
-            verification: snap.verification || null,
-            verified: snap.verification?.state === 'ok',
-            verifiedAt: snap.verification?.upid 
-              ? new Date((snap.verification['last-run'] || 0) * 1000).toLocaleString('fr-FR') 
-              : null,
-
-            // Protection
-            protected: snap.protected || false,
-
-            // Owner
-            owner: snap.owner || '',
-            comment: snap.comment || '',
+          if (Array.isArray(nsData)) {
+            const subNs = nsData.map(n => n.ns || '').filter(Boolean)
+            namespaces = ['', ...subNs]
           }
+        } catch {
+          // Older PBS versions may not support namespace endpoint — use root only
+        }
+
+        // Fetch snapshots for each namespace in parallel
+        const nsPromises = namespaces.map(async (ns) => {
+          const nsParam = ns ? `?ns=${encodeURIComponent(ns)}` : ''
+          const snapshots = await pbsFetch<any[]>(
+            conn,
+            `/admin/datastore/${encodeURIComponent(storeName)}/snapshots${nsParam}`
+          )
+
+          return (snapshots || []).map(snap => {
+            const backupTime = snap['backup-time']
+              ? new Date(snap['backup-time'] * 1000)
+              : null
+
+            const vmName = snap.comment || ''
+
+            return {
+              id: `${storeName}/${ns ? ns + '/' : ''}${snap['backup-type']}/${snap['backup-id']}/${snap['backup-time']}`,
+              datastore: storeName,
+              namespace: ns,
+              backupType: snap['backup-type'],
+              backupId: snap['backup-id'],
+              vmName: vmName,
+              backupTime: snap['backup-time'] || 0,
+              backupTimeFormatted: backupTime?.toLocaleString('fr-FR') || '-',
+              backupTimeIso: backupTime?.toISOString() || '',
+
+              // Taille
+              size: snap.size || 0,
+              sizeFormatted: formatBytes(snap.size || 0),
+
+              // Fichiers
+              files: snap.files || [],
+              fileCount: snap.files?.length || 0,
+
+              // Vérification
+              verification: snap.verification || null,
+              verified: snap.verification?.state === 'ok',
+              verifiedAt: snap.verification?.upid
+                ? new Date((snap.verification['last-run'] || 0) * 1000).toLocaleString('fr-FR')
+                : null,
+
+              // Protection
+              protected: snap.protected || false,
+
+              // Owner
+              owner: snap.owner || '',
+              comment: snap.comment || '',
+            }
+          })
         })
+
+        const nsResults = await Promise.all(nsPromises)
+
+        return nsResults.flat()
       } catch (e: any) {
         console.warn(`Failed to get snapshots for datastore ${storeName}:`, e)
         warnings.push(`Failed to fetch datastore '${storeName}': ${e?.message || String(e)}`)
@@ -112,6 +135,7 @@ return []
         b.backupId?.toLowerCase().includes(search) ||
         b.vmName?.toLowerCase().includes(search) ||
         b.datastore?.toLowerCase().includes(search) ||
+        b.namespace?.toLowerCase().includes(search) ||
         b.comment?.toLowerCase().includes(search)
       )
     }

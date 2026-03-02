@@ -84,79 +84,98 @@ export async function GET(
           if (!storeName) return []
 
           try {
-            // Récupérer tous les snapshots et filtrer par backup-id (vmid)
-            const snapshots = await pbsFetch<any[]>(
-              conn,
-              `/admin/datastore/${encodeURIComponent(storeName)}/snapshots`
-            )
+            // List all namespaces (empty string = root, plus sub-namespaces)
+            let namespaces: string[] = ['']
 
-            return (snapshots || [])
-              .filter(snap => {
-                // Le backup-id correspond au VMID
-                const backupId = String(snap['backup-id'] || '')
-                const matchVmid = backupId === String(vmid)
-                
-                // Filtrer par type si spécifié
-                const matchType = !typeFilter || snap['backup-type'] === typeFilter
-                
-                return matchVmid && matchType
-              })
-              .map(snap => {
-                const backupTime = snap['backup-time']
-                  ? new Date(snap['backup-time'] * 1000)
-                  : null
+            try {
+              const nsData = await pbsFetch<any[]>(
+                conn,
+                `/admin/datastore/${encodeURIComponent(storeName)}/namespace`
+              )
 
-                // Construire le volume ID au format PVE
-                // Format attendu par PVE: "backup/type/vmid/YYYY-MM-DDTHH:MM:SSZ"
-                // PVE attend le timestamp en format ISO 8601, pas en Unix timestamp
-                const backupTimeIso = backupTime?.toISOString().replace(/\.\d{3}Z$/, 'Z') || ''
-                const backupPath = `backup/${snap['backup-type']}/${snap['backup-id']}/${backupTimeIso}`
+              if (Array.isArray(nsData)) {
+                const subNs = nsData.map(n => n.ns || '').filter(Boolean)
+                namespaces = ['', ...subNs]
+              }
+            } catch {
+              // Older PBS versions may not support namespace endpoint
+            }
 
-                return {
-                  id: `${storeName}/${snap['backup-type']}/${snap['backup-id']}/${snap['backup-time']}`,
+            // Fetch snapshots for each namespace in parallel
+            const nsPromises = namespaces.map(async (ns) => {
+              const nsParam = ns ? `?ns=${encodeURIComponent(ns)}` : ''
+              const snapshots = await pbsFetch<any[]>(
+                conn,
+                `/admin/datastore/${encodeURIComponent(storeName)}/snapshots${nsParam}`
+              )
 
-                  // Infos PBS
-                  pbsId: pbs.id,
-                  pbsName: pbs.name,
-                  pbsUrl: pbs.baseUrl,
+              return (snapshots || [])
+                .filter(snap => {
+                  const backupId = String(snap['backup-id'] || '')
+                  const matchVmid = backupId === String(vmid)
+                  const matchType = !typeFilter || snap['backup-type'] === typeFilter
 
-                  // Infos datastore
-                  datastore: storeName,
+                  return matchVmid && matchType
+                })
+                .map(snap => {
+                  const backupTime = snap['backup-time']
+                    ? new Date(snap['backup-time'] * 1000)
+                    : null
 
-                  // Path pour construire le volid PVE (sans le storage prefix)
-                  backupPath,
+                  const backupTimeIso = backupTime?.toISOString().replace(/\.\d{3}Z$/, 'Z') || ''
+                  const backupPath = `backup/${snap['backup-type']}/${snap['backup-id']}/${backupTimeIso}`
 
-                  // Infos backup
-                  backupType: snap['backup-type'],
-                  backupId: snap['backup-id'],
-                  vmName: snap.comment || '',
-                  backupTime: snap['backup-time'] || 0,
-                  backupTimeFormatted: backupTime?.toLocaleString('fr-FR') || '-',
-                  backupTimeIso: backupTimeIso,
+                  return {
+                    id: `${storeName}/${ns ? ns + '/' : ''}${snap['backup-type']}/${snap['backup-id']}/${snap['backup-time']}`,
 
-                  // Taille
-                  size: snap.size || 0,
-                  sizeFormatted: formatBytes(snap.size || 0),
+                    // Infos PBS
+                    pbsId: pbs.id,
+                    pbsName: pbs.name,
+                    pbsUrl: pbs.baseUrl,
 
-                  // Fichiers
-                  files: snap.files || [],
-                  fileCount: snap.files?.length || 0,
+                    // Infos datastore
+                    datastore: storeName,
+                    namespace: ns,
 
-                  // Vérification
-                  verification: snap.verification || null,
-                  verified: snap.verification?.state === 'ok',
-                  verifiedAt: snap.verification?.upid
-                    ? new Date((snap.verification['last-run'] || 0) * 1000).toLocaleString('fr-FR')
-                    : null,
+                    // Path pour construire le volid PVE (sans le storage prefix)
+                    backupPath,
 
-                  // Protection
-                  protected: snap.protected || false,
+                    // Infos backup
+                    backupType: snap['backup-type'],
+                    backupId: snap['backup-id'],
+                    vmName: snap.comment || '',
+                    backupTime: snap['backup-time'] || 0,
+                    backupTimeFormatted: backupTime?.toLocaleString('fr-FR') || '-',
+                    backupTimeIso: backupTimeIso,
 
-                  // Owner
-                  owner: snap.owner || '',
-                  comment: snap.comment || '',
-                }
-              })
+                    // Taille
+                    size: snap.size || 0,
+                    sizeFormatted: formatBytes(snap.size || 0),
+
+                    // Fichiers
+                    files: snap.files || [],
+                    fileCount: snap.files?.length || 0,
+
+                    // Vérification
+                    verification: snap.verification || null,
+                    verified: snap.verification?.state === 'ok',
+                    verifiedAt: snap.verification?.upid
+                      ? new Date((snap.verification['last-run'] || 0) * 1000).toLocaleString('fr-FR')
+                      : null,
+
+                    // Protection
+                    protected: snap.protected || false,
+
+                    // Owner
+                    owner: snap.owner || '',
+                    comment: snap.comment || '',
+                  }
+                })
+            })
+
+            const nsResults = await Promise.all(nsPromises)
+
+            return nsResults.flat()
           } catch (e: any) {
             console.warn(`Failed to get snapshots for ${pbs.name}/${storeName}:`, e)
             warnings.push(`${pbs.name}/${storeName}: ${e?.message || String(e)}`)

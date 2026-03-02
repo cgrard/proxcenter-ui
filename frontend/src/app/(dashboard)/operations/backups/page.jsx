@@ -175,7 +175,8 @@ return () => setPageInfo('', '', '')
 
     try {
       const backupId = encodeURIComponent(backup.id)
-      const res = await fetch(`/api/v1/pbs/${encodeURIComponent(selectedPbs)}/backups/${backupId}/content`)
+      const nsParam = backup.namespace ? `?ns=${encodeURIComponent(backup.namespace)}` : ''
+      const res = await fetch(`/api/v1/pbs/${encodeURIComponent(selectedPbs)}/backups/${backupId}/content${nsParam}`)
       const json = await res.json()
 
       if (json.error) {
@@ -204,7 +205,9 @@ return () => setPageInfo('', '', '')
         archive: archiveName,
         filepath: path,
       })
-      
+
+      if (selectedBackup.namespace) params.set('ns', selectedBackup.namespace)
+
       const res = await fetch(`/api/v1/pbs/${encodeURIComponent(selectedPbs)}/backups/${backupId}/content?${params}`)
       const json = await res.json()
 
@@ -455,6 +458,20 @@ return () => clearTimeout(timer)
       renderCell: params => (
         <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
           <Typography variant='body2'>{params.value}</Typography>
+        </Box>
+      )
+    },
+    {
+      field: 'namespace',
+      headerName: 'Namespace',
+      width: 130,
+      renderCell: params => (
+        <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
+          {params.value ? (
+            <Chip size='small' label={params.value} variant='outlined' />
+          ) : (
+            <Typography variant='body2' sx={{ opacity: 0.3 }}>--</Typography>
+          )}
         </Box>
       )
     },
@@ -782,7 +799,7 @@ return () => clearTimeout(timer)
                       {selectedBackup.vmName || selectedBackup.backupId}
                     </Typography>
                     <Typography variant='body2' sx={{ opacity: 0.7 }}>
-                      {selectedBackup.datastore} • {selectedBackup.backupTimeFormatted}
+                      {selectedBackup.datastore}{selectedBackup.namespace ? ` / ${selectedBackup.namespace}` : ''} • {selectedBackup.backupTimeFormatted}
                     </Typography>
                   </Box>
                   <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
