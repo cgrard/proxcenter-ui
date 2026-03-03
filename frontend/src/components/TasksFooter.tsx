@@ -450,11 +450,11 @@ export default function TasksFooter({
             px: 2,
             py: 0.75,
             cursor: 'pointer',
-            bgcolor: 'rgba(255,255,255,0.03)',
+            bgcolor: '#151521',
             borderBottom: expanded ? '1px solid' : 'none',
             borderColor: 'rgba(231,227,252,0.12)',
             '&:hover': {
-              bgcolor: 'rgba(255,255,255,0.06)'
+              bgcolor: '#1a1a2e'
             }
           }}
         >
