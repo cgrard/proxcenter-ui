@@ -84,6 +84,18 @@ export type DetailsPayload = {
     rate?: number
   }>
 
+  cloudInitConfig?: {
+    ciuser?: string
+    cipassword?: string
+    citype?: string
+    nameserver?: string
+    searchdomain?: string
+    cicustom?: string
+    sshkeys?: string
+    ipconfigs?: Record<string, string>
+    drive?: string
+  } | null
+
   optionsInfo?: {
     onboot?: boolean
     protection?: boolean

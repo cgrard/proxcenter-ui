@@ -631,6 +631,7 @@ return Number.isFinite(num) ? num.toFixed(2) : String(v)
     let disksInfo: any[] = []
     let networkInfo: any[] = []
     let optionsInfo: any = {}
+    let cloudInitConfig: any = null
     let name = g.name || `VM ${vmid}`
     let description = ''
 
@@ -732,6 +733,42 @@ return Number.isFinite(num) ? num.toFixed(2) : String(v)
           vmStateStorage: config.vmstatestorage || 'Automatic',
           amdSEV: config.sev ? 'enabled' : 'default',
         }
+
+        // Cloud-Init extraction
+        const ciFields: Record<string, any> = {}
+        let hasCloudInit = false
+
+        if (config.ciuser !== undefined) { ciFields.ciuser = config.ciuser; hasCloudInit = true }
+        if (config.cipassword !== undefined) { ciFields.cipassword = '********'; hasCloudInit = true }
+        if (config.citype !== undefined) { ciFields.citype = config.citype; hasCloudInit = true }
+        if (config.nameserver !== undefined) { ciFields.nameserver = config.nameserver; hasCloudInit = true }
+        if (config.searchdomain !== undefined) { ciFields.searchdomain = config.searchdomain; hasCloudInit = true }
+        if (config.cicustom !== undefined) { ciFields.cicustom = config.cicustom; hasCloudInit = true }
+        if (config.sshkeys !== undefined) {
+          try { ciFields.sshkeys = decodeURIComponent(config.sshkeys) } catch { ciFields.sshkeys = config.sshkeys }
+          hasCloudInit = true
+        }
+
+        const ipconfigs: Record<string, string> = {}
+        Object.keys(config).forEach(key => {
+          if (/^ipconfig\d+$/.test(key)) {
+            ipconfigs[key] = config[key]
+            hasCloudInit = true
+          }
+        })
+        if (Object.keys(ipconfigs).length > 0) ciFields.ipconfigs = ipconfigs
+
+        // Detect cloud-init drive in disks
+        const allDiskKeys = Object.keys(config).filter(k => /^(scsi|ide|sata|virtio)\d+$/.test(k))
+        for (const dk of allDiskKeys) {
+          if (String(config[dk]).includes('cloudinit')) {
+            ciFields.drive = dk
+            hasCloudInit = true
+            break
+          }
+        }
+
+        cloudInitConfig = hasCloudInit ? ciFields : null
       } catch (e) {
         console.error('Error parsing config:', e)
       }
@@ -762,6 +799,7 @@ return Number.isFinite(num) ? num.toFixed(2) : String(v)
       disksInfo,
       networkInfo,
       optionsInfo,
+      cloudInitConfig,
       nodeCapacity,
     }
   }

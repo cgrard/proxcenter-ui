@@ -34,6 +34,9 @@ const ALLOWED_QEMU_FIELDS = new Set([
   // Args
   'args',
 
+  // Cloud-Init
+  'ciuser', 'cipassword', 'sshkeys', 'nameserver', 'searchdomain', 'citype', 'cicustom',
+
   // Delete (pour supprimer des options)
   'delete',
 ])
@@ -145,15 +148,21 @@ export async function PUT(
     
     for (const [key, value] of Object.entries(body)) {
       // Vérifier si le champ est autorisé ou si c'est un champ réseau/disque
-      const isAllowed = allowedFields.has(key) || 
+      const isAllowed = allowedFields.has(key) ||
                         /^net\d+$/.test(key) ||      // net0, net1, etc.
                         /^(scsi|virtio|ide|sata)\d+$/.test(key) || // disques
                         /^unused\d+$/.test(key) ||   // unused disks
                         /^hostpci\d+$/.test(key) ||  // PCI passthrough
-                        /^usb\d+$/.test(key)         // USB passthrough
+                        /^usb\d+$/.test(key) ||      // USB passthrough
+                        /^ipconfig\d+$/.test(key)    // Cloud-Init IP configs
 
       if (isAllowed && value !== undefined && value !== null) {
-        formData.append(key, String(value))
+        // PVE requires sshkeys to be URL-encoded inside the value (double-encoding)
+        if (key === 'sshkeys') {
+          formData.append(key, encodeURIComponent(String(value)))
+        } else {
+          formData.append(key, String(value))
+        }
       }
     }
 

@@ -3098,9 +3098,9 @@ return
     }
   }, [detailTab, selection?.type, selection?.id, notesLoaded, notesLoading, loadNotes])
 
-  // Charger la config HA quand on sélectionne l'onglet HA (index 8)
+  // Charger la config HA quand on sélectionne l'onglet HA (index 9)
   useEffect(() => {
-    if (detailTab === 8 && selection?.type === 'vm' && !haLoaded && !haLoading) {
+    if (detailTab === 9 && selection?.type === 'vm' && !haLoaded && !haLoading) {
       loadHaConfig()
     }
   }, [detailTab, selection?.type, selection?.id, haLoaded, haLoading, loadHaConfig])

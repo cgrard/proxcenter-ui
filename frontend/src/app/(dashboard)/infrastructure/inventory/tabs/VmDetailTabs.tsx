@@ -323,6 +323,14 @@ export default function VmDetailTabs(props: any) {
                     </Box>
                   }
                 />
+                <Tab
+                  label={
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                      <i className="ri-cloud-line" style={{ fontSize: 16 }} />
+                      {t('inventory.tabs.cloudInit')}
+                    </Box>
+                  }
+                />
                 {selectedVmIsCluster && (
                   <Tab
                     label={
@@ -2752,8 +2760,197 @@ return (
                 </Box>
               )}
 
-              {/* ==================== ONGLET 8 - HA (seulement pour les clusters) ==================== */}
-              {detailTab === 8 && selectedVmIsCluster && (
+              {/* ==================== ONGLET 8 - CLOUD-INIT ==================== */}
+              {detailTab === 8 && (
+                <Box sx={{ py: 2 }}>
+                  {loading ? (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                      <CircularProgress />
+                    </Box>
+                  ) : !data.cloudInitConfig ? (
+                    <Card variant="outlined" sx={{ borderRadius: 2 }}>
+                      <CardContent sx={{ py: 6, textAlign: 'center' }}>
+                        <i className="ri-cloud-off-line" style={{ fontSize: 48, opacity: 0.3 }} />
+                        <Typography variant="h6" sx={{ mt: 2, fontWeight: 600 }}>
+                          {t('inventory.cloudInit.noCloudInit')}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1, maxWidth: 480, mx: 'auto' }}>
+                          {t('inventory.cloudInit.noCloudInitDesc')}
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <Card variant="outlined" sx={{ borderRadius: 2 }}>
+                      <CardContent sx={{ p: 0 }}>
+                        <Box sx={{ overflowX: 'auto' }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                            <thead>
+                              <tr style={{ backgroundColor: 'rgba(0,0,0,0.04)' }}>
+                                <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid rgba(0,0,0,0.2)', width: '30%' }}>{t('inventory.option')}</th>
+                                <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid rgba(0,0,0,0.2)' }}>{t('inventory.value')}</th>
+                                <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 600, borderBottom: '1px solid rgba(0,0,0,0.2)', width: '60px' }}>{t('inventory.actions')}</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {/* User */}
+                              <tr>
+                                <td style={{ padding: '10px 16px', borderBottom: '1px solid rgba(0,0,0,0.15)', fontWeight: 500 }}>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <i className="ri-user-line" style={{ fontSize: 16, opacity: 0.6 }} />
+                                    {t('inventory.cloudInit.user')}
+                                  </Box>
+                                </td>
+                                <td style={{ padding: '10px 16px', borderBottom: '1px solid rgba(0,0,0,0.15)', opacity: data.cloudInitConfig.ciuser ? 1 : 0.5, fontStyle: data.cloudInitConfig.ciuser ? 'normal' : 'italic' }}>
+                                  {data.cloudInitConfig.ciuser || t('common.noData')}
+                                </td>
+                                <td style={{ padding: '10px 16px', borderBottom: '1px solid rgba(0,0,0,0.15)', textAlign: 'center' }}>
+                                  <MuiTooltip title={t('common.edit')}>
+                                    <IconButton size="small" onClick={() => setEditOptionDialog({ key: 'ciuser', label: t('inventory.cloudInit.user'), value: data.cloudInitConfig.ciuser || '', type: 'text' })}>
+                                      <i className="ri-pencil-line" style={{ fontSize: 16 }} />
+                                    </IconButton>
+                                  </MuiTooltip>
+                                </td>
+                              </tr>
+                              {/* Password */}
+                              <tr>
+                                <td style={{ padding: '10px 16px', borderBottom: '1px solid rgba(0,0,0,0.15)', fontWeight: 500 }}>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <i className="ri-lock-password-line" style={{ fontSize: 16, opacity: 0.6 }} />
+                                    {t('inventory.cloudInit.password')}
+                                  </Box>
+                                </td>
+                                <td style={{ padding: '10px 16px', borderBottom: '1px solid rgba(0,0,0,0.15)', opacity: data.cloudInitConfig.cipassword ? 1 : 0.5, fontStyle: data.cloudInitConfig.cipassword ? 'normal' : 'italic' }}>
+                                  {data.cloudInitConfig.cipassword ? t('inventory.cloudInit.passwordMasked') : t('common.noData')}
+                                </td>
+                                <td style={{ padding: '10px 16px', borderBottom: '1px solid rgba(0,0,0,0.15)', textAlign: 'center' }}>
+                                  <MuiTooltip title={t('common.edit')}>
+                                    <IconButton size="small" onClick={() => setEditOptionDialog({ key: 'cipassword', label: t('inventory.cloudInit.password'), value: '', type: 'text' })}>
+                                      <i className="ri-pencil-line" style={{ fontSize: 16 }} />
+                                    </IconButton>
+                                  </MuiTooltip>
+                                </td>
+                              </tr>
+                              {/* SSH Public Keys */}
+                              <tr>
+                                <td style={{ padding: '10px 16px', borderBottom: '1px solid rgba(0,0,0,0.15)', fontWeight: 500 }}>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <i className="ri-key-2-line" style={{ fontSize: 16, opacity: 0.6 }} />
+                                    {t('inventory.cloudInit.sshKeys')}
+                                  </Box>
+                                </td>
+                                <td style={{ padding: '10px 16px', borderBottom: '1px solid rgba(0,0,0,0.15)', opacity: data.cloudInitConfig.sshkeys ? 1 : 0.5, fontStyle: data.cloudInitConfig.sshkeys ? 'normal' : 'italic' }}>
+                                  {data.cloudInitConfig.sshkeys ? (
+                                    <Box component="pre" sx={{ m: 0, fontSize: 12, fontFamily: 'JetBrains Mono, monospace', whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: 120, overflow: 'auto' }}>
+                                      {data.cloudInitConfig.sshkeys}
+                                    </Box>
+                                  ) : t('common.noData')}
+                                </td>
+                                <td style={{ padding: '10px 16px', borderBottom: '1px solid rgba(0,0,0,0.15)', textAlign: 'center' }}>
+                                  <MuiTooltip title={t('common.edit')}>
+                                    <IconButton size="small" onClick={() => setEditOptionDialog({ key: 'sshkeys', label: t('inventory.cloudInit.sshKeys'), value: data.cloudInitConfig.sshkeys || '', type: 'text' })}>
+                                      <i className="ri-pencil-line" style={{ fontSize: 16 }} />
+                                    </IconButton>
+                                  </MuiTooltip>
+                                </td>
+                              </tr>
+                              {/* IP Configurations */}
+                              {data.cloudInitConfig.ipconfigs && Object.entries(data.cloudInitConfig.ipconfigs)
+                                .sort(([a], [b]) => {
+                                  const na = parseInt(a.replace('ipconfig', ''))
+                                  const nb = parseInt(b.replace('ipconfig', ''))
+                                  return na - nb
+                                })
+                                .map(([key, val]: [string, any]) => (
+                                <tr key={key}>
+                                  <td style={{ padding: '10px 16px', borderBottom: '1px solid rgba(0,0,0,0.15)', fontWeight: 500 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                      <i className="ri-global-line" style={{ fontSize: 16, opacity: 0.6 }} />
+                                      {t('inventory.cloudInit.ipConfig')} ({key.replace('ipconfig', '')})
+                                    </Box>
+                                  </td>
+                                  <td style={{ padding: '10px 16px', borderBottom: '1px solid rgba(0,0,0,0.15)' }}>
+                                    <Typography variant="body2" sx={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12 }}>{String(val)}</Typography>
+                                    <Typography variant="caption" color="text.secondary">{t('inventory.cloudInit.ipConfigHelp')}</Typography>
+                                  </td>
+                                  <td style={{ padding: '10px 16px', borderBottom: '1px solid rgba(0,0,0,0.15)', textAlign: 'center' }}>
+                                    <MuiTooltip title={t('common.edit')}>
+                                      <IconButton size="small" onClick={() => setEditOptionDialog({ key, label: `${t('inventory.cloudInit.ipConfig')} (${key.replace('ipconfig', '')})`, value: String(val), type: 'text' })}>
+                                        <i className="ri-pencil-line" style={{ fontSize: 16 }} />
+                                      </IconButton>
+                                    </MuiTooltip>
+                                  </td>
+                                </tr>
+                              ))}
+                              {/* If no ipconfigs yet, show ipconfig0 placeholder */}
+                              {(!data.cloudInitConfig.ipconfigs || Object.keys(data.cloudInitConfig.ipconfigs).length === 0) && (
+                                <tr>
+                                  <td style={{ padding: '10px 16px', borderBottom: '1px solid rgba(0,0,0,0.15)', fontWeight: 500 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                      <i className="ri-global-line" style={{ fontSize: 16, opacity: 0.6 }} />
+                                      {t('inventory.cloudInit.ipConfig')} (0)
+                                    </Box>
+                                  </td>
+                                  <td style={{ padding: '10px 16px', borderBottom: '1px solid rgba(0,0,0,0.15)', opacity: 0.5, fontStyle: 'italic' }}>
+                                    {t('common.noData')}
+                                  </td>
+                                  <td style={{ padding: '10px 16px', borderBottom: '1px solid rgba(0,0,0,0.15)', textAlign: 'center' }}>
+                                    <MuiTooltip title={t('common.edit')}>
+                                      <IconButton size="small" onClick={() => setEditOptionDialog({ key: 'ipconfig0', label: `${t('inventory.cloudInit.ipConfig')} (0)`, value: '', type: 'text' })}>
+                                        <i className="ri-pencil-line" style={{ fontSize: 16 }} />
+                                      </IconButton>
+                                    </MuiTooltip>
+                                  </td>
+                                </tr>
+                              )}
+                              {/* DNS Server */}
+                              <tr>
+                                <td style={{ padding: '10px 16px', borderBottom: '1px solid rgba(0,0,0,0.15)', fontWeight: 500 }}>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <i className="ri-dns-line" style={{ fontSize: 16, opacity: 0.6 }} />
+                                    {t('inventory.cloudInit.nameserver')}
+                                  </Box>
+                                </td>
+                                <td style={{ padding: '10px 16px', borderBottom: '1px solid rgba(0,0,0,0.15)', opacity: data.cloudInitConfig.nameserver ? 1 : 0.5, fontStyle: data.cloudInitConfig.nameserver ? 'normal' : 'italic' }}>
+                                  {data.cloudInitConfig.nameserver || t('common.noData')}
+                                </td>
+                                <td style={{ padding: '10px 16px', borderBottom: '1px solid rgba(0,0,0,0.15)', textAlign: 'center' }}>
+                                  <MuiTooltip title={t('common.edit')}>
+                                    <IconButton size="small" onClick={() => setEditOptionDialog({ key: 'nameserver', label: t('inventory.cloudInit.nameserver'), value: data.cloudInitConfig.nameserver || '', type: 'text' })}>
+                                      <i className="ri-pencil-line" style={{ fontSize: 16 }} />
+                                    </IconButton>
+                                  </MuiTooltip>
+                                </td>
+                              </tr>
+                              {/* Search Domain */}
+                              <tr>
+                                <td style={{ padding: '10px 16px', borderBottom: '1px solid rgba(0,0,0,0.15)', fontWeight: 500 }}>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <i className="ri-search-line" style={{ fontSize: 16, opacity: 0.6 }} />
+                                    {t('inventory.cloudInit.searchdomain')}
+                                  </Box>
+                                </td>
+                                <td style={{ padding: '10px 16px', borderBottom: '1px solid rgba(0,0,0,0.15)', opacity: data.cloudInitConfig.searchdomain ? 1 : 0.5, fontStyle: data.cloudInitConfig.searchdomain ? 'normal' : 'italic' }}>
+                                  {data.cloudInitConfig.searchdomain || t('common.noData')}
+                                </td>
+                                <td style={{ padding: '10px 16px', borderBottom: '1px solid rgba(0,0,0,0.15)', textAlign: 'center' }}>
+                                  <MuiTooltip title={t('common.edit')}>
+                                    <IconButton size="small" onClick={() => setEditOptionDialog({ key: 'searchdomain', label: t('inventory.cloudInit.searchdomain'), value: data.cloudInitConfig.searchdomain || '', type: 'text' })}>
+                                      <i className="ri-pencil-line" style={{ fontSize: 16 }} />
+                                    </IconButton>
+                                  </MuiTooltip>
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  )}
+                </Box>
+              )}
+
+              {/* ==================== ONGLET 9 - HA (seulement pour les clusters) ==================== */}
+              {detailTab === 9 && selectedVmIsCluster && (
                 <Box sx={{ py: 2 }}>
                   <Card variant="outlined" sx={{ borderRadius: 2 }}>
                     <CardContent>
@@ -2977,8 +3174,8 @@ return (
                 </Box>
               )}
 
-              {/* ==================== ONGLET FIREWALL (9 si cluster, 8 sinon) ==================== */}
-              {((selectedVmIsCluster && detailTab === 9) || (!selectedVmIsCluster && detailTab === 8)) && selection?.type === 'vm' && (
+              {/* ==================== ONGLET FIREWALL (10 si cluster, 9 sinon) ==================== */}
+              {((selectedVmIsCluster && detailTab === 10) || (!selectedVmIsCluster && detailTab === 9)) && selection?.type === 'vm' && (
                 <VmFirewallTab
                   connectionId={parseVmId(selection.id).connId}
                   node={parseVmId(selection.id).node}

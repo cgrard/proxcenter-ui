@@ -435,7 +435,22 @@
       "ha": "HA",
       "firewall": "Firewall",
       "network": "Réseau",
+      "cloudInit": "Cloud-Init",
       "historyEmpty": "L'historique des tâches (démarrages, arrêts, migrations, snapshots, sauvegardes) apparaîtra ici."
+    },
+    "cloudInit": {
+      "user": "Utilisateur",
+      "password": "Mot de passe",
+      "sshKeys": "Clés SSH publiques",
+      "ipConfig": "Configuration IP",
+      "nameserver": "Serveur DNS",
+      "searchdomain": "Domaine de recherche",
+      "citype": "Type Cloud-Init",
+      "noCloudInit": "Aucun disque Cloud-Init détecté",
+      "noCloudInitDesc": "Cette VM ne possède pas de disque Cloud-Init. Ajoutez un disque Cloud-Init au matériel de la VM pour configurer les paramètres Cloud-Init.",
+      "passwordMasked": "Mot de passe défini (masqué par Proxmox)",
+      "ipConfigHelp": "Format : ip=<IPv4/CIDR>,gw=<GW> ou ip=dhcp",
+      "saved": "Configuration Cloud-Init sauvegardée"
     },
     "noNotes": "Aucune note pour cette VM. Cliquez sur \"Modifier\" pour en ajouter.",
     "saveCpuChanges": "Sauvegarder les modifications CPU",
