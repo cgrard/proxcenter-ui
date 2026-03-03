@@ -77,14 +77,20 @@ function TagManager({ tags, connId, node, type, vmid, onTagsChange }: TagManager
     setNewTagInput('')
   }
 
+  // Sanitize tag for Proxmox: lowercase, alphanumeric + hyphen + underscore only
+  const sanitizeTag = (raw: string): string =>
+    raw.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9_-]/g, '').replace(/-{2,}/g, '-').replace(/^-|-$/g, '')
+
   // Ajouter un tag
   const handleAddTag = async (tagToAdd: string) => {
-    if (!tagToAdd.trim() || tags.includes(tagToAdd.trim())) return
+    const sanitized = sanitizeTag(tagToAdd)
+
+    if (!sanitized || tags.includes(sanitized)) return
     
     setBusy(true)
 
     try {
-      const newTags = [...tags, tagToAdd.trim()]
+      const newTags = [...tags, sanitized]
       const tagsString = newTags.join(';')
       
       const res = await fetch(
@@ -221,7 +227,7 @@ return (
               size="small"
               placeholder={t('inventoryPage.newTag')}
               value={newTagInput}
-              onChange={e => setNewTagInput(e.target.value)}
+              onChange={e => setNewTagInput(e.target.value.toLowerCase().replace(/[^a-z0-9_\s-]/g, ''))}
               onKeyDown={e => {
                 if (e.key === 'Enter' && newTagInput.trim()) {
                   handleAddTag(newTagInput)
