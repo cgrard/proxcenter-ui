@@ -475,9 +475,9 @@ return () => clearTimeout(timer)
   )
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1, minHeight: 0 }}>
       {/* Header Actions */}
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, flexShrink: 0 }}>
         <Button
           variant='outlined'
           size='small'
@@ -501,8 +501,8 @@ return () => clearTimeout(timer)
       <StatsCards logs={logs} t={t} />
 
       {/* Filters + Table */}
-      <Card variant='outlined' sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-        <CardContent sx={{ pb: 0 }}>
+      <Card variant='outlined' sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+        <CardContent sx={{ pb: 0, flexShrink: 0 }}>
           <Stack direction='row' spacing={1.5} sx={{ flexWrap: 'wrap', alignItems: 'center', mb: 2 }}>
             <TextField
               size='small'
@@ -561,35 +561,37 @@ return () => clearTimeout(timer)
           <Alert severity='error' sx={{ mx: 2, mb: 2 }}>{error}</Alert>
         )}
 
-        <Box sx={{ flex: 1, minHeight: 500 }}>
-          <DataGrid
-            rows={logs}
-            columns={columns}
-            loading={loading}
-            paginationModel={paginationModel}
-            onPaginationModelChange={setPaginationModel}
-            pageSizeOptions={[25, 50, 100]}
-            paginationMode='server'
-            rowCount={total}
-            disableRowSelectionOnClick
-            density='compact'
-            sx={{
-              border: 'none',
-              '& .MuiDataGrid-row': {
-                minHeight: '36px !important',
-                maxHeight: '36px !important',
-              },
-              '& .MuiDataGrid-cell': {
-                display: 'flex',
-                alignItems: 'center',
-                py: 0.5,
-              },
-              '& .MuiDataGrid-columnHeaders': {
-                borderBottom: '1px solid',
-                borderColor: 'divider',
-              },
-            }}
-          />
+        <Box sx={{ flex: 1, minHeight: 0, position: 'relative' }}>
+          <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
+            <DataGrid
+              rows={logs}
+              columns={columns}
+              loading={loading}
+              paginationModel={paginationModel}
+              onPaginationModelChange={setPaginationModel}
+              pageSizeOptions={[25, 50, 100]}
+              paginationMode='server'
+              rowCount={total}
+              disableRowSelectionOnClick
+              density='compact'
+              sx={{
+                border: 'none',
+                '& .MuiDataGrid-row': {
+                  minHeight: '36px !important',
+                  maxHeight: '36px !important',
+                },
+                '& .MuiDataGrid-cell': {
+                  display: 'flex',
+                  alignItems: 'center',
+                  py: 0.5,
+                },
+                '& .MuiDataGrid-columnHeaders': {
+                  borderBottom: '1px solid',
+                  borderColor: 'divider',
+                },
+              }}
+            />
+          </Box>
         </Box>
       </Card>
     </Box>

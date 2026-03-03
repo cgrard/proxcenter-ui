@@ -50,6 +50,30 @@ function n(v: number, d = 1) { return v.toFixed(d) }
 function pueGrade(pue: number) { if (pue <= 1.2) return 'A'; if (pue <= 1.4) return 'B'; if (pue <= 1.6) return 'C'; if (pue <= 2.0) return 'D'; return 'E' }
 function pueLabel(pue: number) { if (pue <= 1.2) return 'Best-in-class (hyperscaler level)'; if (pue <= 1.4) return 'Very efficient'; if (pue <= 1.6) return 'Average datacenter'; if (pue <= 2.0) return 'Below average — optimization recommended'; return 'Inefficient — immediate action required' }
 
+// ────────── Logo helper ──────────
+async function loadLogoPng(): Promise<string | null> {
+  try {
+    const res = await fetch('https://proxcenter.io/images/proxcenter-logo.svg')
+    const svgText = await res.text()
+    const img = new Image()
+    const blob = new Blob([svgText], { type: 'image/svg+xml;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    return await new Promise<string | null>((resolve) => {
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        canvas.width = img.naturalWidth * 2
+        canvas.height = img.naturalHeight * 2
+        const ctx = canvas.getContext('2d')!
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+        URL.revokeObjectURL(url)
+        resolve(canvas.toDataURL('image/png'))
+      }
+      img.onerror = () => { URL.revokeObjectURL(url); resolve(null) }
+      img.src = url
+    })
+  } catch { return null }
+}
+
 // ────────── Main export ──────────
 export async function exportResourcesPdf(data: ExportData): Promise<void> {
   const { jsPDF } = await import('jspdf')
@@ -64,6 +88,8 @@ export async function exportResourcesPdf(data: ExportData): Promise<void> {
   const dateFull = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
   const dateShort = now.toISOString().slice(0, 10)
   let totalPages = 0
+
+  const logoPng = await loadLogoPng()
 
   // ── Helpers ──
 
@@ -82,7 +108,11 @@ export async function exportResourcesPdf(data: ExportData): Promise<void> {
       doc.text(subtitle, M, 25)
     }
     doc.setFontSize(8).setTextColor(WHITE)
-    doc.text(dateFull, W - M, 21, { align: 'right' })
+    doc.text(dateFull, logoPng ? W - M - 30 : W - M, 21, { align: 'right' })
+    // Logo top-right
+    if (logoPng) {
+      doc.addImage(logoPng, 'PNG', W - M - 25, 4, 25, 18)
+    }
   }
 
   function footer(page: number) {

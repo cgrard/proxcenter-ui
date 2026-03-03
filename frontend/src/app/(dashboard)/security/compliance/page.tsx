@@ -127,9 +127,9 @@ function HardeningTab() {
   ]
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, flex: 1, minHeight: 0 }}>
       {/* Connection selector + profile selector + scan button */}
-      <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+      <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap', flexShrink: 0 }}>
         <Autocomplete
           options={connections}
           getOptionLabel={(opt: any) => opt.name || opt.id}
@@ -184,7 +184,7 @@ function HardeningTab() {
           )}
 
           {/* Score gauge + stat cards */}
-          <Grid container spacing={3} columns={5}>
+          <Grid container spacing={3} columns={5} sx={{ flexShrink: 0 }}>
             {/* Score gauge */}
             <Grid size={{ xs: 5, sm: 2.5, md: 1 }}>
               <Card sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -247,8 +247,8 @@ function HardeningTab() {
           </Grid>
 
           {/* Results Table */}
-          <Card>
-            <TableContainer>
+          <Card sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+            <TableContainer sx={{ flex: 1, overflow: 'auto' }}>
               <Table size="small">
                 <TableHead>
                   <TableRow>
@@ -505,20 +505,20 @@ function ProfilesTab() {
   }
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, flex: 1, minHeight: 0 }}>
       {toast && (
-        <Alert severity={toast.type} onClose={() => setToast(null)}>
+        <Alert severity={toast.type} onClose={() => setToast(null)} sx={{ flexShrink: 0 }}>
           {toast.message}
         </Alert>
       )}
 
       {/* Description */}
-      <Typography variant="body2" color="text.secondary">
+      <Typography variant="body2" color="text.secondary" sx={{ flexShrink: 0 }}>
         {t('compliance.profilesDescription')}
       </Typography>
 
       {/* Actions */}
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
         <Button
           variant="contained"
           size="small"
@@ -545,8 +545,8 @@ function ProfilesTab() {
       )}
 
       {profiles.length > 0 && (
-        <Card>
-          <TableContainer>
+        <Card sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+          <TableContainer sx={{ flex: 1, overflow: 'auto' }}>
             <Table size="small">
               <TableHead>
                 <TableRow>
@@ -938,8 +938,8 @@ export default function CompliancePage() {
 
   return (
     <EnterpriseGuard requiredFeature={Features.COMPLIANCE}>
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-        <Tabs value={tab} onChange={(_, v) => setTab(v)}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, flex: 1, minHeight: 0 }}>
+        <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ flexShrink: 0 }}>
           <Tab
             icon={<i className="ri-shield-check-line" />}
             iconPosition="start"

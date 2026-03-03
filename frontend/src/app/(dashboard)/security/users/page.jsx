@@ -605,12 +605,21 @@ return () => setPageInfo('', '', '')
                     loading={loading}
                     pageSizeOptions={[10, 25, 50]}
                     disableRowSelectionOnClick
-                    rowHeight={56}
+                    density='compact'
                     sx={{
                       border: 'none',
+                      '& .MuiDataGrid-row': {
+                        minHeight: '40px !important',
+                        maxHeight: '40px !important',
+                      },
                       '& .MuiDataGrid-cell': {
                         display: 'flex',
                         alignItems: 'center',
+                        py: 0.5,
+                      },
+                      '& .MuiDataGrid-columnHeaders': {
+                        borderBottom: '1px solid',
+                        borderColor: 'divider',
                       },
                     }}
                   />
