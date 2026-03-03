@@ -1338,7 +1338,9 @@ return () => setPageInfo('', '', '')
 
   const { data: recommendationsRaw, mutate: mutateRecs, isLoading: recsLoading } = useDRSRecsHook(isEnterprise)
 
-  const recommendations: DRSRecommendation[] = (ensureArray(recommendationsRaw as any) as DRSRecommendation[]).filter(r => !executedRecIds.has(r.id))
+  const recommendations: DRSRecommendation[] = (ensureArray(recommendationsRaw as any) as DRSRecommendation[])
+    .filter(r => !executedRecIds.has(r.id))
+    .filter((r, i, arr) => arr.findIndex(x => x.id === r.id) === i)
 
   const { data: migrationsRaw, mutate: mutateMigrations, isLoading: migrationsLoading } = useDRSMigrations(isEnterprise)
 
@@ -1708,30 +1710,22 @@ return next
 
     // Lancer la vérification de migration
     checkMigration(rec)
-    
+
     // Valider que la recommandation est toujours valide (VM toujours sur le bon nœud)
+    // Ne pas appeler mutateRecs ici — ça provoquerait un flash "clusters équilibrés"
+    // si la validation retourne moins de recs (stale). Le SWR auto-refresh s'en charge.
     try {
       const res = await fetch(`/api/v1/orchestrator/drs/recommendations?validate=true`)
       const validated = await res.json()
-      const updatedRec = validated.find((r: DRSRecommendation) => r.id === rec.id)
-      
+      const updatedRec = Array.isArray(validated) ? validated.find((r: DRSRecommendation) => r.id === rec.id) : null
+
       if (updatedRec) {
-        // Mettre à jour avec les données validées
         setSelectedRec(updatedRec)
-        
-        // Si la recommandation est devenue stale, avertir l'utilisateur
-        if (updatedRec.status === 'stale') {
-          // La recommendation sera affichée avec son nouveau statut
-        }
       }
-
-
-      // Mettre à jour le cache SWR avec les données validées
-      mutateRecs(validated, false)
     } catch (e) {
       console.error('Error validating recommendation:', e)
     }
-  }, [checkMigration, mutateRecs])
+  }, [checkMigration])
 
   const handleRecommendationAction = useCallback(async (id: string, action: 'approve' | 'reject' | 'execute') => {
     try {
@@ -1758,8 +1752,8 @@ return next
       // Gérer les différents cas d'erreur
       const errorMsg = e.message || ''
       
-      if (errorMsg.includes('has moved') || errorMsg.includes('stale')) {
-        // VM a bougé depuis la création de la recommandation
+      if (errorMsg.includes('has moved') || errorMsg.includes('stale') || errorMsg.includes('does not exist') || errorMsg.includes('Configuration file')) {
+        // VM a bougé ou n'existe plus sur le nœud source
         setDrawerOpen(false)
         setSelectedRec(null)
 
