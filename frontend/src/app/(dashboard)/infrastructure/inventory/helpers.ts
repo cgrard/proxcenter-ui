@@ -728,7 +728,7 @@ return Number.isFinite(num) ? num.toFixed(2) : String(v)
           useLocalTime: config.localtime === 1 || config.localtime === true ? 'yes' : 'default',
           rtcStartDate: config.startdate || 'now',
           smbiosUuid: config.smbios1?.match(/uuid=([^,]+)/)?.[1] || 'Auto-generated',
-          agentEnabled: config.agent && String(config.agent).includes('enabled=1'),
+          agentEnabled: config.agent && (String(config.agent).startsWith('1') || String(config.agent).includes('enabled=1')),
           spiceEnhancements: config.spice_enhancements || 'none',
           vmStateStorage: config.vmstatestorage || 'Automatic',
           amdSEV: config.sev ? 'enabled' : 'default',
