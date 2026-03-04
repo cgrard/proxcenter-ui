@@ -585,6 +585,7 @@
       "format": "Format: {format}",
       "ssdEmulation": "SSD emulation",
       "backup": "Backup",
+      "addDisk": "Add Disk",
       "sockets": "Sockets",
       "cpuType": "Type",
       "cores": "Cores",

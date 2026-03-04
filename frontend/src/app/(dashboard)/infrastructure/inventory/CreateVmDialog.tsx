@@ -34,6 +34,32 @@ import {
 
 import { AllVmItem } from './InventoryTree'
 
+type DiskConfig = {
+  bus: string
+  index: number
+  storage: string
+  size: number
+  format: string
+  cache: string
+  discard: boolean
+  ioThread: boolean
+  ssd: boolean
+  backup: boolean
+}
+
+const createDefaultDisk = (): DiskConfig => ({
+  bus: 'scsi',
+  index: 0,
+  storage: '',
+  size: 32,
+  format: 'raw',
+  cache: 'none',
+  discard: false,
+  ioThread: true,
+  ssd: false,
+  backup: true,
+})
+
 function CreateVmDialog({
   open,
   onClose,
@@ -59,6 +85,7 @@ function CreateVmDialog({
   const [storages, setStorages] = useState<any[]>([])
   const [isoImages, setIsoImages] = useState<any[]>([])
   const [networks, setNetworks] = useState<any[]>([])
+  const [bridges, setBridges] = useState<any[]>([])
   const [pools, setPools] = useState<any[]>([])
   const [loadingData, setLoadingData] = useState(false)
   
@@ -89,16 +116,8 @@ function CreateVmDialog({
   const [qemuAgent, setQemuAgent] = useState(false)
   const [addTpm, setAddTpm] = useState(false)
   
-  // Formulaire - Disks
-  const [diskBus, setDiskBus] = useState('scsi')
-  const [diskStorage, setDiskStorage] = useState('')
-  const [diskSize, setDiskSize] = useState(32)
-  const [diskFormat, setDiskFormat] = useState('raw')
-  const [diskCache, setDiskCache] = useState('none')
-  const [diskDiscard, setDiskDiscard] = useState(false)
-  const [diskIoThread, setDiskIoThread] = useState(true)
-  const [diskSsd, setDiskSsd] = useState(false)
-  const [diskBackup, setDiskBackup] = useState(true)
+  // Formulaire - Disks (array-based)
+  const [disks, setDisks] = useState<DiskConfig[]>([createDefaultDisk()])
   
   // Formulaire - CPU
   const [cpuSockets, setCpuSockets] = useState(1)
@@ -124,11 +143,85 @@ function CreateVmDialog({
   const [rateLimit, setRateLimit] = useState('')
   const [mtu, setMtu] = useState('1500')
 
+  // Load next VMID from the Proxmox cluster API
+  const loadNextVmid = async (connId: string) => {
+    try {
+      const res = await fetch(`/api/v1/connections/${encodeURIComponent(connId)}/cluster/nextid`)
+      if (res.ok) {
+        const json = await res.json()
+        if (json.data) {
+          setVmid(String(json.data))
+          setVmidError(null)
+          return
+        }
+      }
+    } catch (e) {
+      console.error('Error loading next VMID from API:', e)
+    }
+    // Fallback: client-side computation
+    const usedVmids = new Set(allVms.map(vm => parseInt(String(vm.vmid), 10)))
+    let nextId = 100
+    while (usedVmids.has(nextId)) nextId++
+    setVmid(String(nextId))
+    setVmidError(null)
+  }
+
+  // Load bridges from node
+  const loadBridges = async (connId: string, node: string) => {
+    try {
+      const res = await fetch(
+        `/api/v1/connections/${encodeURIComponent(connId)}/nodes/${encodeURIComponent(node)}/network`
+      )
+      if (res.ok) {
+        const json = await res.json()
+        const allInterfaces = json.data || []
+        const bridgeList = allInterfaces.filter((iface: any) => iface.type === 'bridge')
+        setBridges(bridgeList)
+        if (bridgeList.length > 0 && !bridgeList.some((b: any) => b.iface === networkBridge)) {
+          setNetworkBridge(bridgeList[0].iface)
+        }
+      }
+    } catch (e) {
+      console.error('Error loading bridges:', e)
+      setBridges([])
+    }
+  }
+
+  // Disk array helpers
+  const addDisk = () => {
+    setDisks(prev => {
+      const bus = 'scsi'
+      const usedIndices = prev.filter(d => d.bus === bus).map(d => d.index)
+      let nextIndex = 0
+      while (usedIndices.includes(nextIndex)) nextIndex++
+      return [...prev, { ...createDefaultDisk(), bus, index: nextIndex, storage: prev[0]?.storage || '' }]
+    })
+  }
+
+  const removeDisk = (idx: number) => {
+    setDisks(prev => prev.filter((_, i) => i !== idx))
+  }
+
+  const updateDisk = (idx: number, updates: Partial<DiskConfig>) => {
+    setDisks(prev => {
+      const updated = [...prev]
+      updated[idx] = { ...updated[idx], ...updates }
+      if (updates.bus && updates.bus !== prev[idx].bus) {
+        const usedIndices = prev.filter((d, i) => i !== idx && d.bus === updates.bus).map(d => d.index)
+        let nextIndex = 0
+        while (usedIndices.includes(nextIndex)) nextIndex++
+        updated[idx].index = nextIndex
+      }
+      return updated
+    })
+  }
+
   // Reset form when dialog opens
   useEffect(() => {
     if (open) {
       setActiveTab(0)
       setError(null)
+      setDisks([createDefaultDisk()])
       loadAllData()
     }
   }, [open])
@@ -137,6 +230,13 @@ function CreateVmDialog({
   useEffect(() => {
     if (selectedConnection && selectedNode) {
       loadStorages(selectedConnection)
+    }
+  }, [selectedConnection, selectedNode])
+
+  // Charger les bridges quand un node est sélectionné
+  useEffect(() => {
+    if (selectedConnection && selectedNode) {
+      loadBridges(selectedConnection, selectedNode)
     }
   }, [selectedConnection, selectedNode])
 
@@ -170,33 +270,6 @@ function CreateVmDialog({
       loadIsoImages(selectedConnection, selectedNode, isoStorage)
     }
   }, [selectedConnection, selectedNode, isoStorage])
-
-  // Calculer le prochain VMID disponible (global sur toutes les connexions)
-  // Ne définir le VMID que s'il n'est pas déjà renseigné par l'utilisateur
-  const [vmidInitialized, setVmidInitialized] = useState(false)
-
-  // Réinitialiser le flag quand le dialog s'ouvre
-  useEffect(() => {
-    if (open) {
-      setVmidInitialized(false)
-    }
-  }, [open])
-
-  useEffect(() => {
-    if (allVms.length > 0 && !vmidInitialized && open) {
-      const usedVmids = allVms.map(vm => parseInt(String(vm.vmid), 10))
-
-      let nextId = 100
-
-      while (usedVmids.includes(nextId)) {
-        nextId++
-      }
-
-      setVmid(String(nextId))
-      setVmidError(null)
-      setVmidInitialized(true)
-    }
-  }, [allVms, vmidInitialized, open])
 
   // Valider le VMID quand il change
   const handleVmidChange = (value: string) => {
@@ -239,20 +312,17 @@ return
     setVmidError(null)
   }
 
-  // Générer le prochain VMID disponible pour la connexion sélectionnée
-  const generateNextVmid = () => {
-    const scopedVms = selectedConnection
-      ? allVms.filter(vm => vm.connId === selectedConnection)
-      : allVms
-    const usedVmids = new Set(scopedVms.map(vm => parseInt(String(vm.vmid), 10)))
-
-    let nextId = 100
-    while (usedVmids.has(nextId)) {
-      nextId++
+  // Générer le prochain VMID disponible via API
+  const generateNextVmid = async () => {
+    if (selectedConnection) {
+      await loadNextVmid(selectedConnection)
+    } else {
+      const usedVmids = new Set(allVms.map(vm => parseInt(String(vm.vmid), 10)))
+      let nextId = 100
+      while (usedVmids.has(nextId)) nextId++
+      setVmid(String(nextId))
+      setVmidError(null)
     }
-
-    setVmid(String(nextId))
-    setVmidError(null)
   }
 
   // Charger toutes les connexions et tous leurs nodes
@@ -297,10 +367,11 @@ return
 
       setNodes(allNodes)
 
-      // 3. Sélectionner le premier node par défaut
+      // 3. Sélectionner le premier node par défaut et charger le VMID
       if (allNodes.length > 0 && !selectedNode) {
         setSelectedNode(allNodes[0].node)
         setSelectedConnection(allNodes[0].connId)
+        loadNextVmid(allNodes[0].connId)
       }
 
     } catch (e) {
@@ -381,6 +452,7 @@ return
       if (bestNode) {
         setSelectedNode(bestNode)
         setSelectedConnection(connId)
+        loadNextVmid(connId)
       }
     } else {
       // Regular node selection
@@ -388,6 +460,7 @@ return
       const nodeData = nodes.find(n => n.node === value)
       if (nodeData) {
         setSelectedConnection(nodeData.connId)
+        loadNextVmid(nodeData.connId)
       }
     }
   }
@@ -397,21 +470,30 @@ return
       const storagesRes = await fetch(`/api/v1/connections/${encodeURIComponent(connId)}/storage`)
       const storagesJson = await storagesRes.json()
       
-      setStorages(storagesJson.data || [])
-      
-      // Sélectionner les storages par défaut
-      const isoStorages = (storagesJson.data || []).filter((s: any) => s.content?.includes('iso'))
+      const allStorages = storagesJson.data || []
+      setStorages(allStorages)
 
-      const diskStorages = (storagesJson.data || []).filter((s: any) => 
-        s.content?.includes('images') || s.content?.includes('rootdir')
+      // Auto-select defaults from filtered storages (only shared + local for selectedNode)
+      const filteredIso = allStorages.filter((s: any) =>
+        s.content?.includes('iso') && (s.shared || s.node === selectedNode)
       )
-      
-      if (isoStorages.length > 0 && !isoStorage) {
-        setIsoStorage(isoStorages[0].storage)
+      const filteredDisk = allStorages.filter((s: any) =>
+        (s.content?.includes('images') || s.content?.includes('rootdir')) && (s.shared || s.node === selectedNode)
+      )
+
+      if (filteredIso.length > 0 && !isoStorage) {
+        setIsoStorage(filteredIso[0].storage)
       }
 
-      if (diskStorages.length > 0 && !diskStorage) {
-        setDiskStorage(diskStorages[0].storage)
+      if (filteredDisk.length > 0) {
+        setDisks(prev => {
+          if (prev.length > 0 && !prev[0].storage) {
+            const updated = [...prev]
+            updated[0] = { ...updated[0], storage: filteredDisk[0].storage }
+            return updated
+          }
+          return prev
+        })
       }
     } catch (e) {
       console.error('Error loading storages:', e)
@@ -470,18 +552,18 @@ return
 
       // i440fx est le défaut, pas besoin de l'envoyer
 
-      // Disque
-      if (diskStorage) {
-        let diskConfig = `${diskStorage}:${diskSize}`
-
-        if (diskFormat !== 'raw') diskConfig += `,format=${diskFormat}`
-        if (diskCache !== 'none') diskConfig += `,cache=${diskCache}`
-        if (diskDiscard) diskConfig += ',discard=on'
-        if (diskIoThread) diskConfig += ',iothread=1'
-        if (diskSsd) diskConfig += ',ssd=1'
-        if (!diskBackup) diskConfig += ',backup=0'
-        
-        payload[`${diskBus}0`] = diskConfig
+      // Disques
+      for (const disk of disks) {
+        if (disk.storage) {
+          let diskConfig = `${disk.storage}:${disk.size}`
+          if (disk.format !== 'raw') diskConfig += `,format=${disk.format}`
+          if (disk.cache !== 'none') diskConfig += `,cache=${disk.cache}`
+          if (disk.discard) diskConfig += ',discard=on'
+          if (disk.ioThread) diskConfig += ',iothread=1'
+          if (disk.ssd) diskConfig += ',ssd=1'
+          if (!disk.backup) diskConfig += ',backup=0'
+          payload[`${disk.bus}${disk.index}`] = diskConfig
+        }
       }
 
       // ISO
@@ -557,9 +639,15 @@ return
     t('inventory.createVm.tabs.confirm'),
   ]
   
-  // Filtrer les storages selon leur contenu
-  const isoStoragesList = storages.filter(s => s.content?.includes('iso'))
-  const diskStoragesList = storages.filter(s => s.content?.includes('images') || s.content?.includes('rootdir'))
+  // Filtrer les storages selon leur contenu ET le node sélectionné
+  const isoStoragesList = useMemo(() =>
+    storages.filter(s => s.content?.includes('iso') && (s.shared || s.node === selectedNode)),
+    [storages, selectedNode]
+  )
+  const diskStoragesList = useMemo(() =>
+    storages.filter(s => (s.content?.includes('images') || s.content?.includes('rootdir')) && (s.shared || s.node === selectedNode)),
+    [storages, selectedNode]
+  )
 
   const renderTabContent = () => {
     switch (activeTab) {
@@ -755,7 +843,11 @@ return
                 <FormControl fullWidth size="small">
                   <InputLabel>{t('inventory.createVm.storage')}</InputLabel>
                   <Select value={isoStorage} onChange={(e) => setIsoStorage(e.target.value)} label={t('inventory.createVm.storage')}>
-                    {isoStoragesList.map(s => <MenuItem key={s.storage} value={s.storage}>{s.storage}</MenuItem>)}
+                    {isoStoragesList.map(s => (
+                      <MenuItem key={s.id || s.storage} value={s.storage}>
+                        {s.storage} ({s.type}){!s.shared && s.node ? ` — ${s.node}` : ''}
+                      </MenuItem>
+                    ))}
                   </Select>
                 </FormControl>
                 <Typography variant="subtitle2" sx={{ alignSelf: 'center', fontWeight: 600 }}>{t('inventory.createVm.guestOs')}</Typography>
@@ -898,82 +990,106 @@ return
       case 3: // Disks
         return (
           <Box>
-            <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-              <Chip label="scsi0" variant="outlined" sx={{ fontFamily: 'monospace' }} />
-              <Tabs value={0} sx={{ minHeight: 32, '& .MuiTab-root': { minHeight: 32, py: 0.5 } }}>
-                <Tab label={t('inventory.createVm.disk')} />
-                <Tab label={t('inventory.createVm.bandwidth')} disabled />
-              </Tabs>
-            </Box>
-            
-            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-              <Stack direction="row" spacing={1} alignItems="center">
-                <Typography variant="body2" sx={{ minWidth: 100 }}>{t('inventory.createVm.busDevice')}</Typography>
-                <FormControl size="small" sx={{ minWidth: 100 }}>
-                  <Select value={diskBus} onChange={(e) => setDiskBus(e.target.value)}>
-                    <MenuItem value="scsi">SCSI</MenuItem>
-                    <MenuItem value="virtio">VirtIO Block</MenuItem>
-                    <MenuItem value="sata">SATA</MenuItem>
-                    <MenuItem value="ide">IDE</MenuItem>
-                  </Select>
-                </FormControl>
-                <TextField size="small" value="0" disabled sx={{ width: 60 }} />
-              </Stack>
-              <FormControl fullWidth size="small">
-                <InputLabel>{t('inventory.createVm.cache')}</InputLabel>
-                <Select value={diskCache} onChange={(e) => setDiskCache(e.target.value)} label={t('inventory.createVm.cache')}>
-                  <MenuItem value="none">{t('inventory.createVm.defaultNoCache')}</MenuItem>
-                  <MenuItem value="directsync">{t('inventory.createVm.directSync')}</MenuItem>
-                  <MenuItem value="writethrough">{t('inventory.createVm.writeThrough')}</MenuItem>
-                  <MenuItem value="writeback">{t('inventory.createVm.writeBack')}</MenuItem>
-                  <MenuItem value="unsafe">{t('inventory.createVm.writeBackUnsafe')}</MenuItem>
-                </Select>
-              </FormControl>
-              
-              <Typography variant="body2">{t('inventory.createVm.scsiControllerLabel', { controller: scsiController })}</Typography>
-              <FormControlLabel 
-                control={<Switch checked={diskDiscard} onChange={(e) => setDiskDiscard(e.target.checked)} size="small" />} 
-                label={t('inventory.createVm.discard')} 
-              />
-              
-              <FormControl fullWidth size="small">
-                <InputLabel>{t('inventory.createVm.storage')}</InputLabel>
-                <Select value={diskStorage} onChange={(e) => setDiskStorage(e.target.value)} label={t('inventory.createVm.storage')}>
-                  {diskStoragesList.map(s => (
-                    <MenuItem key={s.storage} value={s.storage}>
-                      {s.storage} ({s.type})
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              <FormControlLabel 
-                control={<Switch checked={diskIoThread} onChange={(e) => setDiskIoThread(e.target.checked)} size="small" />} 
-                label={t('inventory.createVm.ioThread')} 
-              />
-              
-              <TextField 
-                label={t('inventory.createVm.diskSizeGib')} 
-                value={diskSize} 
-                onChange={(e) => setDiskSize(parseInt(e.target.value) || 0)} 
-                size="small" 
-                type="number" 
-              />
-              <Box />
-              
-              <Typography variant="body2" sx={{ opacity: 0.7 }}>{t('inventory.createVm.format', { format: diskFormat })}</Typography>
-              <Box />
-              
-              <Divider sx={{ gridColumn: '1 / -1', my: 1 }} />
-              
-              <FormControlLabel 
-                control={<Switch checked={diskSsd} onChange={(e) => setDiskSsd(e.target.checked)} size="small" />} 
-                label={t('inventory.createVm.ssdEmulation')} 
-              />
-              <FormControlLabel 
-                control={<Switch checked={diskBackup} onChange={(e) => setDiskBackup(e.target.checked)} size="small" />} 
-                label={t('inventory.createVm.backup')} 
-              />
-            </Box>
+            {disks.map((disk, diskIdx) => (
+              <Box key={diskIdx} sx={{ mb: 3 }}>
+                <Box sx={{ display: 'flex', gap: 2, mb: 2, alignItems: 'center' }}>
+                  <Chip label={`${disk.bus}${disk.index}`} variant="outlined" sx={{ fontFamily: 'monospace' }} />
+                  <Tabs value={0} sx={{ minHeight: 32, flex: 1, '& .MuiTab-root': { minHeight: 32, py: 0.5 } }}>
+                    <Tab label={t('inventory.createVm.disk')} />
+                    <Tab label={t('inventory.createVm.bandwidth')} disabled />
+                  </Tabs>
+                  {disks.length > 1 && (
+                    <Tooltip title="Remove disk">
+                      <IconButton size="small" onClick={() => removeDisk(diskIdx)} color="error">
+                        <i className="ri-delete-bin-line" style={{ fontSize: 18 }} />
+                      </IconButton>
+                    </Tooltip>
+                  )}
+                </Box>
+
+                <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <Typography variant="body2" sx={{ minWidth: 100 }}>{t('inventory.createVm.busDevice')}</Typography>
+                    <FormControl size="small" sx={{ minWidth: 100 }}>
+                      <Select value={disk.bus} onChange={(e) => updateDisk(diskIdx, { bus: e.target.value })}>
+                        <MenuItem value="scsi">SCSI</MenuItem>
+                        <MenuItem value="virtio">VirtIO Block</MenuItem>
+                        <MenuItem value="sata">SATA</MenuItem>
+                        <MenuItem value="ide">IDE</MenuItem>
+                      </Select>
+                    </FormControl>
+                    <TextField size="small" value={disk.index} disabled sx={{ width: 60 }} />
+                  </Stack>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>{t('inventory.createVm.cache')}</InputLabel>
+                    <Select value={disk.cache} onChange={(e) => updateDisk(diskIdx, { cache: e.target.value })} label={t('inventory.createVm.cache')}>
+                      <MenuItem value="none">{t('inventory.createVm.defaultNoCache')}</MenuItem>
+                      <MenuItem value="directsync">{t('inventory.createVm.directSync')}</MenuItem>
+                      <MenuItem value="writethrough">{t('inventory.createVm.writeThrough')}</MenuItem>
+                      <MenuItem value="writeback">{t('inventory.createVm.writeBack')}</MenuItem>
+                      <MenuItem value="unsafe">{t('inventory.createVm.writeBackUnsafe')}</MenuItem>
+                    </Select>
+                  </FormControl>
+
+                  {diskIdx === 0 && (
+                    <Typography variant="body2">{t('inventory.createVm.scsiControllerLabel', { controller: scsiController })}</Typography>
+                  )}
+                  {diskIdx !== 0 && <Box />}
+                  <FormControlLabel
+                    control={<Switch checked={disk.discard} onChange={(e) => updateDisk(diskIdx, { discard: e.target.checked })} size="small" />}
+                    label={t('inventory.createVm.discard')}
+                  />
+
+                  <FormControl fullWidth size="small">
+                    <InputLabel>{t('inventory.createVm.storage')}</InputLabel>
+                    <Select value={disk.storage} onChange={(e) => updateDisk(diskIdx, { storage: e.target.value })} label={t('inventory.createVm.storage')}>
+                      {diskStoragesList.map(s => (
+                        <MenuItem key={s.id || s.storage} value={s.storage}>
+                          {s.storage} ({s.type}){!s.shared && s.node ? ` — ${s.node}` : ''}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                  <FormControlLabel
+                    control={<Switch checked={disk.ioThread} onChange={(e) => updateDisk(diskIdx, { ioThread: e.target.checked })} size="small" />}
+                    label={t('inventory.createVm.ioThread')}
+                  />
+
+                  <TextField
+                    label={t('inventory.createVm.diskSizeGib')}
+                    value={disk.size}
+                    onChange={(e) => updateDisk(diskIdx, { size: parseInt(e.target.value) || 0 })}
+                    size="small"
+                    type="number"
+                  />
+                  <Box />
+
+                  <Typography variant="body2" sx={{ opacity: 0.7 }}>{t('inventory.createVm.format', { format: disk.format })}</Typography>
+                  <Box />
+
+                  <Divider sx={{ gridColumn: '1 / -1', my: 1 }} />
+
+                  <FormControlLabel
+                    control={<Switch checked={disk.ssd} onChange={(e) => updateDisk(diskIdx, { ssd: e.target.checked })} size="small" />}
+                    label={t('inventory.createVm.ssdEmulation')}
+                  />
+                  <FormControlLabel
+                    control={<Switch checked={disk.backup} onChange={(e) => updateDisk(diskIdx, { backup: e.target.checked })} size="small" />}
+                    label={t('inventory.createVm.backup')}
+                  />
+                </Box>
+                {diskIdx < disks.length - 1 && <Divider sx={{ mt: 3 }} />}
+              </Box>
+            ))}
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<i className="ri-add-line" />}
+              onClick={addDisk}
+              sx={{ mt: 1 }}
+            >
+              {t('inventory.createVm.addDisk') || 'Add Disk'}
+            </Button>
           </Box>
         )
 
@@ -1086,12 +1202,20 @@ return
             
             {!noNetwork && (
               <>
-                <TextField 
-                  label={t('inventory.createVm.bridge')} 
-                  value={networkBridge} 
-                  onChange={(e) => setNetworkBridge(e.target.value)} 
-                  size="small"
-                />
+                <FormControl fullWidth size="small">
+                  <InputLabel>{t('inventory.createVm.bridge')}</InputLabel>
+                  <Select value={networkBridge} onChange={(e) => setNetworkBridge(e.target.value)} label={t('inventory.createVm.bridge')}>
+                    {bridges.length > 0 ? (
+                      bridges.map((b: any) => (
+                        <MenuItem key={b.iface} value={b.iface}>
+                          {b.iface}{b.comments ? ` — ${b.comments}` : ''}{b.cidr ? ` (${b.cidr})` : ''}
+                        </MenuItem>
+                      ))
+                    ) : (
+                      <MenuItem value={networkBridge}>{networkBridge}</MenuItem>
+                    )}
+                  </Select>
+                </FormControl>
                 <FormControl fullWidth size="small">
                   <InputLabel>{t('inventory.createVm.model')}</InputLabel>
                   <Select value={networkModel} onChange={(e) => setNetworkModel(e.target.value)} label={t('inventory.createVm.model')}>
@@ -1167,7 +1291,9 @@ return
               <Typography variant="body2"><b>Machine:</b> {machine} / {bios}</Typography>
               <Typography variant="body2"><b>SCSI:</b> {scsiController}</Typography>
               <Divider sx={{ my: 1 }} />
-              <Typography variant="body2"><b>Disk:</b> {diskBus}0 - {diskStorage}:{diskSize}GB</Typography>
+              {disks.map((disk, i) => (
+                <Typography key={i} variant="body2"><b>Disk {disk.bus}{disk.index}:</b> {disk.storage}:{disk.size}GB</Typography>
+              ))}
               <Divider sx={{ my: 1 }} />
               <Typography variant="body2"><b>CPU:</b> {cpuSockets} socket(s) × {cpuCores} core(s) = {cpuSockets * cpuCores} vCPU(s), type={cpuType}</Typography>
               <Divider sx={{ my: 1 }} />
