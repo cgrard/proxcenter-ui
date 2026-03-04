@@ -353,6 +353,8 @@ return `${mins}m`
                 borderColor: 'divider',
                 borderRadius: 2,
                 p: 1.25,
+                position: 'relative',
+                overflow: 'hidden',
                 bgcolor: (theme) => theme.palette.mode === 'light' ? 'grey.50' : undefined,
               }}
             >
@@ -394,6 +396,20 @@ return `${mins}m`
                   </Box>
                 ) : null}
               </Stack>
+              <Box
+                component="img"
+                src={theme.palette.mode === 'dark' ? '/images/proxmox-logo-dark.svg' : '/images/proxmox-logo.svg'}
+                alt=""
+                sx={{
+                  position: 'absolute',
+                  bottom: 8,
+                  right: 8,
+                  width: 56,
+                  height: 56,
+                  opacity: 0.13,
+                  pointerEvents: 'none',
+                }}
+              />
             </Box>
 
             {/* Colonne 4 - Mises à jour disponibles */}
