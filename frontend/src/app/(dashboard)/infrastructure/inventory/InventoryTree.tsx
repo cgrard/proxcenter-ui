@@ -1,8 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
+import { useVirtualizer } from '@tanstack/react-virtual'
 
 import { SimpleTreeView, TreeItem } from '@mui/x-tree-view'
 import { 
@@ -440,6 +441,295 @@ function getCpuPct(cpu?: number): number {
 return cpu * 100
 }
 
+type VmItemVariant = 'flat' | 'favorite' | 'grouped' | 'template' | 'tree'
+
+type VmItemProps = {
+  vmKey: string
+  connId: string
+  connName: string
+  node: string
+  vmType: string
+  vmid: string
+  name: string
+  status?: string
+  cpu?: number
+  mem?: number
+  maxmem?: number
+  template?: boolean
+  isCluster?: boolean
+  isSelected: boolean
+  isMigrating: boolean
+  isPendingAction: boolean
+  isFavorite: boolean
+  onFavoriteToggle: (e: React.MouseEvent) => void
+  onClick: () => void
+  onContextMenu: (e: React.MouseEvent) => void
+  variant: VmItemVariant
+  t: ReturnType<typeof useTranslations>
+}
+
+const VmItem = React.memo(function VmItem(props: VmItemProps) {
+  const {
+    vmKey,
+    vmType,
+    name,
+    status,
+    cpu,
+    mem,
+    maxmem,
+    template,
+    isSelected,
+    isMigrating,
+    isPendingAction,
+    isFavorite,
+    onFavoriteToggle,
+    onClick,
+    onContextMenu,
+    variant,
+    t,
+  } = props
+
+  if (variant === 'tree') {
+    return (
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0 }}>
+        <Box
+          component="span"
+          onClick={(e: React.MouseEvent) => {
+            e.stopPropagation()
+            if (!isMigrating) onFavoriteToggle(e)
+          }}
+          sx={{
+            cursor: isMigrating ? 'not-allowed' : 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            color: isFavorite ? '#ffc107' : 'text.disabled',
+            '&:hover': { color: isMigrating ? undefined : '#ffc107' },
+          }}
+        >
+          <i className={isFavorite ? "ri-star-fill" : "ri-star-line"} style={{ fontSize: 14 }} />
+        </Box>
+        <StatusIcon status={status} type="vm" isMigrating={isMigrating} isPendingAction={isPendingAction} />
+        <i className={getVmIcon(vmType, template)} style={{ opacity: 0.8, fontSize: 14 }} />
+        <Typography variant="body2" sx={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {name}
+        </Typography>
+        {template && (
+          <Chip label={t('inventory.tpl')} size="small" sx={{ height: 16, fontSize: 10 }} />
+        )}
+        {status === 'running' && getCpuPct(cpu) >= CPU_WARNING_THRESHOLD && (
+          <Tooltip title={`${t('common.warning')} CPU: ${getCpuPct(cpu).toFixed(0)}%`}>
+            <i className="ri-cpu-line" style={{ fontSize: 14, color: '#ed6c02' }} />
+          </Tooltip>
+        )}
+        {status === 'running' && getMemPct(mem, maxmem) >= RAM_WARNING_THRESHOLD && (
+          <Tooltip title={`${t('common.warning')} RAM: ${getMemPct(mem, maxmem).toFixed(0)}%`}>
+            <i className="ri-ram-line" style={{ fontSize: 14, color: '#ed6c02' }} />
+          </Tooltip>
+        )}
+      </Box>
+    )
+  }
+
+  if (variant === 'template') {
+    const vmContent = (
+      <Box
+        data-vmkey={vmKey}
+        onClick={() => !isMigrating && onClick()}
+        onContextMenu={(e) => { if (!isMigrating) onContextMenu(e) }}
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1,
+          px: 1.5,
+          py: 0.75,
+          cursor: isMigrating ? 'not-allowed' : 'pointer',
+          borderRadius: 1,
+          bgcolor: isSelected
+            ? 'action.selected'
+            : 'transparent',
+          opacity: isMigrating ? 0.5 : 1,
+          '&:hover': { bgcolor: isMigrating ? 'transparent' : 'action.hover' },
+          '&:hover .favorite-star': { opacity: isMigrating ? 0 : 1 }
+        }}
+      >
+        <IconButton
+          size="small"
+          className="favorite-star"
+          onClick={(e) => {
+            e.stopPropagation()
+            onFavoriteToggle(e)
+          }}
+          sx={{
+            p: 0.25,
+            opacity: isFavorite ? 1 : 0,
+            transition: 'opacity 0.2s',
+            color: isFavorite ? '#ffc107' : 'text.secondary',
+            '&:hover': { color: '#ffc107' }
+          }}
+        >
+          <i className={isFavorite ? "ri-star-fill" : "ri-star-line"} style={{ fontSize: 14 }} />
+        </IconButton>
+        <i className="ri-file-copy-fill" style={{ opacity: 0.8, fontSize: 14, color: '#0288d1' }} />
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flex: 1, minWidth: 0 }}>
+          <Typography variant="body2" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {name}
+          </Typography>
+          <Chip label={vmType === 'lxc' ? 'LXC' : 'VM'} size="small" sx={{ height: 16, fontSize: 10 }} />
+        </Box>
+      </Box>
+    )
+    return isMigrating ? <Tooltip title={t('audit.actions.migrate') + "..."} placement="right">{vmContent}</Tooltip> : vmContent
+  }
+
+  if (variant === 'favorite') {
+    const vmContent = (
+      <Box
+        data-vmkey={vmKey}
+        onClick={() => !isMigrating && onClick()}
+        onContextMenu={(e) => { if (!isMigrating) onContextMenu(e) }}
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1,
+          px: 1.5,
+          py: 0.75,
+          cursor: isMigrating ? 'not-allowed' : 'pointer',
+          borderRadius: 1,
+          bgcolor: isSelected
+            ? 'action.selected'
+            : 'transparent',
+          opacity: isMigrating ? 0.5 : 1,
+          '&:hover': { bgcolor: isMigrating ? 'transparent' : 'action.hover' }
+        }}
+      >
+        <IconButton
+          size="small"
+          onClick={(e) => {
+            e.stopPropagation()
+            onFavoriteToggle(e)
+          }}
+          sx={{
+            p: 0.25,
+            color: '#ffc107',
+            '&:hover': { color: '#ff9800' }
+          }}
+        >
+          <i className="ri-star-fill" style={{ fontSize: 14 }} />
+        </IconButton>
+        <StatusIcon status={status} type="vm" isMigrating={isMigrating} isPendingAction={isPendingAction} />
+        <i className={getVmIcon(vmType, template)} style={{ opacity: 0.8, fontSize: 14 }} />
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flex: 1, minWidth: 0 }}>
+          <Typography variant="body2" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {name}
+          </Typography>
+          {template && (
+            <Chip label={t('inventory.template')} size="small" sx={{ height: 16, fontSize: 10, ml: 0.5 }} />
+          )}
+        </Box>
+      </Box>
+    )
+    return isMigrating ? <Tooltip title={t('audit.actions.migrate') + "..."} placement="right">{vmContent}</Tooltip> : vmContent
+  }
+
+  const isGrouped = variant === 'grouped'
+
+  const vmContent = (
+    <Box
+      data-vmkey={vmKey}
+      onClick={() => !isMigrating && onClick()}
+      onContextMenu={(e) => { if (!isMigrating) onContextMenu(e) }}
+      sx={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 1,
+        px: 1.5,
+        ...(isGrouped ? { pl: 3, py: 0.5 } : { py: 0.75 }),
+        cursor: isMigrating ? 'not-allowed' : 'pointer',
+        ...(!isGrouped ? { borderRadius: 1 } : {}),
+        bgcolor: isSelected
+          ? (isGrouped ? undefined : 'action.selected')
+          : 'transparent',
+        opacity: isMigrating ? 0.5 : 1,
+        '&:hover': { bgcolor: isMigrating ? 'transparent' : 'action.hover' },
+        '&:hover .favorite-star': { opacity: isMigrating ? 0 : 1 }
+      }}
+    >
+      <IconButton
+        size="small"
+        className="favorite-star"
+        onClick={(e) => {
+          e.stopPropagation()
+          onFavoriteToggle(e)
+        }}
+        sx={{
+          p: 0.25,
+          opacity: isFavorite ? 1 : 0,
+          transition: 'opacity 0.2s',
+          color: isFavorite ? '#ffc107' : 'text.secondary',
+          '&:hover': { color: '#ffc107' }
+        }}
+      >
+        <i className={isFavorite ? "ri-star-fill" : "ri-star-line"} style={{ fontSize: 14 }} />
+      </IconButton>
+      <StatusIcon status={status} type="vm" isMigrating={isMigrating} isPendingAction={isPendingAction} />
+      <i className={getVmIcon(vmType, template)} style={{ opacity: 0.8, fontSize: 14 }} />
+      {isGrouped ? (
+        <>
+          <Typography variant="body2" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {name}
+          </Typography>
+          {template && (
+            <Chip label={t('inventory.tpl')} size="small" sx={{ height: 16, fontSize: 10 }} />
+          )}
+          {status === 'running' && getCpuPct(cpu) >= CPU_WARNING_THRESHOLD && (
+            <Tooltip title={`${t('common.warning')} CPU: ${getCpuPct(cpu).toFixed(0)}%`}>
+              <i className="ri-cpu-line" style={{ fontSize: 14, color: '#ed6c02' }} />
+            </Tooltip>
+          )}
+          {status === 'running' && getMemPct(mem, maxmem) >= RAM_WARNING_THRESHOLD && (
+            <Tooltip title={`${t('common.warning')} RAM: ${getMemPct(mem, maxmem).toFixed(0)}%`}>
+              <i className="ri-ram-line" style={{ fontSize: 14, color: '#ed6c02' }} />
+            </Tooltip>
+          )}
+        </>
+      ) : (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flex: 1, minWidth: 0 }}>
+          <Typography variant="body2" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {name}
+          </Typography>
+          {template && (
+            <Chip label={t('inventory.template')} size="small" sx={{ height: 16, fontSize: 10, ml: 0.5 }} />
+          )}
+          {status === 'running' && getCpuPct(cpu) >= CPU_WARNING_THRESHOLD && (
+            <Tooltip title={`${t('common.warning')} CPU: ${getCpuPct(cpu).toFixed(0)}%`}>
+              <i className="ri-cpu-line" style={{ fontSize: 14, color: '#ed6c02', flexShrink: 0 }} />
+            </Tooltip>
+          )}
+          {status === 'running' && getMemPct(mem, maxmem) >= RAM_WARNING_THRESHOLD && (
+            <Tooltip title={`${t('common.warning')} RAM: ${getMemPct(mem, maxmem).toFixed(0)}%`}>
+              <i className="ri-ram-line" style={{ fontSize: 14, color: '#ed6c02', flexShrink: 0 }} />
+            </Tooltip>
+          )}
+        </Box>
+      )}
+    </Box>
+  )
+  return isMigrating ? <Tooltip title={t('audit.actions.migrate') + "..."} placement="right">{vmContent}</Tooltip> : vmContent
+}, (prev, next) =>
+  prev.vmKey === next.vmKey &&
+  prev.isSelected === next.isSelected &&
+  prev.isMigrating === next.isMigrating &&
+  prev.isPendingAction === next.isPendingAction &&
+  prev.isFavorite === next.isFavorite &&
+  prev.status === next.status &&
+  prev.cpu === next.cpu &&
+  prev.mem === next.mem &&
+  prev.maxmem === next.maxmem &&
+  prev.name === next.name &&
+  prev.variant === next.variant &&
+  prev.template === next.template
+)
+
 function itemKey(sel: InventorySelection) {
   return `${sel.type}:${sel.id}`
 }
@@ -518,6 +808,7 @@ return migratingVmIds.has(`${connId}:${vmid}`)
   // Controlled tree expansion state
   const [manualExpandedItems, setManualExpandedItems] = useState<string[]>(['root:root'])
   const programmaticExpand = useRef(false)
+  const virtualScrollRef = useRef<HTMLDivElement>(null)
   const [isHydrated, setIsHydrated] = useState(false)
 
   // Sections collapsed (pour les modes hosts, pools, tags)
@@ -1531,6 +1822,23 @@ return favorites.has(vmKey)
     onPbsServersChange?.(pbsServers)
   }, [pbsServers, onPbsServersChange])
 
+  const flatItems = useMemo(() => {
+    if (viewMode === 'vms') return displayVms
+    if (viewMode === 'favorites') return favoritesList
+    if (viewMode === 'templates') return filteredVms.filter(vm => vm.template)
+    return null
+  }, [viewMode, displayVms, favoritesList, filteredVms])
+
+  const virtualizer = useVirtualizer({
+    count: flatItems?.length ?? 0,
+    getScrollElement: () => virtualScrollRef.current,
+    estimateSize: () => 40,
+    overscan: 10,
+  })
+
+  const isTreeExpanded = manualExpandedItems.length > 1
+  const isSectionsAllExpanded = collapsedSections.size === 0
+
   const header = useMemo(
     () => (
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, px: 1, pt: 1.5, pb: 0.5 }}>
@@ -1574,16 +1882,16 @@ return favorites.has(vmKey)
             </Tooltip>
           )}
           {viewMode === 'tree' && (
-            <Tooltip title={manualExpandedItems.length > 1 ? t('inventory.collapseAll') : t('inventory.expandAll')}>
-              <IconButton size='small' onClick={manualExpandedItems.length > 1 ? collapseAll : expandAll}>
-                <i className={manualExpandedItems.length > 1 ? 'ri-contract-up-down-line' : 'ri-expand-up-down-line'} style={{ fontSize: 18 }} />
+            <Tooltip title={isTreeExpanded ? t('inventory.collapseAll') : t('inventory.expandAll')}>
+              <IconButton size='small' onClick={isTreeExpanded ? collapseAll : expandAll}>
+                <i className={isTreeExpanded ? 'ri-contract-up-down-line' : 'ri-expand-up-down-line'} style={{ fontSize: 18 }} />
               </IconButton>
             </Tooltip>
           )}
           {(viewMode === 'hosts' || viewMode === 'pools' || viewMode === 'tags') && (
-            <Tooltip title={collapsedSections.size === 0 ? t('inventory.collapseAll') : t('inventory.expandAll')}>
+            <Tooltip title={isSectionsAllExpanded ? t('inventory.collapseAll') : t('inventory.expandAll')}>
               <IconButton size='small' onClick={() => {
-                if (collapsedSections.size === 0) {
+                if (isSectionsAllExpanded) {
                   const keys = viewMode === 'hosts' ? hostsList.map(h => h.key)
                     : viewMode === 'pools' ? poolsList.map(p => p.pool)
                     : tagsList.map(t => t.tag)
@@ -1592,7 +1900,7 @@ return favorites.has(vmKey)
                   expandAllSections()
                 }
               }}>
-                <i className={collapsedSections.size === 0 ? 'ri-contract-up-down-line' : 'ri-expand-up-down-line'} style={{ fontSize: 18 }} />
+                <i className={isSectionsAllExpanded ? 'ri-contract-up-down-line' : 'ri-expand-up-down-line'} style={{ fontSize: 18 }} />
               </IconButton>
             </Tooltip>
           )}
@@ -1698,7 +2006,7 @@ return favorites.has(vmKey)
         </ToggleButtonGroup>
       </Box>
     ),
-    [loading, searchInput, viewMode, displayVms.length, hostsList.length, poolsList.length, tagsList.length, templatesCount, favoritesList.length, onRefresh, refreshLoading, onCollapse, isCollapsed, allowedViewModes, theme.palette.mode, expandAll, collapseAll, expandAllSections, collapseAllSections, manualExpandedItems, collapsedSections]
+    [loading, searchInput, viewMode, displayVms.length, hostsList.length, poolsList.length, tagsList.length, templatesCount, favoritesList.length, onRefresh, refreshLoading, onCollapse, isCollapsed, allowedViewModes, theme.palette.mode, expandAll, collapseAll, expandAllSections, collapseAllSections, isTreeExpanded, isSectionsAllExpanded]
   )
 
   return (
@@ -1706,7 +2014,7 @@ return favorites.has(vmKey)
       <Box sx={{ flexShrink: 0 }}>
         {header}
       </Box>
-      <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+      <Box ref={virtualScrollRef} sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
 
       {error ? <Alert severity='error'>{error}</Alert> : null}
 
@@ -1727,80 +2035,51 @@ return favorites.has(vmKey)
               </Typography>
             </Box>
           ) : (
-            displayVms.map(vm => {
-              const vmKey = `${vm.connId}:${vm.node}:${vm.type}:${vm.vmid}`
-              const isFav = favorites.has(vmKey)
-              const isMigrating = isVmMigrating(vm.connId, vm.vmid)
-              const isPendingAction = isVmPendingAction(vm.connId, vm.vmid)
-
-              
-return (() => {
-              const vmContent = (
-              <Box
-                key={vmKey}
-                data-vmkey={vmKey}
-                onClick={() => !isMigrating && onSelect({ type: 'vm', id: vmKey })}
-                onContextMenu={(e) => !isMigrating && handleContextMenu(e, vm.connId, vm.node, vm.type, vm.vmid, vm.name, vm.status, vm.isCluster, vm.template)}
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 1,
-                  px: 1.5,
-                  py: 0.75,
-                  cursor: isMigrating ? 'not-allowed' : 'pointer',
-                  borderRadius: 1,
-                  bgcolor: selected?.id === vmKey
-                    ? 'action.selected'
-                    : 'transparent',
-                  opacity: isMigrating ? 0.5 : 1,
-                  '&:hover': { bgcolor: isMigrating ? 'transparent' : 'action.hover' },
-                  '&:hover .favorite-star': { opacity: isMigrating ? 0 : 1 }
-                }}
-              >
-                {/* Étoile favori */}
-                <IconButton
-                  size="small"
-                  className="favorite-star"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    toggleFavorite(vm.connId, vm.node, vm.type, vm.vmid, vm.name)
-                  }}
-                  sx={{
-                    p: 0.25,
-                    opacity: isFav ? 1 : 0,
-                    transition: 'opacity 0.2s',
-                    color: isFav ? '#ffc107' : 'text.secondary',
-                    '&:hover': { color: '#ffc107' }
-                  }}
-                >
-                  <i className={isFav ? "ri-star-fill" : "ri-star-line"} style={{ fontSize: 14 }} />
-                </IconButton>
-                <StatusIcon status={vm.status} type="vm" isMigrating={isMigrating} isPendingAction={isPendingAction} />
-                <i className={getVmIcon(vm.type, vm.template)} style={{ opacity: 0.8, fontSize: 14 }} />
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flex: 1, minWidth: 0 }}>
-                  <Typography variant="body2" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {vm.name}
-                  </Typography>
-                  {vm.template && (
-                    <Chip label={t('inventory.template')} size="small" sx={{ height: 16, fontSize: 10, ml: 0.5 }} />
-                  )}
-                  {/* Icône CPU si charge élevée */}
-                  {vm.status === 'running' && getCpuPct(vm.cpu) >= CPU_WARNING_THRESHOLD && (
-                    <Tooltip title={`${t('common.warning')} CPU: ${getCpuPct(vm.cpu).toFixed(0)}%`}>
-                      <i className="ri-cpu-line" style={{ fontSize: 14, color: '#ed6c02', flexShrink: 0 }} />
-                    </Tooltip>
-                  )}
-                  {/* Icône RAM si consommation élevée */}
-                  {vm.status === 'running' && getMemPct(vm.mem, vm.maxmem) >= RAM_WARNING_THRESHOLD && (
-                    <Tooltip title={`${t('common.warning')} RAM: ${getMemPct(vm.mem, vm.maxmem).toFixed(0)}%`}>
-                      <i className="ri-ram-line" style={{ fontSize: 14, color: '#ed6c02', flexShrink: 0 }} />
-                    </Tooltip>
-                  )}
-                </Box>
-              </Box>
-              )
-              return isMigrating ? <Tooltip key={vmKey} title={t('audit.actions.migrate') + "..."} placement="right">{vmContent}</Tooltip> : vmContent
-            })()})
+            <Box sx={{ height: `${virtualizer.getTotalSize()}px`, width: '100%', position: 'relative' }}>
+              {virtualizer.getVirtualItems().map(virtualRow => {
+                const vm = flatItems![virtualRow.index]
+                const vmKey = `${vm.connId}:${vm.node}:${vm.type}:${vm.vmid}`
+                return (
+                  <Box
+                    key={virtualRow.key}
+                    ref={virtualizer.measureElement}
+                    data-index={virtualRow.index}
+                    sx={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      transform: `translateY(${virtualRow.start}px)`,
+                    }}
+                  >
+                    <VmItem
+                      vmKey={vmKey}
+                      connId={vm.connId}
+                      connName={vm.connName}
+                      node={vm.node}
+                      vmType={vm.type}
+                      vmid={vm.vmid}
+                      name={vm.name}
+                      status={vm.status}
+                      cpu={vm.cpu}
+                      mem={vm.mem}
+                      maxmem={vm.maxmem}
+                      template={vm.template}
+                      isCluster={vm.isCluster}
+                      isSelected={selected?.id === vmKey}
+                      isMigrating={isVmMigrating(vm.connId, vm.vmid)}
+                      isPendingAction={isVmPendingAction(vm.connId, vm.vmid)}
+                      isFavorite={favorites.has(vmKey)}
+                      onFavoriteToggle={() => toggleFavorite(vm.connId, vm.node, vm.type, vm.vmid, vm.name)}
+                      onClick={() => onSelect({ type: 'vm', id: vmKey })}
+                      onContextMenu={(e) => handleContextMenu(e, vm.connId, vm.node, vm.type, vm.vmid, vm.name, vm.status, vm.isCluster, vm.template)}
+                      variant="flat"
+                      t={t}
+                    />
+                  </Box>
+                )
+              })}
+            </Box>
           )}
         </Box>
       ) : viewMode === 'favorites' ? (
@@ -1818,63 +2097,51 @@ return (() => {
               </Typography>
             </Box>
           ) : (
-            favoritesList.map(vm => {
-              const vmKey = `${vm.connId}:${vm.node}:${vm.type}:${vm.vmid}`
-              const isMigrating = isVmMigrating(vm.connId, vm.vmid)
-              const isPendingAction = isVmPendingAction(vm.connId, vm.vmid)
-
-              
-return (() => {
-              const vmContent = (
-              <Box
-                key={vmKey}
-                data-vmkey={vmKey}
-                onClick={() => !isMigrating && onSelect({ type: 'vm', id: vmKey })}
-                onContextMenu={(e) => !isMigrating && handleContextMenu(e, vm.connId, vm.node, vm.type, vm.vmid, vm.name, vm.status, vm.isCluster, vm.template)}
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 1,
-                  px: 1.5,
-                  py: 0.75,
-                  cursor: isMigrating ? 'not-allowed' : 'pointer',
-                  borderRadius: 1,
-                  bgcolor: selected?.id === vmKey
-                    ? 'action.selected'
-                    : 'transparent',
-                  opacity: isMigrating ? 0.5 : 1,
-                  '&:hover': { bgcolor: isMigrating ? 'transparent' : 'action.hover' }
-                }}
-              >
-                {/* Étoile favori (toujours visible) */}
-                <IconButton
-                  size="small"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    toggleFavorite(vm.connId, vm.node, vm.type, vm.vmid, vm.name)
-                  }}
-                  sx={{
-                    p: 0.25,
-                    color: '#ffc107',
-                    '&:hover': { color: '#ff9800' }
-                  }}
-                >
-                  <i className="ri-star-fill" style={{ fontSize: 14 }} />
-                </IconButton>
-                <StatusIcon status={vm.status} type="vm" isMigrating={isMigrating} isPendingAction={isPendingAction} />
-                <i className={getVmIcon(vm.type, vm.template)} style={{ opacity: 0.8, fontSize: 14 }} />
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flex: 1, minWidth: 0 }}>
-                  <Typography variant="body2" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {vm.name}
-                  </Typography>
-                  {vm.template && (
-                    <Chip label={t('inventory.template')} size="small" sx={{ height: 16, fontSize: 10, ml: 0.5 }} />
-                  )}
-                </Box>
-              </Box>
-              )
-              return isMigrating ? <Tooltip key={vmKey} title={t('audit.actions.migrate') + "..."} placement="right">{vmContent}</Tooltip> : vmContent
-            })()})
+            <Box sx={{ height: `${virtualizer.getTotalSize()}px`, width: '100%', position: 'relative' }}>
+              {virtualizer.getVirtualItems().map(virtualRow => {
+                const vm = flatItems![virtualRow.index]
+                const vmKey = `${vm.connId}:${vm.node}:${vm.type}:${vm.vmid}`
+                return (
+                  <Box
+                    key={virtualRow.key}
+                    ref={virtualizer.measureElement}
+                    data-index={virtualRow.index}
+                    sx={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      transform: `translateY(${virtualRow.start}px)`,
+                    }}
+                  >
+                    <VmItem
+                      vmKey={vmKey}
+                      connId={vm.connId}
+                      connName={vm.connName}
+                      node={vm.node}
+                      vmType={vm.type}
+                      vmid={vm.vmid}
+                      name={vm.name}
+                      status={vm.status}
+                      cpu={vm.cpu}
+                      mem={vm.mem}
+                      maxmem={vm.maxmem}
+                      template={vm.template}
+                      isCluster={vm.isCluster}
+                      isSelected={selected?.id === vmKey}
+                      isMigrating={isVmMigrating(vm.connId, vm.vmid)}
+                      isPendingAction={isVmPendingAction(vm.connId, vm.vmid)}
+                      isFavorite={true}
+                      onFavoriteToggle={() => toggleFavorite(vm.connId, vm.node, vm.type, vm.vmid, vm.name)}
+                      onClick={() => onSelect({ type: 'vm', id: vmKey })}
+                      onContextMenu={(e) => handleContextMenu(e, vm.connId, vm.node, vm.type, vm.vmid, vm.name, vm.status, vm.isCluster, vm.template)}
+                      variant="favorite"
+                      t={t}
+                    />
+                  </Box>
+                )
+              })}
+            </Box>
           )}
         </Box>
       ) : viewMode === 'hosts' ? (
@@ -1923,70 +2190,33 @@ return (
                 {/* VMs de l'hôte */}
                 {!isCollapsed && host.vms.map(vm => {
                   const vmKey = `${vm.connId}:${vm.node}:${vm.type}:${vm.vmid}`
-                  const isFav = favorites.has(vmKey)
-                  const isMigrating = isVmMigrating(vm.connId, vm.vmid)
-                  const isPendingAction = isVmPendingAction(vm.connId, vm.vmid)
-
-                  const vmContent = (
-                  <Box
-                    key={vmKey}
-                    data-vmkey={vmKey}
-                    onClick={() => !isMigrating && onSelect({ type: 'vm', id: vmKey })}
-                    onContextMenu={(e) => !isMigrating && handleContextMenu(e, vm.connId, vm.node, vm.type, vm.vmid, vm.name, vm.status, vm.isCluster, vm.template)}
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 1,
-                      px: 1.5,
-                      pl: 3,
-                      py: 0.5,
-                      cursor: isMigrating ? 'not-allowed' : 'pointer',
-                      bgcolor: selected?.id === vmKey
-                        ? undefined
-                        : 'transparent',
-                      opacity: isMigrating ? 0.5 : 1,
-                      '&:hover': { bgcolor: isMigrating ? 'transparent' : 'action.hover' },
-                      '&:hover .favorite-star': { opacity: isMigrating ? 0 : 1 }
-                    }}
-                  >
-                    <IconButton
-                      size="small"
-                      className="favorite-star"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        toggleFavorite(vm.connId, vm.node, vm.type, vm.vmid, vm.name)
-                      }}
-                      sx={{
-                        p: 0.25,
-                        opacity: isFav ? 1 : 0,
-                        transition: 'opacity 0.2s',
-                        color: isFav ? '#ffc107' : 'text.secondary',
-                        '&:hover': { color: '#ffc107' }
-                      }}
-                    >
-                      <i className={isFav ? "ri-star-fill" : "ri-star-line"} style={{ fontSize: 14 }} />
-                    </IconButton>
-                    <StatusIcon status={vm.status} type="vm" isMigrating={isMigrating} isPendingAction={isPendingAction} />
-                    <i className={getVmIcon(vm.type, vm.template)} style={{ opacity: 0.8, fontSize: 14 }} />
-                    <Typography variant="body2" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {vm.name}
-                    </Typography>
-                    {vm.template && (
-                      <Chip label={t('inventory.tpl')} size="small" sx={{ height: 16, fontSize: 10 }} />
-                    )}
-                    {vm.status === 'running' && getCpuPct(vm.cpu) >= CPU_WARNING_THRESHOLD && (
-                      <Tooltip title={`${t('common.warning')} CPU: ${getCpuPct(vm.cpu).toFixed(0)}%`}>
-                        <i className="ri-cpu-line" style={{ fontSize: 14, color: '#ed6c02' }} />
-                      </Tooltip>
-                    )}
-                    {vm.status === 'running' && getMemPct(vm.mem, vm.maxmem) >= RAM_WARNING_THRESHOLD && (
-                      <Tooltip title={`${t('common.warning')} RAM: ${getMemPct(vm.mem, vm.maxmem).toFixed(0)}%`}>
-                        <i className="ri-ram-line" style={{ fontSize: 14, color: '#ed6c02' }} />
-                      </Tooltip>
-                    )}
-                  </Box>
+                  return (
+                    <VmItem
+                      key={vmKey}
+                      vmKey={vmKey}
+                      connId={vm.connId}
+                      connName={vm.connName}
+                      node={vm.node}
+                      vmType={vm.type}
+                      vmid={vm.vmid}
+                      name={vm.name}
+                      status={vm.status}
+                      cpu={vm.cpu}
+                      mem={vm.mem}
+                      maxmem={vm.maxmem}
+                      template={vm.template}
+                      isCluster={vm.isCluster}
+                      isSelected={selected?.id === vmKey}
+                      isMigrating={isVmMigrating(vm.connId, vm.vmid)}
+                      isPendingAction={isVmPendingAction(vm.connId, vm.vmid)}
+                      isFavorite={favorites.has(vmKey)}
+                      onFavoriteToggle={() => toggleFavorite(vm.connId, vm.node, vm.type, vm.vmid, vm.name)}
+                      onClick={() => onSelect({ type: 'vm', id: vmKey })}
+                      onContextMenu={(e) => handleContextMenu(e, vm.connId, vm.node, vm.type, vm.vmid, vm.name, vm.status, vm.isCluster, vm.template)}
+                      variant="grouped"
+                      t={t}
+                    />
                   )
-                  return isMigrating ? <Tooltip key={vmKey} title={t('audit.actions.migrate') + "..."} placement="right">{vmContent}</Tooltip> : vmContent
                 })}
               </Box>
             )})
@@ -2037,70 +2267,33 @@ return (
                 {/* VMs du pool */}
                 {!isCollapsed && vms.map(vm => {
                   const vmKey = `${vm.connId}:${vm.node}:${vm.type}:${vm.vmid}`
-                  const isFav = favorites.has(vmKey)
-                  const isMigrating = isVmMigrating(vm.connId, vm.vmid)
-                  const isPendingAction = isVmPendingAction(vm.connId, vm.vmid)
-
-                  const vmContent = (
-                  <Box
-                    key={vmKey}
-                    data-vmkey={vmKey}
-                    onClick={() => !isMigrating && onSelect({ type: 'vm', id: vmKey })}
-                    onContextMenu={(e) => !isMigrating && handleContextMenu(e, vm.connId, vm.node, vm.type, vm.vmid, vm.name, vm.status, vm.isCluster, vm.template)}
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 1,
-                      px: 1.5,
-                      pl: 3,
-                      py: 0.5,
-                      cursor: isMigrating ? 'not-allowed' : 'pointer',
-                      bgcolor: selected?.id === vmKey
-                        ? undefined
-                        : 'transparent',
-                      opacity: isMigrating ? 0.5 : 1,
-                      '&:hover': { bgcolor: isMigrating ? 'transparent' : 'action.hover' },
-                      '&:hover .favorite-star': { opacity: isMigrating ? 0 : 1 }
-                    }}
-                  >
-                    <IconButton
-                      size="small"
-                      className="favorite-star"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        toggleFavorite(vm.connId, vm.node, vm.type, vm.vmid, vm.name)
-                      }}
-                      sx={{
-                        p: 0.25,
-                        opacity: isFav ? 1 : 0,
-                        transition: 'opacity 0.2s',
-                        color: isFav ? '#ffc107' : 'text.secondary',
-                        '&:hover': { color: '#ffc107' }
-                      }}
-                    >
-                      <i className={isFav ? "ri-star-fill" : "ri-star-line"} style={{ fontSize: 14 }} />
-                    </IconButton>
-                    <StatusIcon status={vm.status} type="vm" isMigrating={isMigrating} isPendingAction={isPendingAction} />
-                    <i className={getVmIcon(vm.type, vm.template)} style={{ opacity: 0.8, fontSize: 14 }} />
-                    <Typography variant="body2" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {vm.name}
-                    </Typography>
-                    {vm.template && (
-                      <Chip label={t('inventory.tpl')} size="small" sx={{ height: 16, fontSize: 10 }} />
-                    )}
-                    {vm.status === 'running' && getCpuPct(vm.cpu) >= CPU_WARNING_THRESHOLD && (
-                      <Tooltip title={`${t('common.warning')} CPU: ${getCpuPct(vm.cpu).toFixed(0)}%`}>
-                        <i className="ri-cpu-line" style={{ fontSize: 14, color: '#ed6c02' }} />
-                      </Tooltip>
-                    )}
-                    {vm.status === 'running' && getMemPct(vm.mem, vm.maxmem) >= RAM_WARNING_THRESHOLD && (
-                      <Tooltip title={`${t('common.warning')} RAM: ${getMemPct(vm.mem, vm.maxmem).toFixed(0)}%`}>
-                        <i className="ri-ram-line" style={{ fontSize: 14, color: '#ed6c02' }} />
-                      </Tooltip>
-                    )}
-                  </Box>
+                  return (
+                    <VmItem
+                      key={vmKey}
+                      vmKey={vmKey}
+                      connId={vm.connId}
+                      connName={vm.connName}
+                      node={vm.node}
+                      vmType={vm.type}
+                      vmid={vm.vmid}
+                      name={vm.name}
+                      status={vm.status}
+                      cpu={vm.cpu}
+                      mem={vm.mem}
+                      maxmem={vm.maxmem}
+                      template={vm.template}
+                      isCluster={vm.isCluster}
+                      isSelected={selected?.id === vmKey}
+                      isMigrating={isVmMigrating(vm.connId, vm.vmid)}
+                      isPendingAction={isVmPendingAction(vm.connId, vm.vmid)}
+                      isFavorite={favorites.has(vmKey)}
+                      onFavoriteToggle={() => toggleFavorite(vm.connId, vm.node, vm.type, vm.vmid, vm.name)}
+                      onClick={() => onSelect({ type: 'vm', id: vmKey })}
+                      onContextMenu={(e) => handleContextMenu(e, vm.connId, vm.node, vm.type, vm.vmid, vm.name, vm.status, vm.isCluster, vm.template)}
+                      variant="grouped"
+                      t={t}
+                    />
                   )
-                  return isMigrating ? <Tooltip key={vmKey} title={t('audit.actions.migrate') + "..."} placement="right">{vmContent}</Tooltip> : vmContent
                 })}
               </Box>
             )})
@@ -2152,74 +2345,34 @@ return (
                 {/* VMs avec ce tag */}
                 {!isCollapsed && vms.map(vm => {
                   const vmKey = `${vm.connId}:${vm.node}:${vm.type}:${vm.vmid}`
-                  const isFav = favorites.has(vmKey)
-                  const isMigrating = isVmMigrating(vm.connId, vm.vmid)
-                  const isPendingAction = isVmPendingAction(vm.connId, vm.vmid)
-
-                  
-return (() => {
                   const tagVmKey = `${vmKey}-${tag}`
-                  const vmContent = (
-                  <Box
-                    key={tagVmKey}
-                    data-vmkey={vmKey}
-                    onClick={() => !isMigrating && onSelect({ type: 'vm', id: vmKey })}
-                    onContextMenu={(e) => !isMigrating && handleContextMenu(e, vm.connId, vm.node, vm.type, vm.vmid, vm.name, vm.status, vm.isCluster, vm.template)}
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 1,
-                      px: 1.5,
-                      pl: 3,
-                      py: 0.5,
-                      cursor: isMigrating ? 'not-allowed' : 'pointer',
-                      bgcolor: selected?.id === vmKey
-                        ? undefined
-                        : 'transparent',
-                      opacity: isMigrating ? 0.5 : 1,
-                      '&:hover': { bgcolor: isMigrating ? 'transparent' : 'action.hover' },
-                      '&:hover .favorite-star': { opacity: isMigrating ? 0 : 1 }
-                    }}
-                  >
-                    <IconButton
-                      size="small"
-                      className="favorite-star"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        toggleFavorite(vm.connId, vm.node, vm.type, vm.vmid, vm.name)
-                      }}
-                      sx={{
-                        p: 0.25,
-                        opacity: isFav ? 1 : 0,
-                        transition: 'opacity 0.2s',
-                        color: isFav ? '#ffc107' : 'text.secondary',
-                        '&:hover': { color: '#ffc107' }
-                      }}
-                    >
-                      <i className={isFav ? "ri-star-fill" : "ri-star-line"} style={{ fontSize: 14 }} />
-                    </IconButton>
-                    <StatusIcon status={vm.status} type="vm" isMigrating={isMigrating} isPendingAction={isPendingAction} />
-                    <i className={getVmIcon(vm.type, vm.template)} style={{ opacity: 0.8, fontSize: 14 }} />
-                    <Typography variant="body2" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {vm.name}
-                    </Typography>
-                    {vm.template && (
-                      <Chip label={t('inventory.tpl')} size="small" sx={{ height: 16, fontSize: 10 }} />
-                    )}
-                    {vm.status === 'running' && getCpuPct(vm.cpu) >= CPU_WARNING_THRESHOLD && (
-                      <Tooltip title={`${t('common.warning')} CPU: ${getCpuPct(vm.cpu).toFixed(0)}%`}>
-                        <i className="ri-cpu-line" style={{ fontSize: 14, color: '#ed6c02' }} />
-                      </Tooltip>
-                    )}
-                    {vm.status === 'running' && getMemPct(vm.mem, vm.maxmem) >= RAM_WARNING_THRESHOLD && (
-                      <Tooltip title={`${t('common.warning')} RAM: ${getMemPct(vm.mem, vm.maxmem).toFixed(0)}%`}>
-                        <i className="ri-ram-line" style={{ fontSize: 14, color: '#ed6c02' }} />
-                      </Tooltip>
-                    )}
-                  </Box>
+                  return (
+                    <VmItem
+                      key={tagVmKey}
+                      vmKey={vmKey}
+                      connId={vm.connId}
+                      connName={vm.connName}
+                      node={vm.node}
+                      vmType={vm.type}
+                      vmid={vm.vmid}
+                      name={vm.name}
+                      status={vm.status}
+                      cpu={vm.cpu}
+                      mem={vm.mem}
+                      maxmem={vm.maxmem}
+                      template={vm.template}
+                      isCluster={vm.isCluster}
+                      isSelected={selected?.id === vmKey}
+                      isMigrating={isVmMigrating(vm.connId, vm.vmid)}
+                      isPendingAction={isVmPendingAction(vm.connId, vm.vmid)}
+                      isFavorite={favorites.has(vmKey)}
+                      onFavoriteToggle={() => toggleFavorite(vm.connId, vm.node, vm.type, vm.vmid, vm.name)}
+                      onClick={() => onSelect({ type: 'vm', id: vmKey })}
+                      onContextMenu={(e) => handleContextMenu(e, vm.connId, vm.node, vm.type, vm.vmid, vm.name, vm.status, vm.isCluster, vm.template)}
+                      variant="grouped"
+                      t={t}
+                    />
                   )
-                  return isMigrating ? <Tooltip key={tagVmKey} title={t('audit.actions.migrate') + "..."} placement="right">{vmContent}</Tooltip> : vmContent
-                  })()
                 })}
               </Box>
             )})
@@ -2234,63 +2387,51 @@ return (() => {
               <Typography variant='body2' sx={{ opacity: 0.6 }}>{t('common.noResults')}</Typography>
             </Box>
           ) : (
-            filteredVms.filter(vm => vm.template).map(vm => {
-              const vmKey = `${vm.connId}:${vm.node}:${vm.type}:${vm.vmid}`
-              const isFav = favorites.has(vmKey)
-              const isMigrating = isVmMigrating(vm.connId, vm.vmid)
-
-              
-return (() => {
-              const vmContent = (
-              <Box
-                key={vmKey}
-                data-vmkey={vmKey}
-                onClick={() => !isMigrating && onSelect({ type: 'vm', id: vmKey })}
-                onContextMenu={(e) => !isMigrating && handleContextMenu(e, vm.connId, vm.node, vm.type, vm.vmid, vm.name, vm.status, vm.isCluster, vm.template)}
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 1,
-                  px: 1.5,
-                  py: 0.75,
-                  cursor: isMigrating ? 'not-allowed' : 'pointer',
-                  borderRadius: 1,
-                  bgcolor: selected?.id === vmKey
-                    ? 'action.selected'
-                    : 'transparent',
-                  opacity: isMigrating ? 0.5 : 1,
-                  '&:hover': { bgcolor: isMigrating ? 'transparent' : 'action.hover' },
-                  '&:hover .favorite-star': { opacity: isMigrating ? 0 : 1 }
-                }}
-              >
-                <IconButton
-                  size="small"
-                  className="favorite-star"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    toggleFavorite(vm.connId, vm.node, vm.type, vm.vmid, vm.name)
-                  }}
-                  sx={{
-                    p: 0.25,
-                    opacity: isFav ? 1 : 0,
-                    transition: 'opacity 0.2s',
-                    color: isFav ? '#ffc107' : 'text.secondary',
-                    '&:hover': { color: '#ffc107' }
-                  }}
-                >
-                  <i className={isFav ? "ri-star-fill" : "ri-star-line"} style={{ fontSize: 14 }} />
-                </IconButton>
-                <i className="ri-file-copy-fill" style={{ opacity: 0.8, fontSize: 14, color: '#0288d1' }} />
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flex: 1, minWidth: 0 }}>
-                  <Typography variant="body2" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {vm.name}
-                  </Typography>
-                  <Chip label={vm.type === 'lxc' ? 'LXC' : 'VM'} size="small" sx={{ height: 16, fontSize: 10 }} />
-                </Box>
-              </Box>
-              )
-              return isMigrating ? <Tooltip key={vmKey} title={t('audit.actions.migrate') + "..."} placement="right">{vmContent}</Tooltip> : vmContent
-            })()})
+            <Box sx={{ height: `${virtualizer.getTotalSize()}px`, width: '100%', position: 'relative' }}>
+              {virtualizer.getVirtualItems().map(virtualRow => {
+                const vm = flatItems![virtualRow.index]
+                const vmKey = `${vm.connId}:${vm.node}:${vm.type}:${vm.vmid}`
+                return (
+                  <Box
+                    key={virtualRow.key}
+                    ref={virtualizer.measureElement}
+                    data-index={virtualRow.index}
+                    sx={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      transform: `translateY(${virtualRow.start}px)`,
+                    }}
+                  >
+                    <VmItem
+                      vmKey={vmKey}
+                      connId={vm.connId}
+                      connName={vm.connName}
+                      node={vm.node}
+                      vmType={vm.type}
+                      vmid={vm.vmid}
+                      name={vm.name}
+                      status={vm.status}
+                      cpu={vm.cpu}
+                      mem={vm.mem}
+                      maxmem={vm.maxmem}
+                      template={vm.template}
+                      isCluster={vm.isCluster}
+                      isSelected={selected?.id === vmKey}
+                      isMigrating={isVmMigrating(vm.connId, vm.vmid)}
+                      isPendingAction={isVmPendingAction(vm.connId, vm.vmid)}
+                      isFavorite={favorites.has(vmKey)}
+                      onFavoriteToggle={() => toggleFavorite(vm.connId, vm.node, vm.type, vm.vmid, vm.name)}
+                      onClick={() => onSelect({ type: 'vm', id: vmKey })}
+                      onContextMenu={(e) => handleContextMenu(e, vm.connId, vm.node, vm.type, vm.vmid, vm.name, vm.status, vm.isCluster, vm.template)}
+                      variant="template"
+                      t={t}
+                    />
+                  </Box>
+                )
+              })}
+            </Box>
           )}
         </Box>
       ) : (
@@ -2401,14 +2542,10 @@ return (
               >
                 {n.vms.map(vm => {
                   const vmKey = `${clu.connId}:${n.node}:${vm.type}:${vm.vmid}`
-                  const isFav = favorites.has(vmKey)
                   const isMigrating = isVmMigrating(clu.connId, vm.vmid)
-                  const isPendingAction = isVmPendingAction(clu.connId, vm.vmid)
-
-                  const treeVmKey = `${clu.connId}:${n.node}:${vm.type}:${vm.vmid}`
                   const vmContent = (
                   <TreeItem
-                    key={treeVmKey}
+                    key={vmKey}
                     itemId={`vm:${clu.connId}:${n.node}:${vm.type}:${vm.vmid}`}
                     disabled={isMigrating}
                     onContextMenu={(e) => !isMigrating && handleContextMenu(e, clu.connId, n.node, vm.type, vm.vmid, vm.name, vm.status, clu.isCluster, vm.template)}
@@ -2420,49 +2557,34 @@ return (
                       }
                     }}
                     label={
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0 }}>
-                        {/* Étoile favori */}
-                        <Box
-                          component="span"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            if (!isMigrating) toggleFavorite(clu.connId, n.node, vm.type, vm.vmid, vm.name)
-                          }}
-                          sx={{
-                            cursor: isMigrating ? 'not-allowed' : 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            color: isFav ? '#ffc107' : 'text.disabled',
-                            '&:hover': { color: isMigrating ? undefined : '#ffc107' },
-                          }}
-                        >
-                          <i className={isFav ? "ri-star-fill" : "ri-star-line"} style={{ fontSize: 14 }} />
-                        </Box>
-                        <StatusIcon status={vm.status} type="vm" isMigrating={isMigrating} isPendingAction={isPendingAction} />
-                        <i className={getVmIcon(vm.type, vm.template)} style={{ opacity: 0.8, fontSize: 14 }} />
-                        <Typography variant="body2" sx={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {vm.name}
-                        </Typography>
-                        {vm.template && (
-                          <Chip label={t('inventory.tpl')} size="small" sx={{ height: 16, fontSize: 10 }} />
-                        )}
-                        {/* Icône CPU si charge élevée */}
-                        {vm.status === 'running' && getCpuPct(vm.cpu) >= CPU_WARNING_THRESHOLD && (
-                          <Tooltip title={`${t('common.warning')} CPU: ${getCpuPct(vm.cpu).toFixed(0)}%`}>
-                            <i className="ri-cpu-line" style={{ fontSize: 14, color: '#ed6c02' }} />
-                          </Tooltip>
-                        )}
-                        {/* Icône RAM si consommation élevée */}
-                        {vm.status === 'running' && getMemPct(vm.mem, vm.maxmem) >= RAM_WARNING_THRESHOLD && (
-                          <Tooltip title={`${t('common.warning')} RAM: ${getMemPct(vm.mem, vm.maxmem).toFixed(0)}%`}>
-                            <i className="ri-ram-line" style={{ fontSize: 14, color: '#ed6c02' }} />
-                          </Tooltip>
-                        )}
-                      </Box>
+                      <VmItem
+                        vmKey={vmKey}
+                        connId={clu.connId}
+                        connName={clu.name}
+                        node={n.node}
+                        vmType={vm.type}
+                        vmid={vm.vmid}
+                        name={vm.name}
+                        status={vm.status}
+                        cpu={vm.cpu}
+                        mem={vm.mem}
+                        maxmem={vm.maxmem}
+                        template={vm.template}
+                        isCluster={clu.isCluster}
+                        isSelected={false}
+                        isMigrating={isMigrating}
+                        isPendingAction={isVmPendingAction(clu.connId, vm.vmid)}
+                        isFavorite={favorites.has(vmKey)}
+                        onFavoriteToggle={() => toggleFavorite(clu.connId, n.node, vm.type, vm.vmid, vm.name)}
+                        onClick={() => {}}
+                        onContextMenu={() => {}}
+                        variant="tree"
+                        t={t}
+                      />
                     }
                   />
                   )
-                  return isMigrating ? <Tooltip key={treeVmKey} title={t('audit.actions.migrate') + "..."} placement="right">{vmContent}</Tooltip> : vmContent
+                  return isMigrating ? <Tooltip key={vmKey} title={t('audit.actions.migrate') + "..."} placement="right">{vmContent}</Tooltip> : vmContent
                 })}
               </TreeItem>
             )
@@ -2510,10 +2632,7 @@ return (
                 >
                   {n.vms.map(vm => {
                     const vmKey = `${clu.connId}:${n.node}:${vm.type}:${vm.vmid}`
-                    const isFav = favorites.has(vmKey)
                     const isMigrating = isVmMigrating(clu.connId, vm.vmid)
-                    const isPendingAction = isVmPendingAction(clu.connId, vm.vmid)
-
                     const vmContent = (
                     <TreeItem
                       key={vmKey}
@@ -2527,45 +2646,30 @@ return (
                         }
                       }}
                       label={
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0 }}>
-                          {/* Étoile favori */}
-                          <Box
-                            component="span"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              if (!isMigrating) toggleFavorite(clu.connId, n.node, vm.type, vm.vmid, vm.name)
-                            }}
-                            sx={{
-                              cursor: isMigrating ? 'not-allowed' : 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              color: isFav ? '#ffc107' : 'text.disabled',
-                              '&:hover': { color: isMigrating ? undefined : '#ffc107' },
-                            }}
-                          >
-                            <i className={isFav ? "ri-star-fill" : "ri-star-line"} style={{ fontSize: 14 }} />
-                          </Box>
-                          <StatusIcon status={vm.status} type="vm" isMigrating={isMigrating} isPendingAction={isPendingAction} />
-                          <i className={getVmIcon(vm.type, vm.template)} style={{ opacity: 0.8, fontSize: 14 }} />
-                          <Typography variant="body2" sx={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {vm.name}
-                          </Typography>
-                          {vm.template && (
-                            <Chip label={t('inventory.tpl')} size="small" sx={{ height: 16, fontSize: 10 }} />
-                          )}
-                          {/* Icône CPU si charge élevée */}
-                          {vm.status === 'running' && getCpuPct(vm.cpu) >= CPU_WARNING_THRESHOLD && (
-                            <Tooltip title={`${t('common.warning')} CPU: ${getCpuPct(vm.cpu).toFixed(0)}%`}>
-                              <i className="ri-cpu-line" style={{ fontSize: 14, color: '#ed6c02' }} />
-                            </Tooltip>
-                          )}
-                          {/* Icône RAM si consommation élevée */}
-                          {vm.status === 'running' && getMemPct(vm.mem, vm.maxmem) >= RAM_WARNING_THRESHOLD && (
-                            <Tooltip title={`${t('common.warning')} RAM: ${getMemPct(vm.mem, vm.maxmem).toFixed(0)}%`}>
-                              <i className="ri-ram-line" style={{ fontSize: 14, color: '#ed6c02' }} />
-                            </Tooltip>
-                          )}
-                        </Box>
+                        <VmItem
+                          vmKey={vmKey}
+                          connId={clu.connId}
+                          connName={clu.name}
+                          node={n.node}
+                          vmType={vm.type}
+                          vmid={vm.vmid}
+                          name={vm.name}
+                          status={vm.status}
+                          cpu={vm.cpu}
+                          mem={vm.mem}
+                          maxmem={vm.maxmem}
+                          template={vm.template}
+                          isCluster={clu.isCluster}
+                          isSelected={false}
+                          isMigrating={isMigrating}
+                          isPendingAction={isVmPendingAction(clu.connId, vm.vmid)}
+                          isFavorite={favorites.has(vmKey)}
+                          onFavoriteToggle={() => toggleFavorite(clu.connId, n.node, vm.type, vm.vmid, vm.name)}
+                          onClick={() => {}}
+                          onContextMenu={() => {}}
+                          variant="tree"
+                          t={t}
+                        />
                       }
                     />
                     )
