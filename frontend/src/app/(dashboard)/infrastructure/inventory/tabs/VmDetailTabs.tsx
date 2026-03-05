@@ -864,7 +864,7 @@ export default function VmDetailTabs(props: any) {
                                   }}
                                 >
                                   <ListItemIcon sx={{ minWidth: 40 }}>
-                                    <i className={disk.isCdrom ? "ri-disc-fill" : "ri-hard-drive-2-fill"} style={{ fontSize: 24, color: disk.isCdrom ? 'var(--mui-palette-secondary-main)' : 'var(--mui-palette-warning-main)' }} />
+                                    <i className={disk.isCdrom ? "ri-disc-fill" : "ri-hard-drive-2-fill"} style={{ fontSize: 24, opacity: disk.isCdrom ? 1 : 0.7, color: disk.isCdrom ? 'var(--mui-palette-secondary-main)' : undefined }} />
                                   </ListItemIcon>
                                   <ListItemText
                                     primary={
