@@ -172,7 +172,8 @@
     "templates": "Templates",
     "reports": "Reports",
     "topology": "Topology",
-    "compliance": "Compliance"
+    "compliance": "Compliance",
+    "changes": "Change Tracking"
   },
   "navbar": {
     "language": "Language",
@@ -4723,5 +4724,30 @@
     "deactivateAll": "Deactivate all",
     "confirmDeleteProfile": "Are you sure you want to delete this profile?",
     "noProfiles": "No profiles yet. Create one to customize which checks are run and their weights."
+  },
+  "changes": {
+    "title": "Change Tracking",
+    "totalChanges": "Total Changes",
+    "search": "Search by name, ID, node...",
+    "allTypes": "All resource types",
+    "allActions": "All actions",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "aFewSecondsAgo": "a few seconds ago",
+    "minutesAgo": "{count}m ago",
+    "hoursAgo": "{count}h ago",
+    "daysAgo": "{count}d ago",
+    "fieldChanged": "field changed",
+    "fieldsChanged": "fields changed",
+    "actionConfigChanged": "Config changed",
+    "actionCreated": "Created",
+    "actionDeleted": "Deleted",
+    "actionMigrated": "Migrated",
+    "actionStarted": "Started",
+    "actionStopped": "Stopped",
+    "emptyTitle": "No changes detected yet",
+    "emptyDescription": "Configuration changes will appear here as they are detected on your Proxmox infrastructure.",
+    "recentChanges": "Recent Changes",
+    "viewAll": "View all changes"
   }
 }

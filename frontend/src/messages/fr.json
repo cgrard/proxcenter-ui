@@ -172,7 +172,8 @@
     "templates": "Templates",
     "reports": "Rapports",
     "topology": "Topologie",
-    "compliance": "Conformité"
+    "compliance": "Conformité",
+    "changes": "Suivi des changements"
   },
   "navbar": {
     "language": "Langue",
@@ -4729,5 +4730,30 @@
     "deactivateAll": "Tout désactiver",
     "confirmDeleteProfile": "Êtes-vous sûr de vouloir supprimer ce profil ?",
     "noProfiles": "Aucun profil. Créez-en un pour personnaliser les vérifications exécutées et leur pondération."
+  },
+  "changes": {
+    "title": "Suivi des changements",
+    "totalChanges": "Total des changements",
+    "search": "Rechercher par nom, ID, noeud...",
+    "allTypes": "Tous les types",
+    "allActions": "Toutes les actions",
+    "today": "Aujourd'hui",
+    "yesterday": "Hier",
+    "aFewSecondsAgo": "il y a quelques secondes",
+    "minutesAgo": "il y a {count}min",
+    "hoursAgo": "il y a {count}h",
+    "daysAgo": "il y a {count}j",
+    "fieldChanged": "champ modifié",
+    "fieldsChanged": "champs modifiés",
+    "actionConfigChanged": "Config modifiée",
+    "actionCreated": "Créé",
+    "actionDeleted": "Supprimé",
+    "actionMigrated": "Migré",
+    "actionStarted": "Démarré",
+    "actionStopped": "Arrêté",
+    "emptyTitle": "Aucun changement détecté",
+    "emptyDescription": "Les modifications de configuration apparaîtront ici au fur et à mesure qu'elles seront détectées sur votre infrastructure Proxmox.",
+    "recentChanges": "Changements récents",
+    "viewAll": "Voir tous les changements"
   }
 }

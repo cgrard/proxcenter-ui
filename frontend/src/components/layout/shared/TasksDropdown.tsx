@@ -22,6 +22,7 @@ import {
 } from '@mui/material'
 
 import { useRunningTasks } from '@/hooks/useRunningTasks'
+import { useRecentChanges } from '@/hooks/useChanges'
 
 type RunningTask = {
   id: string
@@ -35,6 +36,32 @@ type RunningTask = {
   durationSec: number
   connectionId: string
   connectionName: string
+}
+
+type RecentChange = {
+  id: number
+  timestamp: string
+  resourceType: string
+  resourceId: string
+  resourceName: string
+  action: string
+  node: string
+  connectionName: string
+  fields: { field: string; oldValue: string; newValue: string }[] | null
+}
+
+const changeActionIcons: Record<string, string> = {
+  config_changed: 'ri-settings-3-line',
+  created: 'ri-add-circle-line',
+  deleted: 'ri-delete-bin-line',
+  migrated: 'ri-swap-box-line',
+}
+
+const resourceTypeIcons: Record<string, string> = {
+  vm: 'ri-computer-line',
+  ct: 'ri-instance-line',
+  node: 'ri-server-line',
+  storage: 'ri-database-2-line',
 }
 
 function formatDuration(seconds: number): string {
@@ -166,6 +193,10 @@ export default function TasksDropdown() {
 
   // SWR hook for running tasks - polls faster when menu is open
   const { data: tasksResponse, isLoading: loading } = useRunningTasks()
+
+  // Recent changes hook
+  const { data: changesResponse } = useRecentChanges(5)
+  const recentChanges: RecentChange[] = changesResponse?.data || []
 
   // Sync SWR data to local state and handle notifications
   useEffect(() => {
@@ -475,19 +506,86 @@ return () => window.removeEventListener('focus', handleFocus)
           )}
         </Box>
 
+        {/* Recent Changes section */}
+        {recentChanges.length > 0 && (
+          <>
+            <Box sx={{ px: 2, py: 1, borderTop: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1 }}>
+              <i className="ri-git-commit-line" style={{ fontSize: 16, opacity: 0.6 }} />
+              <Typography variant="subtitle2" fontWeight={600} sx={{ opacity: 0.8 }}>
+                {t('changes.recentChanges')}
+              </Typography>
+              <Chip label={recentChanges.length} size="small" sx={{ height: 18, fontSize: '0.65rem' }} />
+            </Box>
+            <Box sx={{ maxHeight: 180, overflow: 'auto' }}>
+              {recentChanges.map((change, idx) => (
+                <Box key={change.id}>
+                  <Box
+                    sx={{
+                      px: 2,
+                      py: 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1.5,
+                      '&:hover': { bgcolor: 'action.hover' }
+                    }}
+                  >
+                    <Box sx={{
+                      width: 28,
+                      height: 28,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      bgcolor: 'action.selected',
+                      borderRadius: 1,
+                    }}>
+                      <i className={resourceTypeIcons[change.resourceType] || 'ri-file-line'} style={{ fontSize: 14 }} />
+                    </Box>
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <i className={changeActionIcons[change.action] || 'ri-edit-line'} style={{ fontSize: 12, opacity: 0.6 }} />
+                        <Typography variant="caption" fontWeight={500} noWrap>
+                          {change.resourceType.toUpperCase()} {change.resourceId}
+                          {change.resourceName ? ` "${change.resourceName}"` : ''}
+                        </Typography>
+                      </Box>
+                      <Typography variant="caption" sx={{ opacity: 0.5, display: 'block' }} noWrap>
+                        {change.fields?.length || 0} {(change.fields?.length || 0) === 1 ? t('changes.fieldChanged') : t('changes.fieldsChanged')}
+                        {' \u2022 '}{change.connectionName || change.node}
+                      </Typography>
+                    </Box>
+                  </Box>
+                  {idx < recentChanges.length - 1 && <Divider />}
+                </Box>
+              ))}
+            </Box>
+          </>
+        )}
+
         {/* Footer */}
         <Box sx={{ px: 2, py: 1, borderTop: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Typography variant="caption" sx={{ opacity: 0.5 }}>
             {lastUpdate && t('tasks.notifications.lastUpdated', { time: lastUpdate.toLocaleTimeString() })}
           </Typography>
-          <Button
-            component={Link}
-            href="/operations/events"
-            size="small"
-            onClick={handleClose}
-          >
-            {t('common.all')}
-          </Button>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            {recentChanges.length > 0 && (
+              <Button
+                component={Link}
+                href="/operations/changes"
+                size="small"
+                onClick={handleClose}
+              >
+                {t('changes.viewAll')}
+              </Button>
+            )}
+            <Button
+              component={Link}
+              href="/operations/events"
+              size="small"
+              onClick={handleClose}
+            >
+              {t('common.all')}
+            </Button>
+          </Box>
         </Box>
       </Menu>
 
