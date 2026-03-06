@@ -28,6 +28,7 @@ import {
   MenuItem,
   Select,
   FormControlLabel,
+  Snackbar,
   Switch,
   TextField,
   ToggleButton,
@@ -881,6 +882,14 @@ return next
   const [snapshotVmstate, setSnapshotVmstate] = useState(false)
   const [creatingSnapshot, setCreatingSnapshot] = useState(false)
   const [snapshotTarget, setSnapshotTarget] = useState<{ connId: string; type: string; node: string; vmid: string } | null>(null)
+  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' | 'info' }>({ open: false, message: '', severity: 'success' })
+  const [backupDialogOpen, setBackupDialogOpen] = useState(false)
+  const [backupTarget, setBackupTarget] = useState<{ connId: string; type: string; node: string; vmid: string; name: string } | null>(null)
+  const [backupStorages, setBackupStorages] = useState<any[]>([])
+  const [backupStorage, setBackupStorage] = useState('')
+  const [backupMode, setBackupMode] = useState('snapshot')
+  const [backupCompress, setBackupCompress] = useState('zstd')
+  const [backupLoading, setBackupLoading] = useState(false)
   const [cloneDialogOpen, setCloneDialogOpen] = useState(false)
   const [cloneTarget, setCloneTarget] = useState<VmContextMenu>(null)
 
@@ -1254,12 +1263,6 @@ return next
     setActionBusy(true)
     setVmActionConfirm(null)
 
-    // backup est géré séparément
-    if (action === 'backup') {
-      await executeBackupNow()
-      return
-    }
-
     try {
       // hibernate = suspend to disk via PVE
       const pveAction = action === 'hibernate' ? 'suspend' : action
@@ -1274,6 +1277,7 @@ return next
 
       // Rafraîchir l'arbre après l'action
       setReloadTick(x => x + 1)
+      setSnackbar({ open: true, message: `${action.charAt(0).toUpperCase() + action.slice(1)} — ${contextMenu.name}`, severity: 'success' })
     } catch (e: any) {
       setVmActionError(`${t('common.error')} (${action}): ${e?.message || e}`)
     } finally {
@@ -1314,6 +1318,7 @@ return next
       setSnapshotDialogOpen(false)
       setSnapshotTarget(null)
       setReloadTick(x => x + 1)
+      setSnackbar({ open: true, message: t('inventory.snapshotCreated'), severity: 'success' })
     } catch (e: any) {
       setVmActionError(`${t('common.error')} (snapshot): ${e?.message || e}`)
     } finally {
@@ -1326,21 +1331,36 @@ return next
     if (!contextMenu) return
     const { connId, node, type, vmid, name } = contextMenu
 
-    setVmActionConfirm({ action: 'backup', name })
+    setBackupTarget({ connId, type, node, vmid, name })
+    setBackupStorage('')
+    setBackupMode('snapshot')
+    setBackupCompress('zstd')
+    setBackupStorages([])
+    setBackupDialogOpen(true)
+    handleCloseContextMenu()
+
+    // Fetch available backup storages
+    try {
+      const res = await fetch(`/api/v1/connections/${encodeURIComponent(connId)}/nodes/${encodeURIComponent(node)}/storages?content=backup`)
+      const data = await res.json()
+
+      if (data?.data?.length) {
+        setBackupStorages(data.data)
+        setBackupStorage(data.data[0].storage)
+      }
+    } catch { /* ignore */ }
   }
 
   const executeBackupNow = async () => {
-    if (!contextMenu) return
-    const { connId, node, type, vmid } = contextMenu
+    if (!backupTarget || !backupStorage) return
 
-    setActionBusy(true)
-    setVmActionConfirm(null)
+    setBackupLoading(true)
 
     try {
-      const res = await fetch(`/api/v1/connections/${encodeURIComponent(connId)}/nodes/${encodeURIComponent(node)}/vzdump`, {
+      const res = await fetch(`/api/v1/connections/${encodeURIComponent(backupTarget.connId)}/nodes/${encodeURIComponent(backupTarget.node)}/vzdump`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ vmid: Number(vmid), mode: 'snapshot', compress: 'zstd' })
+        body: JSON.stringify({ vmid: Number(backupTarget.vmid), storage: backupStorage, mode: backupMode, compress: backupCompress })
       })
 
       if (!res.ok) {
@@ -1348,12 +1368,14 @@ return next
         throw new Error(err?.error || `HTTP ${res.status}`)
       }
 
+      setBackupDialogOpen(false)
+      setBackupTarget(null)
       setReloadTick(x => x + 1)
+      setSnackbar({ open: true, message: `${t('inventory.backupStarted')} — ${backupTarget.name}`, severity: 'success' })
     } catch (e: any) {
       setVmActionError(`${t('common.error')} (backup): ${e?.message || e}`)
     } finally {
-      setActionBusy(false)
-      handleCloseContextMenu()
+      setBackupLoading(false)
     }
   }
 
@@ -2880,9 +2902,17 @@ return (
       >
         {/* Header du menu */}
         <Box sx={{ px: 2, py: 1, borderBottom: '1px solid', borderColor: 'divider' }}>
-          <Typography variant="subtitle2" fontWeight={900}>
-            {contextMenu?.name}
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+            {contextMenu && (
+              <i
+                className={getVmIcon(contextMenu.type, contextMenu.template)}
+                style={{ fontSize: 16, opacity: 0.8 }}
+              />
+            )}
+            <Typography variant="subtitle2" fontWeight={900}>
+              {contextMenu?.name}
+            </Typography>
+          </Box>
           <Typography variant="caption" sx={{ opacity: 0.6 }}>
             {contextMenu?.template ? 'TEMPLATE' : contextMenu?.type?.toUpperCase()} • #{contextMenu?.vmid}
           </Typography>
@@ -3381,7 +3411,6 @@ return (
           {vmActionConfirm?.action === 'reboot' && <i className="ri-restart-line" style={{ fontSize: 24, color: 'var(--mui-palette-warning-main)' }} />}
           {vmActionConfirm?.action === 'suspend' && <PauseIcon sx={{ fontSize: 24, color: 'info.main' }} />}
           {vmActionConfirm?.action === 'hibernate' && <i className="ri-zzz-line" style={{ fontSize: 24, color: 'var(--mui-palette-info-main)' }} />}
-          {vmActionConfirm?.action === 'backup' && <i className="ri-save-line" style={{ fontSize: 24 }} />}
           {t('common.confirm')}
         </DialogTitle>
         <DialogContent>
@@ -3474,6 +3503,87 @@ return (
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Dialog backup */}
+      <Dialog
+        open={backupDialogOpen}
+        onClose={() => { setBackupDialogOpen(false); setBackupTarget(null) }}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <i className="ri-save-line" style={{ fontSize: 24 }} />
+          {t('inventory.backupNow')} — {backupTarget?.name}
+        </DialogTitle>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '8px !important' }}>
+          <FormControl size="small" fullWidth>
+            <InputLabel>{t('inventory.backupStorage')}</InputLabel>
+            <Select
+              value={backupStorage}
+              label={t('inventory.backupStorage')}
+              onChange={e => setBackupStorage(e.target.value)}
+            >
+              {backupStorages.map((s: any) => (
+                <MenuItem key={s.storage} value={s.storage}>{s.storage}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <FormControl size="small" fullWidth>
+            <InputLabel>{t('inventory.backupMode')}</InputLabel>
+            <Select
+              value={backupMode}
+              label={t('inventory.backupMode')}
+              onChange={e => setBackupMode(e.target.value)}
+            >
+              <MenuItem value="snapshot">Snapshot</MenuItem>
+              <MenuItem value="suspend">Suspend</MenuItem>
+              <MenuItem value="stop">Stop</MenuItem>
+            </Select>
+          </FormControl>
+          <FormControl size="small" fullWidth>
+            <InputLabel>{t('inventory.backupCompress')}</InputLabel>
+            <Select
+              value={backupCompress}
+              label={t('inventory.backupCompress')}
+              onChange={e => setBackupCompress(e.target.value)}
+            >
+              <MenuItem value="zstd">ZSTD</MenuItem>
+              <MenuItem value="lzo">LZO</MenuItem>
+              <MenuItem value="gzip">GZIP</MenuItem>
+              <MenuItem value="0">{t('common.none')}</MenuItem>
+            </Select>
+          </FormControl>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => { setBackupDialogOpen(false); setBackupTarget(null) }}>
+            {t('common.cancel')}
+          </Button>
+          <Button
+            variant="contained"
+            onClick={executeBackupNow}
+            disabled={backupLoading || !backupStorage}
+            startIcon={backupLoading ? <CircularProgress size={16} /> : null}
+          >
+            {t('inventory.backupNow')}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Snackbar */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar(s => ({ ...s, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert
+          onClose={() => setSnackbar(s => ({ ...s, open: false }))}
+          severity={snackbar.severity}
+          variant="filled"
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
 
       {/* Dialog d'erreur Unlock */}
       {unlockErrorDialog.open && (
