@@ -238,7 +238,6 @@ export default function RollingUpdateWizard({
   const [nodeNetworks, setNodeNetworks] = useState<Record<string, Array<{ ip: string; iface: string; gateway: string }>>>({})
   const [nodeHostIds, setNodeHostIds] = useState<Record<string, string>>({})
   const [sshAddresses, setSshAddresses] = useState<Record<string, string>>({})
-  const [sshCustomInputs, setSshCustomInputs] = useState<Record<string, string>>({})
   const [sshSaving, setSshSaving] = useState<Record<string, boolean>>({})
 
   // Execution state
@@ -343,25 +342,26 @@ export default function RollingUpdateWizard({
     return () => { cancelled = true }
   }, [open, connectionId, nodes.length])
 
-  // Save SSH address override for a node
+  // Save SSH address override for a node (optimistic update)
   const saveSshAddress = useCallback(async (nodeName: string, address: string) => {
     const hostId = nodeHostIds[nodeName]
     if (!hostId) return
+
+    // Optimistic: update state immediately so the select reflects the choice
+    setSshAddresses(prev => {
+      const next = { ...prev }
+      if (address) next[nodeName] = address
+      else delete next[nodeName]
+      return next
+    })
+
     setSshSaving(prev => ({ ...prev, [nodeName]: true }))
     try {
-      const res = await fetch(`/api/v1/hosts/${hostId}`, {
+      await fetch(`/api/v1/hosts/${hostId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sshAddress: address || null }),
       })
-      if (res.ok) {
-        setSshAddresses(prev => {
-          const next = { ...prev }
-          if (address) next[nodeName] = address
-          else delete next[nodeName]
-          return next
-        })
-      }
     } catch {}
     finally { setSshSaving(prev => ({ ...prev, [nodeName]: false })) }
   }, [nodeHostIds])
@@ -716,35 +716,25 @@ export default function RollingUpdateWizard({
                     {nodeOrder.filter(n => !excludedNodes.includes(n)).map(nodeName => {
                       const interfaces = nodeNetworks[nodeName] || []
                       const currentAddress = sshAddresses[nodeName] || ''
-                      const isKnownIp = interfaces.some(i => i.ip === currentAddress)
-                      const isCustom = !!currentAddress && !isKnownIp
-                      const selectValue = !currentAddress ? '__auto__' : isCustom ? '__custom__' : currentAddress
+                      const selectValue = currentAddress && interfaces.some(i => i.ip === currentAddress) ? currentAddress : !currentAddress ? '__auto__' : '__auto__'
 
                       return (
                         <Box key={nodeName} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Typography variant="body2" sx={{ minWidth: 100, fontWeight: 600 }}>
+                          <Typography variant="body2" sx={{ minWidth: 100, fontWeight: 600, fontSize: 13 }}>
                             {nodeName}
                           </Typography>
 
-                          <FormControl size="small" sx={{ minWidth: 220 }}>
+                          <FormControl size="small" sx={{ minWidth: 240 }}>
                             <Select
                               value={selectValue}
                               onChange={(e) => {
                                 const val = e.target.value
-                                if (val === '__auto__') {
-                                  saveSshAddress(nodeName, '')
-                                  setSshCustomInputs(prev => { const n = { ...prev }; delete n[nodeName]; return n })
-                                } else if (val === '__custom__') {
-                                  setSshCustomInputs(prev => ({ ...prev, [nodeName]: currentAddress || '' }))
-                                } else {
-                                  saveSshAddress(nodeName, val)
-                                  setSshCustomInputs(prev => { const n = { ...prev }; delete n[nodeName]; return n })
-                                }
+                                saveSshAddress(nodeName, val === '__auto__' ? '' : val)
                               }}
-                              sx={{ '& .MuiSelect-select': { fontFamily: 'monospace', fontSize: 13 } }}
+                              sx={{ fontSize: 13 }}
                               disabled={sshSaving[nodeName]}
                             >
-                              <MenuItem value="__auto__">
+                              <MenuItem value="__auto__" sx={{ fontSize: 13 }}>
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                   <i className="ri-radar-line" style={{ fontSize: 14, opacity: 0.6 }} />
                                   <span>{t('updates.sshAutoDetect')}</span>
@@ -752,51 +742,23 @@ export default function RollingUpdateWizard({
                               </MenuItem>
 
                               {interfaces.length > 0 && (
-                                <ListSubheader sx={{ fontSize: 11 }}>{t('updates.sshNodeInterfaces')}</ListSubheader>
+                                <ListSubheader sx={{ fontSize: 11, lineHeight: '28px' }}>{t('updates.sshNodeInterfaces')}</ListSubheader>
                               )}
 
                               {interfaces.map(({ ip, iface, gateway }) => (
-                                <MenuItem key={ip} value={ip}>
+                                <MenuItem key={ip} value={ip} sx={{ fontSize: 13 }}>
                                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    <Typography sx={{ fontFamily: 'monospace', fontSize: 13 }}>{ip}</Typography>
+                                    <span style={{ fontFamily: 'var(--font-jetbrains-mono, monospace)' }}>{ip}</span>
                                     <Typography variant="caption" color="text.secondary">
-                                      {iface}{gateway ? ` (gw)` : ''}
+                                      {iface}{gateway ? ' (gw)' : ''}
                                     </Typography>
                                   </Box>
                                 </MenuItem>
                               ))}
-
-                              <ListSubheader sx={{ fontSize: 11 }}>{t('updates.sshOther')}</ListSubheader>
-                              <MenuItem value="__custom__">
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                  <i className="ri-edit-line" style={{ fontSize: 14, opacity: 0.6 }} />
-                                  <span>{t('updates.sshCustomAddress')}</span>
-                                </Box>
-                              </MenuItem>
                             </Select>
                           </FormControl>
 
-                          {selectValue === '__custom__' && (
-                            <>
-                              <TextField
-                                size="small"
-                                placeholder={t('updates.sshAddressPlaceholder')}
-                                value={sshCustomInputs[nodeName] || ''}
-                                onChange={(e) => setSshCustomInputs(prev => ({ ...prev, [nodeName]: e.target.value }))}
-                                sx={{ flex: 1, '& input': { fontFamily: 'monospace', fontSize: 13 } }}
-                              />
-                              <Button
-                                size="small"
-                                variant="outlined"
-                                disabled={!sshCustomInputs[nodeName]?.trim() || sshSaving[nodeName]}
-                                onClick={() => saveSshAddress(nodeName, sshCustomInputs[nodeName]?.trim() || '')}
-                              >
-                                {sshSaving[nodeName] ? <CircularProgress size={16} /> : 'OK'}
-                              </Button>
-                            </>
-                          )}
-
-                          {sshSaving[nodeName] && selectValue !== '__custom__' && (
+                          {sshSaving[nodeName] && (
                             <CircularProgress size={16} />
                           )}
                         </Box>
