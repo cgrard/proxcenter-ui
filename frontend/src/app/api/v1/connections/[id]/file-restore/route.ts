@@ -67,6 +67,21 @@ export async function GET(
     // Construire le volume ID complet si nécessaire
     const volumeId = volume.includes(':') ? volume : `${storage}:${volume}`
 
+    // Vérifier si le chemin cible une image disque brute (non explorable)
+    // Ex: /drive-scsi0.img.fidx, /drive-virtio0.raw.fidx
+    const firstSegment = filepath.split('/').filter(Boolean)[0] || ''
+    if (
+      firstSegment.endsWith('.img.fidx') ||
+      firstSegment.endsWith('.raw.fidx') ||
+      firstSegment.endsWith('.img.didx') ||
+      firstSegment.endsWith('.raw.didx')
+    ) {
+      return NextResponse.json({
+        error: "Raw disk images (.img.fidx) cannot be browsed via file-restore. Only filesystem archives (.pxar) are supported.",
+        code: "RAW_DISK_NOT_BROWSABLE"
+      }, { status: 400 })
+    }
+
     // Encoder le filepath en base64 comme attendu par l'API PVE
     const filepathBase64 = Buffer.from(filepath, 'utf-8').toString('base64')
 
