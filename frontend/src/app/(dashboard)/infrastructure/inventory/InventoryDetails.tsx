@@ -197,6 +197,7 @@ export default function InventoryDetails({
   const [balloon, setBalloon] = useState(0) // en MB
   const [balloonEnabled, setBalloonEnabled] = useState(false)
   const [savingCpu, setSavingCpu] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
   const [savingMemory, setSavingMemory] = useState(false)
   const [actionBusy, setActionBusy] = useState(false)
   const [exitMaintenanceDialogOpen, setExitMaintenanceDialogOpen] = useState(false)
@@ -2985,6 +2986,22 @@ return () => {
 
   const progress = useMemo(() => (loading ? <LinearProgress /> : null), [loading])
 
+  const refreshData = useCallback(async () => {
+    if (!selection || refreshing) return
+    setRefreshing(true)
+    try {
+      const payload = await fetchDetails(selection)
+      if (payload) {
+        setData(payload)
+        setLocalTags(payload.tags || [])
+      }
+    } catch (e: any) {
+      console.error('Refresh error:', e)
+    } finally {
+      setRefreshing(false)
+    }
+  }, [selection, refreshing])
+
   const canShowRrd = selection && (selection.type === 'node' || selection.type === 'vm')
 
   // Charger les backups quand on sélectionne une VM (pré-chargement pour le badge)
@@ -4422,8 +4439,13 @@ return vm?.isCluster ?? false
                     onTagsChange={setLocalTags}
                   />
 
-                  {/* Actions — poussées à droite */}
-                  <Box sx={{ ml: 'auto', flexShrink: 0 }}>
+                  {/* Refresh + Actions — poussées à droite */}
+                  <Box sx={{ ml: 'auto', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <MuiTooltip title={t('common.refresh')}>
+                      <IconButton size="small" onClick={refreshData} disabled={refreshing} sx={{ bgcolor: 'action.hover', '&:hover': { bgcolor: 'action.selected' }, '@keyframes spin': { '0%': { transform: 'rotate(0deg)' }, '100%': { transform: 'rotate(360deg)' } }, ...(refreshing && { '& i': { animation: 'spin 1s linear infinite' } }) }}>
+                        <i className="ri-refresh-line" style={{ fontSize: 18 }} />
+                      </IconButton>
+                    </MuiTooltip>
                     <VmActions
                       disabled={actionBusy || unlocking}
                       vmStatus={vmStatus}
@@ -4518,9 +4540,14 @@ return vm?.isCluster ?? false
                 </Box>
               ) : null}
 
-              {/* Boutons Create VM/LXC pour clusters et hosts */}
+              {/* Refresh + Boutons Create VM/LXC pour clusters et hosts */}
               {(selection?.type === 'cluster' || selection?.type === 'node') && (
-                <Stack direction="row" spacing={1} sx={{ ml: data.hostInfo?.uptime ? 2 : 'auto' }}>
+                <Stack direction="row" spacing={1} alignItems="center" sx={{ ml: data.hostInfo?.uptime ? 2 : 'auto' }}>
+                  <MuiTooltip title={t('common.refresh')}>
+                    <IconButton size="small" onClick={refreshData} disabled={refreshing} sx={{ bgcolor: 'action.hover', '&:hover': { bgcolor: 'action.selected' }, '@keyframes spin': { '0%': { transform: 'rotate(0deg)' }, '100%': { transform: 'rotate(360deg)' } }, ...(refreshing && { '& i': { animation: 'spin 1s linear infinite' } }) }}>
+                      <i className="ri-refresh-line" style={{ fontSize: 18 }} />
+                    </IconButton>
+                  </MuiTooltip>
                   <Button
                     size="small"
                     variant="contained"
