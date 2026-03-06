@@ -772,6 +772,7 @@ export default function InventoryTree({ selected, onSelect, onRefreshRef, viewMo
   const [error, setError] = useState<string | null>(null)
   const [clusters, setClusters] = useState<TreeCluster[]>([])
   const [pbsServers, setPbsServers] = useState<TreePbsServer[]>([])
+  const [externalHypervisors, setExternalHypervisors] = useState<{ id: string; name: string; type: string }[]>([])
   const [reloadTick, setReloadTick] = useState(0)
   
   // Helper pour vérifier si une VM est en migration
@@ -1493,6 +1494,7 @@ return next
         const data = json.data
         const clusters = data?.clusters || []
         const pbsData = data?.pbsServers || []
+        const externalData = data?.externalHypervisors || []
 
         // Transformer les données de l'API en format TreeCluster
         const built: TreeCluster[] = clusters.map((cluster: any) => ({
@@ -1564,11 +1566,13 @@ return next
         if (!alive) return
         setClusters(built)
         setPbsServers(builtPbs)
+        setExternalHypervisors(externalData)
       } catch (e: any) {
         if (!alive) return
         setError(e?.message || String(e))
         setClusters([])
         setPbsServers([])
+        setExternalHypervisors([])
       } finally {
         if (!alive) return
         setLoading(false)
@@ -2884,6 +2888,53 @@ return (
             ))}
           </>
         )}
+
+        {/* External Hypervisors (VMware, Hyper-V, XCP-NG) — migration targets */}
+        {(() => {
+          const hypervisorConfig: Record<string, { label: string; icon: string; color: string; logo?: string }> = {
+            vmware: { label: 'VMware ESXi', icon: 'ri-cloud-line', color: '#638C1C' },
+            hyperv: { label: 'Microsoft Hyper-V', icon: 'ri-microsoft-line', color: '#00BCF2' },
+            xcpng: { label: 'XCP-NG', icon: 'ri-server-line', color: '#00ADB5' },
+          }
+
+          const grouped = externalHypervisors.reduce<Record<string, { id: string; name: string }[]>>((acc, h) => {
+            if (!acc[h.type]) acc[h.type] = []
+            acc[h.type].push(h)
+            return acc
+          }, {})
+
+          return Object.entries(grouped).map(([type, conns]) => {
+            const cfg = hypervisorConfig[type] || { label: type, icon: 'ri-server-line', color: '#999' }
+            return (
+              <React.Fragment key={`ext-${type}`}>
+                {/* Section header */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, px: 1, py: 0.5, mt: 1, opacity: 0.6 }}>
+                  <i className={cfg.icon} style={{ fontSize: 12, color: cfg.color }} />
+                  <Typography variant="caption" fontWeight={600} sx={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    {cfg.label}
+                  </Typography>
+                  <Typography variant="caption" sx={{ fontSize: 10, opacity: 0.8 }}>
+                    ({conns.length})
+                  </Typography>
+                  <Chip label={t('common.comingSoon')} size="small" sx={{ height: 14, fontSize: '0.55rem', ml: 0.5 }} />
+                </Box>
+                {conns.map(conn => (
+                  <TreeItem
+                    key={`ext:${conn.id}`}
+                    itemId={`ext:${conn.id}`}
+                    label={
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, opacity: 0.6 }}>
+                        <i className={cfg.icon} style={{ fontSize: 14, color: cfg.color }} />
+                        <span style={{ fontSize: 14 }}>{conn.name}</span>
+                      </Box>
+                    }
+                  />
+                ))}
+              </React.Fragment>
+            )
+          })
+        })()}
+
         </TreeItem>
       </SimpleTreeView>
       )}

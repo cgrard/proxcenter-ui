@@ -19,6 +19,7 @@
 type CachedInventory = {
   clusters: any[]
   pbsServers: any[]
+  externalHypervisors: any[]
   stats: {
     totalClusters: number
     totalNodes: number

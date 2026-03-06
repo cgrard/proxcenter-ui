@@ -114,13 +114,20 @@ type PbsServerData = {
 /* Raw fetch from Proxmox (the expensive part)                        */
 /* ------------------------------------------------------------------ */
 
+type ExternalHypervisor = {
+  id: string
+  name: string
+  type: string
+}
+
 async function fetchRawInventory(): Promise<{
   clusters: ClusterData[]
   pbsServers: PbsServerData[]
+  externalHypervisors: ExternalHypervisor[]
   stats: { totalClusters: number; totalNodes: number; totalGuests: number; onlineNodes: number; runningGuests: number; totalPbsServers: number; totalDatastores: number; totalBackups: number }
 }> {
-  // 1) Charger toutes les connexions PVE et PBS en parallèle
-  const [pveConnections, pbsConnections] = await Promise.all([
+  // 1) Charger toutes les connexions PVE, PBS et hyperviseurs externes en parallèle
+  const [pveConnections, pbsConnections, externalConnections] = await Promise.all([
     prisma.connection.findMany({
       where: { type: 'pve' },
       orderBy: { createdAt: 'desc' },
@@ -131,11 +138,17 @@ async function fetchRawInventory(): Promise<{
       orderBy: { createdAt: 'desc' },
       select: { id: true, name: true, type: true },
     }),
+    prisma.connection.findMany({
+      where: { type: { in: ['vmware', 'hyperv', 'xcpng'] } },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, name: true, type: true },
+    }),
   ])
 
   const emptyResult = {
     clusters: [] as ClusterData[],
     pbsServers: [] as PbsServerData[],
+    externalHypervisors: [] as ExternalHypervisor[],
     stats: {
       totalClusters: 0, totalNodes: 0, totalGuests: 0,
       onlineNodes: 0, runningGuests: 0,
@@ -143,8 +156,8 @@ async function fetchRawInventory(): Promise<{
     }
   }
 
-  if (!pveConnections.length && !pbsConnections.length) {
-    return emptyResult
+  if (!pveConnections.length && !pbsConnections.length && !externalConnections.length) {
+    return { ...emptyResult, externalHypervisors: externalConnections }
   }
 
   // 2) Pour chaque connexion PVE, charger nodes et guests EN PARALLÈLE
@@ -459,6 +472,7 @@ return aId - bId
   return {
     clusters,
     pbsServers,
+    externalHypervisors: externalConnections,
     stats: {
       totalClusters: clusters.length,
       totalNodes,
@@ -610,6 +624,7 @@ export async function GET(request: NextRequest) {
       data: {
         clusters,
         pbsServers: raw.pbsServers,
+        externalHypervisors: raw.externalHypervisors,
         cached: cacheResult.status !== 'miss',
         stats: {
           totalClusters: clusters.length,
