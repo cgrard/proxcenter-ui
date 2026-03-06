@@ -88,6 +88,33 @@ export default function ImageCard({ image, onDeploy }: ImageCardProps) {
           </Typography>
         </Box>
 
+        {/* Source URL */}
+        <Tooltip title={image.downloadUrl} arrow>
+          <Typography
+            variant="caption"
+            component="a"
+            href={image.downloadUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            sx={{
+              opacity: 0.5,
+              fontSize: '0.6rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 0.5,
+              textDecoration: 'none',
+              color: 'text.secondary',
+              '&:hover': { opacity: 0.8, color: 'primary.main' },
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <i className="ri-external-link-line" style={{ fontSize: 10, flexShrink: 0 }} />
+            {(() => { try { return new URL(image.downloadUrl).hostname } catch { return image.downloadUrl } })()}
+          </Typography>
+        </Tooltip>
+
         {/* Deploy button */}
         <Tooltip title={t('templates.catalog.deployTooltip')}>
           <Button
