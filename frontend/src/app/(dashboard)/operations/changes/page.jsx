@@ -384,6 +384,7 @@ export default function ChangesPage() {
   const [purging, setPurging] = useState(false)
   const [savingSettings, setSavingSettings] = useState(false)
   const [retentionDays, setRetentionDays] = useState(30)
+  const [collapsedDays, setCollapsedDays] = useState({})
 
   const { data: response, isLoading, error, mutate } = useChanges({ limit: 300, resourceType: resourceType || undefined, action: action || undefined })
   const { data: settingsData, mutate: mutateSettings } = useSWRFetch('/api/v1/changes/settings')
@@ -596,25 +597,49 @@ export default function ChangesPage() {
       ) : (
         <Card variant='outlined' sx={{ flex: 1, overflow: 'auto' }}>
           <CardContent>
-            {groupedChanges.map(group => (
-              <Box key={group.dayKey}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, mt: 1 }}>
-                  <Typography
-                    variant='overline'
-                    fontWeight={700}
-                    sx={{ color: 'text.secondary', letterSpacing: 1.5 }}
-                  >
-                    {group.label}
-                  </Typography>
-                  <Box sx={{ flex: 1, height: 1, bgcolor: 'divider' }} />
-                  <Chip size='small' label={group.changes.length} sx={{ height: 20, fontSize: '0.65rem' }} />
-                </Box>
+            {groupedChanges.map(group => {
+              const isCollapsed = !!collapsedDays[group.dayKey]
 
-                {group.changes.map(change => (
-                  <TimelineEntry key={change.id} change={change} t={t} />
-                ))}
-              </Box>
-            ))}
+              return (
+                <Box key={group.dayKey}>
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 2,
+                      mb: isCollapsed ? 1 : 2,
+                      mt: 1,
+                      cursor: 'pointer',
+                      userSelect: 'none',
+                      '&:hover': { opacity: 0.8 },
+                    }}
+                    onClick={() => setCollapsedDays(prev => ({ ...prev, [group.dayKey]: !prev[group.dayKey] }))}
+                  >
+                    <IconButton size='small' sx={{ p: 0.25 }}>
+                      <i
+                        className={isCollapsed ? 'ri-arrow-right-s-line' : 'ri-arrow-down-s-line'}
+                        style={{ fontSize: 18 }}
+                      />
+                    </IconButton>
+                    <Typography
+                      variant='overline'
+                      fontWeight={700}
+                      sx={{ color: 'text.secondary', letterSpacing: 1.5 }}
+                    >
+                      {group.label}
+                    </Typography>
+                    <Box sx={{ flex: 1, height: 1, bgcolor: 'divider' }} />
+                    <Chip size='small' label={group.changes.length} sx={{ height: 20, fontSize: '0.65rem' }} />
+                  </Box>
+
+                  <Collapse in={!isCollapsed}>
+                    {group.changes.map(change => (
+                      <TimelineEntry key={change.id} change={change} t={t} />
+                    ))}
+                  </Collapse>
+                </Box>
+              )
+            })}
           </CardContent>
         </Card>
       )}
