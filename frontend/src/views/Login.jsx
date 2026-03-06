@@ -121,9 +121,8 @@ export default function LoginPage() {
             )}}
           />
           {authMethod === 'local' && (
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+            <Box sx={{ mb: 3 }}>
               <FormControlLabel control={<Checkbox checked={rememberMe} onChange={e => setRememberMe(e.target.checked)} size='small' />} label={<Typography variant='body2'>{t('auth.rememberMe')}</Typography>} />
-              <Typography variant='body2' color='primary' sx={{ cursor: 'pointer' }} onClick={() => alert(t('common.comingSoon'))}>{t('auth.forgotPassword')}</Typography>
             </Box>
           )}
           {authMethod === 'ldap' && <Box sx={{ mb: 3 }} />}
