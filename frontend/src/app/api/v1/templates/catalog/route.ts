@@ -19,10 +19,10 @@ export async function GET(req: Request) {
     const builtIn = vendor ? getImagesByVendor(vendor) : CLOUD_IMAGES
     const builtInWithFlag = builtIn.map(img => ({ ...img, isCustom: false }))
 
-    // Custom images from DB
+    // Custom images from DB (non-blocking: if table doesn't exist yet, return empty)
     const customRows = await prisma.customImage.findMany({
       orderBy: { createdAt: 'desc' },
-    })
+    }).catch(() => [])
     let customImages = customRows.map(customImageToCloudImage)
     if (vendor) {
       customImages = customImages.filter(img => img.vendor === vendor)
