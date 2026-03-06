@@ -9,7 +9,7 @@ import { deploySchema } from "@/lib/schemas"
 import { getConnectionById } from "@/lib/connections/getConnection"
 import { pveFetch } from "@/lib/proxmox/client"
 import { getImageBySlug } from "@/lib/templates/cloudImages"
-import { isFileBasedStorage } from "@/lib/proxmox/storage"
+import { isFileBasedStorage, supportsVmDisks } from "@/lib/proxmox/storage"
 
 export const runtime = "nodejs"
 
@@ -104,6 +104,14 @@ export async function POST(req: Request) {
         )
         const storageType = storageConfig?.type || "dir"
         let downloadStorage = body.storage
+
+        // Reject storages that don't support VM disk images (e.g. CephFS)
+        if (!supportsVmDisks(storageType)) {
+          throw new Error(
+            `Storage '${body.storage}' (type '${storageType}') does not support VM disk images. ` +
+            `Please select a storage that supports VM images (e.g. dir, NFS, RBD, LVM, ZFS).`
+          )
+        }
 
         // Block-based storages (zfspool, lvm, lvmthin, rbd...) do not support download-url.
         // Use a file-based storage as staging area for the download, then import-from it.

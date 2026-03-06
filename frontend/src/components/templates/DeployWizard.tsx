@@ -28,7 +28,7 @@ import {
 } from '@mui/material'
 
 import type { CloudImage } from '@/lib/templates/cloudImages'
-import { isFileBasedStorage } from '@/lib/proxmox/storage'
+import { supportsVmDisks } from '@/lib/proxmox/storage'
 import DeploymentProgress from './DeploymentProgress'
 import VendorLogo from './VendorLogo'
 
@@ -205,7 +205,7 @@ export default function DeployWizard({ open, onClose, image, prefillBlueprint }:
     fetch(`/api/v1/connections/${encodeURIComponent(connectionId)}/nodes/${encodeURIComponent(node)}/storages`)
       .then(r => r.json())
       .then(res => {
-        const stList = (res.data || []).filter((s: any) => isFileBasedStorage(s.type) && s.enabled !== 0)
+        const stList = (res.data || []).filter((s: any) => supportsVmDisks(s.type) && s.enabled !== 0)
         setStorages(stList)
         setStorage(stList.length > 0 ? stList[0].storage : '')
       })
