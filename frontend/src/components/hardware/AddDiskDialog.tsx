@@ -23,6 +23,8 @@ import {
   CircularProgress,
   Tabs,
   Tab,
+  Radio,
+  RadioGroup,
 } from '@mui/material'
 
 import { formatBytes } from '@/utils/format'
@@ -51,10 +53,19 @@ export function AddDiskDialog({ open, onClose, onSave, connId, node, vmid, exist
 
   // Disk config
   const [busType, setBusType] = useState<'scsi' | 'virtio' | 'sata' | 'ide'>('scsi')
+  const [deviceType, setDeviceType] = useState<'disk' | 'cdrom'>('disk')
   const [busIndex, setBusIndex] = useState(0)
   const [storage, setStorage] = useState('')
   const [diskSize, setDiskSize] = useState(32)
   const [format, setFormat] = useState('raw')
+
+  // CDROM state
+  const [cdromMode, setCdromMode] = useState<'iso' | 'physical' | 'none'>('none')
+  const [isoStorage, setIsoStorage] = useState('')
+  const [isoImage, setIsoImage] = useState('')
+  const [isoStorages, setIsoStorages] = useState<Array<{ storage: string; type: string }>>([])
+  const [isoImages, setIsoImages] = useState<string[]>([])
+  const [isoLoading, setIsoLoading] = useState(false)
   const [cache, setCache] = useState('none')
   const [discard, setDiscard] = useState(false)
   const [iothread, setIothread] = useState(false)
@@ -72,6 +83,11 @@ export function AddDiskDialog({ open, onClose, onSave, connId, node, vmid, exist
   const [mbpsWr, setMbpsWr] = useState('')
   const [iopsRd, setIopsRd] = useState('')
   const [iopsWr, setIopsWr] = useState('')
+
+  // Reset device type when bus changes
+  useEffect(() => {
+    if (busType !== 'ide' && busType !== 'sata') setDeviceType('disk')
+  }, [busType])
 
   // Charger les storages
   useEffect(() => {
@@ -95,6 +111,10 @@ export function AddDiskDialog({ open, onClose, onSave, connId, node, vmid, exist
           if (diskStorages.length > 0 && !storage) {
             setStorage(diskStorages[0].storage)
           }
+
+          // Also load ISO storages
+          const isoStores = json.data.filter((s: Storage) => s.content?.includes('iso'))
+          setIsoStorages(isoStores)
         }
       } catch (e) {
         console.error('Error loading storages:', e)
@@ -105,6 +125,29 @@ export function AddDiskDialog({ open, onClose, onSave, connId, node, vmid, exist
 
     loadStorages()
   }, [open, connId, node])
+
+  // Load ISO images for selected ISO storage
+  useEffect(() => {
+    if (!open || !connId || !node || !isoStorage || deviceType !== 'cdrom') {
+      setIsoImages([])
+      return
+    }
+    const loadIsos = async () => {
+      setIsoLoading(true)
+      try {
+        const res = await fetch(`/api/v1/connections/${encodeURIComponent(connId)}/nodes/${encodeURIComponent(node)}/storage/${encodeURIComponent(isoStorage)}/content?content=iso`)
+        if (res.ok) {
+          const json = await res.json()
+          setIsoImages((json.data || []).map((i: any) => {
+            const m = i.volid?.match(/iso\/(.+)$/)
+            return m ? m[1] : i.volid || ''
+          }).filter(Boolean))
+        }
+      } catch {}
+      finally { setIsoLoading(false) }
+    }
+    loadIsos()
+  }, [open, connId, node, isoStorage, deviceType])
 
   // Calculer le prochain index disponible
   useEffect(() => {
@@ -132,19 +175,34 @@ return match ? parseInt(match[1]) : -1
   }, [open, busType, existingDisks])
 
   const handleSave = async () => {
-    if (!storage) {
-      setError(t('common.select') + ' storage')
-
-return
-    }
-
     setSaving(true)
     setError(null)
 
     try {
       const diskId = busType === 'virtio' ? `virtio${busIndex}` : `${busType}${busIndex}`
 
-      // Construire la config du disque
+      // CDROM device
+      if (deviceType === 'cdrom') {
+        let value: string
+        if (cdromMode === 'iso' && isoStorage && isoImage) {
+          value = `${isoStorage}:iso/${isoImage},media=cdrom`
+        } else if (cdromMode === 'physical') {
+          value = 'cdrom'
+        } else {
+          value = 'none,media=cdrom'
+        }
+        await onSave({ [diskId]: value })
+        onClose()
+        return
+      }
+
+      // Regular disk
+      if (!storage) {
+        setError(t('common.select') + ' storage')
+        setSaving(false)
+        return
+      }
+
       const diskConfig: any = {
         [diskId]: `${storage}:${diskSize}`,
       }
@@ -184,22 +242,24 @@ return
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-        <i className="ri-hard-drive-2-line" style={{ fontSize: 24 }} />
-        Ajouter: Disque dur
+        <i className={deviceType === 'cdrom' ? "ri-disc-line" : "ri-hard-drive-2-line"} style={{ fontSize: 24 }} />
+        {deviceType === 'cdrom' ? 'Ajouter: CD/DVD Drive' : 'Ajouter: Disque dur'}
       </DialogTitle>
 
-      <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ px: 3, borderBottom: 1, borderColor: 'divider' }}>
-        <Tab label="Disk" />
-        <Tab label="Bandwidth" />
-      </Tabs>
+      {deviceType !== 'cdrom' && (
+        <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ px: 3, borderBottom: 1, borderColor: 'divider' }}>
+          <Tab label="Disk" />
+          <Tab label="Bandwidth" />
+        </Tabs>
+      )}
 
       <DialogContent>
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-        {tab === 0 && (
+        {(tab === 0 || deviceType === 'cdrom') && (
           <Stack spacing={2} sx={{ mt: 1 }}>
-            {/* Bus/Device */}
-            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 2 }}>
+            {/* Bus/Device + Device Type */}
+            <Box sx={{ display: 'grid', gridTemplateColumns: (busType === 'ide' || busType === 'sata') ? '1fr 1fr auto' : '1fr auto', gap: 2 }}>
               <FormControl fullWidth size="small">
                 <InputLabel>Bus/Device</InputLabel>
                 <Select value={busType} onChange={(e) => setBusType(e.target.value as any)} label="Bus/Device">
@@ -209,6 +269,15 @@ return
                   <MenuItem value="ide">IDE</MenuItem>
                 </Select>
               </FormControl>
+              {(busType === 'ide' || busType === 'sata') && (
+                <FormControl fullWidth size="small">
+                  <InputLabel>Type</InputLabel>
+                  <Select value={deviceType} onChange={(e) => setDeviceType(e.target.value as any)} label="Type">
+                    <MenuItem value="disk">Disk</MenuItem>
+                    <MenuItem value="cdrom">CD/DVD</MenuItem>
+                  </Select>
+                </FormControl>
+              )}
               <TextField
                 size="small"
                 type="number"
@@ -219,8 +288,47 @@ return
               />
             </Box>
 
+            {/* CDROM config */}
+            {deviceType === 'cdrom' && (
+              <RadioGroup value={cdromMode} onChange={(e) => setCdromMode(e.target.value as any)}>
+                <FormControlLabel value="iso" control={<Radio />} label={
+                  <Typography variant="body2" fontWeight={500}>{t('hardware.cdrom.useIso')}</Typography>
+                } />
+                {cdromMode === 'iso' && (
+                  <Box sx={{ pl: 4, pb: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <FormControl fullWidth size="small">
+                      <InputLabel>Storage</InputLabel>
+                      <Select value={isoStorage} onChange={(e) => { setIsoStorage(e.target.value); setIsoImage('') }} label="Storage">
+                        {isoStorages.map((s: any) => (
+                          <MenuItem key={s.storage} value={s.storage}>
+                            {s.storage} <Typography component="span" variant="caption" sx={{ ml: 1, opacity: 0.6 }}>({s.type})</Typography>
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                    <FormControl fullWidth size="small">
+                      <InputLabel>ISO Image</InputLabel>
+                      <Select value={isoImage} onChange={(e) => setIsoImage(e.target.value)} label="ISO Image" disabled={!isoStorage || isoLoading}>
+                        {isoLoading ? (
+                          <MenuItem disabled><CircularProgress size={16} sx={{ mr: 1 }} /> {t('common.loading')}</MenuItem>
+                        ) : isoImages.map(iso => (
+                          <MenuItem key={iso} value={iso}>{iso}</MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Box>
+                )}
+                <FormControlLabel value="physical" control={<Radio />} label={
+                  <Typography variant="body2" fontWeight={500}>{t('hardware.cdrom.usePhysical')}</Typography>
+                } />
+                <FormControlLabel value="none" control={<Radio />} label={
+                  <Typography variant="body2" fontWeight={500}>{t('hardware.cdrom.noMedia')}</Typography>
+                } />
+              </RadioGroup>
+            )}
+
             {/* SCSI Controller (si SCSI) */}
-            {busType === 'scsi' && (
+            {deviceType === 'disk' && busType === 'scsi' && (
               <FormControl fullWidth size="small">
                 <InputLabel>SCSI Controller</InputLabel>
                 <Select value={scsiController} onChange={(e) => setScsiController(e.target.value)} label="SCSI Controller">
@@ -234,8 +342,8 @@ return
               </FormControl>
             )}
 
-            {/* Storage */}
-            <FormControl fullWidth size="small">
+            {/* Storage (disk only) */}
+            {deviceType === 'disk' && <FormControl fullWidth size="small">
               <InputLabel>Storage</InputLabel>
               <Select
                 value={storage}
@@ -254,8 +362,9 @@ return
                   </MenuItem>
                 ))}
               </Select>
-            </FormControl>
+            </FormControl>}
 
+            {deviceType === 'disk' && <>
             {/* Disk Size & Format */}
             <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
               <TextField
@@ -333,6 +442,7 @@ return
                 label="Skip replication"
               />
             </Box>
+            </>}
           </Stack>
         )}
 
@@ -385,7 +495,7 @@ return
 
       <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button onClick={onClose} disabled={saving}>{t('common.cancel')}</Button>
-        <Button variant="contained" onClick={handleSave} disabled={saving || !storage}>
+        <Button variant="contained" onClick={handleSave} disabled={saving || (deviceType === 'disk' && !storage) || (deviceType === 'cdrom' && cdromMode === 'iso' && (!isoStorage || !isoImage))}>
           {saving ? <CircularProgress size={20} /> : t('common.add')}
         </Button>
       </DialogActions>

@@ -24,6 +24,8 @@ import {
   Tabs,
   Tab,
   Chip,
+  Radio,
+  RadioGroup,
 } from '@mui/material'
 
 import { formatBytes } from '@/utils/format'
@@ -51,6 +53,8 @@ type EditDiskDialogProps = {
     replicate?: boolean
     aio?: string
     ro?: boolean
+    isCdrom?: boolean
+    rawValue?: string
   } | null
   availableStorages?: Array<{ storage: string; type: string; avail?: number; total?: number }>
 }
@@ -91,9 +95,43 @@ export function EditDiskDialog({ open, onClose, onSave, onDelete, onResize, onMo
   const [iopsRd, setIopsRd] = useState('')
   const [iopsWr, setIopsWr] = useState('')
 
+  // CDROM state
+  const [cdromMode, setCdromMode] = useState<'iso' | 'physical' | 'none'>('none')
+  const [isoStorage, setIsoStorage] = useState('')
+  const [isoImage, setIsoImage] = useState('')
+  const [isoStorages, setIsoStorages] = useState<Array<{ storage: string; type: string }>>([])
+  const [isoImages, setIsoImages] = useState<string[]>([])
+  const [isoLoading, setIsoLoading] = useState(false)
+  const [cdromSaving, setCdromSaving] = useState(false)
+
   // Charger les valeurs du disque
   useEffect(() => {
     if (open && disk) {
+      // CDROM-specific init
+      if (disk.isCdrom) {
+        const raw = disk.rawValue || ''
+        if (raw === 'cdrom') {
+          // Physical CD/DVD drive
+          setCdromMode('physical')
+          setIsoStorage('')
+          setIsoImage('')
+        } else if (disk.storage === 'none' || raw === 'none,media=cdrom') {
+          setCdromMode('none')
+          setIsoStorage('')
+          setIsoImage('')
+        } else if (raw.includes('media=cdrom') && disk.storage && disk.storage !== 'none') {
+          setCdromMode('iso')
+          setIsoStorage(disk.storage)
+          // Extract ISO filename from raw value like "local:iso/debian.iso,media=cdrom"
+          const isoMatch = raw.match(/^[^:]+:iso\/(.+?)(?:,|$)/)
+          setIsoImage(isoMatch ? isoMatch[1] : '')
+        } else {
+          setCdromMode('none')
+          setIsoStorage('')
+          setIsoImage('')
+        }
+      }
+
       setCache(disk.cache || 'none')
       setDiscard(disk.discard || false)
       setIothread(disk.iothread || false)
@@ -130,6 +168,45 @@ export function EditDiskDialog({ open, onClose, onSave, onDelete, onResize, onMo
       setTab(0)
     }
   }, [open, disk])
+
+  // Load ISO storages for CDROM
+  useEffect(() => {
+    if (!open || !disk?.isCdrom || !connId || !node) return
+    const loadIsoStorages = async () => {
+      try {
+        const res = await fetch(`/api/v1/connections/${encodeURIComponent(connId)}/nodes/${encodeURIComponent(node)}/storages?content=iso`)
+        if (res.ok) {
+          const json = await res.json()
+          setIsoStorages((json.data || []).filter((s: any) => s.content?.includes('iso')))
+        }
+      } catch {}
+    }
+    loadIsoStorages()
+  }, [open, disk?.isCdrom, connId, node])
+
+  // Load ISO images for selected storage
+  useEffect(() => {
+    if (!open || !disk?.isCdrom || !connId || !node || !isoStorage) {
+      setIsoImages([])
+      return
+    }
+    const loadIsos = async () => {
+      setIsoLoading(true)
+      try {
+        const res = await fetch(`/api/v1/connections/${encodeURIComponent(connId)}/nodes/${encodeURIComponent(node)}/storage/${encodeURIComponent(isoStorage)}/content?content=iso`)
+        if (res.ok) {
+          const json = await res.json()
+          setIsoImages((json.data || []).map((i: any) => {
+            // volid looks like "local:iso/debian.iso" — extract filename
+            const m = i.volid?.match(/iso\/(.+)$/)
+            return m ? m[1] : i.volid || ''
+          }).filter(Boolean))
+        }
+      } catch {}
+      finally { setIsoLoading(false) }
+    }
+    loadIsos()
+  }, [open, disk?.isCdrom, connId, node, isoStorage])
 
   // Charger les storages disponibles
   useEffect(() => {
@@ -256,6 +333,28 @@ return
     }
   }
 
+  const handleCdromSave = async () => {
+    if (!disk) return
+    setCdromSaving(true)
+    setError(null)
+    try {
+      let value: string
+      if (cdromMode === 'iso' && isoStorage && isoImage) {
+        value = `${isoStorage}:iso/${isoImage},media=cdrom`
+      } else if (cdromMode === 'physical') {
+        value = 'cdrom'
+      } else {
+        value = 'none,media=cdrom'
+      }
+      await onSave(value)
+      onClose()
+    } catch (e: any) {
+      setError(e.message || 'Error')
+    } finally {
+      setCdromSaving(false)
+    }
+  }
+
   const handleDelete = async () => {
     if (!disk) return
     if (!confirm(t('hardware.confirmDeleteDisk', { id: disk.id }))) return
@@ -275,8 +374,100 @@ return
 
   if (!disk) return null
 
-  const isWorking = saving || deleting || resizing || moving
+  const isWorking = saving || deleting || resizing || moving || cdromSaving
 
+  // ── CDROM Dialog ──────────────────────────────────────────
+  if (disk.isCdrom) {
+    return (
+      <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <i className="ri-disc-line" style={{ fontSize: 24 }} />
+            {disk.id} (CD/DVD)
+          </Box>
+        </DialogTitle>
+
+        <DialogContent>
+          {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+
+          <RadioGroup value={cdromMode} onChange={(e) => setCdromMode(e.target.value as any)}>
+            {/* Option 1: ISO image */}
+            <FormControlLabel value="iso" control={<Radio />} label={
+              <Typography variant="body2" fontWeight={500}>
+                {t('hardware.cdrom.useIso')}
+              </Typography>
+            } />
+            {cdromMode === 'iso' && (
+              <Box sx={{ pl: 4, pb: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Storage</InputLabel>
+                  <Select value={isoStorage} onChange={(e) => { setIsoStorage(e.target.value); setIsoImage('') }} label="Storage">
+                    {isoStorages.map(s => (
+                      <MenuItem key={s.storage} value={s.storage}>
+                        {s.storage} <Typography component="span" variant="caption" sx={{ ml: 1, opacity: 0.6 }}>({s.type})</Typography>
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                <FormControl fullWidth size="small">
+                  <InputLabel>ISO Image</InputLabel>
+                  <Select
+                    value={isoImage}
+                    onChange={(e) => setIsoImage(e.target.value)}
+                    label="ISO Image"
+                    disabled={!isoStorage || isoLoading}
+                  >
+                    {isoLoading ? (
+                      <MenuItem disabled><CircularProgress size={16} sx={{ mr: 1 }} /> {t('common.loading')}</MenuItem>
+                    ) : isoImages.map(iso => (
+                      <MenuItem key={iso} value={iso}>{iso}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Box>
+            )}
+
+            {/* Option 2: Physical drive */}
+            <FormControlLabel value="physical" control={<Radio />} label={
+              <Typography variant="body2" fontWeight={500}>
+                {t('hardware.cdrom.usePhysical')}
+              </Typography>
+            } />
+
+            {/* Option 3: No media */}
+            <FormControlLabel value="none" control={<Radio />} label={
+              <Typography variant="body2" fontWeight={500}>
+                {t('hardware.cdrom.noMedia')}
+              </Typography>
+            } />
+          </RadioGroup>
+        </DialogContent>
+
+        <DialogActions sx={{ px: 3, pb: 2, justifyContent: 'space-between' }}>
+          <Button
+            color="error"
+            onClick={handleDelete}
+            disabled={isWorking}
+            startIcon={deleting ? <CircularProgress size={16} /> : <i className="ri-delete-bin-line" />}
+          >
+            {t('common.delete')}
+          </Button>
+          <Box>
+            <Button onClick={onClose} disabled={isWorking} sx={{ mr: 1 }}>{t('common.cancel')}</Button>
+            <Button
+              variant="contained"
+              onClick={handleCdromSave}
+              disabled={isWorking || (cdromMode === 'iso' && (!isoStorage || !isoImage))}
+            >
+              {cdromSaving ? <CircularProgress size={20} /> : t('common.save')}
+            </Button>
+          </Box>
+        </DialogActions>
+      </Dialog>
+    )
+  }
+
+  // ── Regular disk Dialog ───────────────────────────────────
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

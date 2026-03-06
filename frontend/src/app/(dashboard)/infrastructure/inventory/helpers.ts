@@ -697,7 +697,7 @@ return Number.isFinite(num) ? num.toFixed(2) : String(v)
             const storagePart = parts[0].split(':')
             const sizeMatch = diskStr.match(/size=(\d+[GMT]?)/i)
 
-            const isCdrom = diskStr.includes('media=cdrom') || storagePart[0] === 'none'
+            const isCdrom = diskStr.includes('media=cdrom') || storagePart[0] === 'none' || String(diskStr) === 'cdrom'
 
             disksInfo.push({
               id: key,
@@ -707,6 +707,7 @@ return Number.isFinite(num) ? num.toFixed(2) : String(v)
               cache: diskStr.match(/cache=(\w+)/)?.[1],
               iothread: diskStr.includes('iothread=1'),
               isCdrom,
+              rawValue: String(diskStr),
             })
           }
         })
