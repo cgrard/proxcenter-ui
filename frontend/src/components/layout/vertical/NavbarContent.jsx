@@ -135,8 +135,17 @@ const NavbarContent = () => {
   const { hasFeature, loading: licenseLoading, status: licenseStatus, isEnterprise } = useLicense()
   const { roles: rbacRoles, hasPermission } = useRBAC()
 
-  // Check if AI feature is available
-  const aiAvailable = !licenseLoading && hasFeature(Features.AI_INSIGHTS)
+  // Check if AI feature is available AND enabled in settings
+  const [aiEnabled, setAiEnabled] = useState(false)
+  const aiAvailable = !licenseLoading && hasFeature(Features.AI_INSIGHTS) && aiEnabled
+
+  useEffect(() => {
+    if (licenseLoading || !hasFeature(Features.AI_INSIGHTS)) return
+    fetch('/api/v1/settings/ai')
+      .then(r => r.ok ? r.json() : null)
+      .then(json => { if (json?.data?.enabled) setAiEnabled(true) })
+      .catch(() => {})
+  }, [licenseLoading, hasFeature])
 
   // i18n hooks
   const t = useTranslations()

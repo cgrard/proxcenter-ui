@@ -716,7 +716,8 @@ export default function RollingUpdateWizard({
                     {nodeOrder.filter(n => !excludedNodes.includes(n)).map(nodeName => {
                       const interfaces = nodeNetworks[nodeName] || []
                       const currentAddress = sshAddresses[nodeName] || ''
-                      const selectValue = currentAddress && interfaces.some(i => i.ip === currentAddress) ? currentAddress : !currentAddress ? '__auto__' : '__auto__'
+                      const inList = interfaces.some(i => i.ip === currentAddress)
+                      const selectValue = !currentAddress ? '__auto__' : currentAddress
 
                       return (
                         <Box key={nodeName} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -728,7 +729,7 @@ export default function RollingUpdateWizard({
                             <Select
                               value={selectValue}
                               onChange={(e) => {
-                                const val = e.target.value
+                                const val = e.target.value as string
                                 saveSshAddress(nodeName, val === '__auto__' ? '' : val)
                               }}
                               sx={{ fontSize: 13 }}
@@ -755,6 +756,17 @@ export default function RollingUpdateWizard({
                                   </Box>
                                 </MenuItem>
                               ))}
+
+                              {currentAddress && !inList && (
+                                <MenuItem value={currentAddress} sx={{ fontSize: 13 }}>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <span style={{ fontFamily: 'var(--font-jetbrains-mono, monospace)' }}>{currentAddress}</span>
+                                    <Typography variant="caption" color="text.secondary">
+                                      ({t('updates.sshCustomAddress') || 'custom'})
+                                    </Typography>
+                                  </Box>
+                                </MenuItem>
+                              )}
                             </Select>
                           </FormControl>
 

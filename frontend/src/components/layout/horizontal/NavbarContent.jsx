@@ -96,7 +96,17 @@ const NavbarContent = () => {
   const { hasFeature, loading: licenseLoading, status: licenseStatus, isEnterprise } = useLicense()
   const { roles: rbacRoles, hasPermission } = useRBAC()
 
-  const aiAvailable = !licenseLoading && hasFeature(Features.AI_INSIGHTS)
+  // Check if AI feature is available AND enabled in settings
+  const [aiEnabled, setAiEnabled] = useState(false)
+  const aiAvailable = !licenseLoading && hasFeature(Features.AI_INSIGHTS) && aiEnabled
+
+  useEffect(() => {
+    if (licenseLoading || !hasFeature(Features.AI_INSIGHTS)) return
+    fetch('/api/v1/settings/ai')
+      .then(r => r.ok ? r.json() : null)
+      .then(json => { if (json?.data?.enabled) setAiEnabled(true) })
+      .catch(() => {})
+  }, [licenseLoading, hasFeature])
 
   // i18n hooks
   const t = useTranslations()
@@ -433,50 +443,21 @@ const NavbarContent = () => {
           {/* Language */}
           <Tooltip title={t('navbar.language')}>
             <IconButton size='small' onClick={e => setLangAnchor(e.currentTarget)} disabled={isPending}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <span style={{ fontSize: '1.1rem' }}>{localeFlags[locale]}</span>
-              </Box>
+              <i className='ri-translate-2' />
             </IconButton>
           </Tooltip>
 
           {/* Theme Dropdown */}
           <ThemeDropdown />
 
-          {/* AI Assistant */}
-          <Tooltip title={aiAvailable ? t('navbar.aiAssistant') : t('license.enterpriseRequired')}>
-            <span>
-              <IconButton
-                size='small'
-                onClick={() => aiAvailable && setAiChatOpen(true)}
-                disabled={!aiAvailable}
-                sx={!aiAvailable ? { opacity: 0.4 } : {}}
-              >
+          {/* AI Assistant — hidden if feature not activated */}
+          {aiAvailable && (
+            <Tooltip title={t('navbar.aiAssistant')}>
+              <IconButton size='small' onClick={() => setAiChatOpen(true)}>
                 <i className='ri-sparkling-2-line' />
-                {!aiAvailable && (
-                  <Box
-                    component='span'
-                    sx={{
-                      position: 'absolute',
-                      top: -4,
-                      right: -4,
-                      width: 14,
-                      height: 14,
-                      borderRadius: '50%',
-                      bgcolor: 'warning.main',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '0.5rem',
-                      fontWeight: 700,
-                      color: 'warning.contrastText'
-                    }}
-                  >
-                    E
-                  </Box>
-                )}
               </IconButton>
-            </span>
-          </Tooltip>
+            </Tooltip>
+          )}
 
           {/* Running Tasks */}
           <TasksDropdown />

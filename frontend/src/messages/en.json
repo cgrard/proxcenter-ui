@@ -4128,6 +4128,7 @@
     "sshAddresses": "SSH Addresses",
     "sshAddressesDescription": "Choose which IP address to use for SSH connections to each node. By default, ProxCenter auto-detects the management IP.",
     "sshAutoDetect": "Auto-detect (default)",
+    "sshCustomAddress": "custom",
     "sshNodeInterfaces": "Node interfaces",
     "mainOptions": "Main Options",
     "migrateNonHaVms": "Migrate non-HA VMs",
