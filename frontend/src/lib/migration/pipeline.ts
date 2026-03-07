@@ -276,54 +276,88 @@ export async function runMigrationPipeline(jobId: string, config: MigrationConfi
 
       if (isCancelled(jobId)) throw new Error("Migration cancelled")
 
-      // SSH to Proxmox node: download VMDK from ESXi + convert to qcow2/raw + import
-      // We use nohup + a status file so the process survives SSH drops
-      const downloadCmd = [
-        // Download the flat VMDK from ESXi HTTPS datastore browser
-        `curl -sk -b "${soapCookie}" -o "${tmpFile}.vmdk" "${vmdkUrl}"`,
-        // Convert from raw (flat VMDK is raw data) to target format
-        `qemu-img convert -p -f raw -O ${importFormat} "${tmpFile}.vmdk" "${tmpFile}.${importFormat}"`,
-        // Import disk into Proxmox storage
-        `qm disk import ${targetVmid} "${tmpFile}.${importFormat}" ${config.targetStorage} --format ${importFormat}`,
-        // Cleanup temp files
-        `rm -f "${tmpFile}.vmdk" "${tmpFile}.${importFormat}"`,
-      ].join(" && ")
+      const scsiSlot = `scsi${i}`
 
-      await appendLog(jobId, `Downloading from ESXi and converting to ${importFormat}...`)
+      // Phase 1: Download VMDK from ESXi
+      await appendLog(jobId, `Downloading VMDK from ESXi (${diskSizeGB} GB)...`)
+      await updateJob(jobId, "transferring", {
+        currentStep: `downloading_disk_${i + 1}`,
+        currentDisk: i,
+        bytesTransferred: BigInt(0),
+        totalBytes: BigInt(disk.capacityBytes),
+      })
 
-      // Use a longer timeout for large disk transfers (up to 4 hours)
-      const sshResult = await executeSSHWithTimeout(config.targetConnectionId, nodeIp, downloadCmd, 14400000)
-      if (!sshResult.success) {
-        // Cleanup on failure
-        await executeSSH(config.targetConnectionId, nodeIp, `rm -f "${tmpFile}.vmdk" "${tmpFile}.${importFormat}"`)
-        throw new Error(`Disk transfer failed: ${sshResult.error}`)
+      const dlResult = await executeSSHWithTimeout(
+        config.targetConnectionId, nodeIp,
+        `curl -sk -b "${soapCookie}" -o "${tmpFile}.vmdk" -w '{"speed":%{speed_download},"size":%{size_download},"time":%{time_total}}' "${vmdkUrl}"`,
+        14400000
+      )
+      if (!dlResult.success) {
+        await executeSSH(config.targetConnectionId, nodeIp, `rm -f "${tmpFile}.vmdk"`)
+        throw new Error(`Download failed: ${dlResult.error}`)
       }
 
-      // Parse the imported disk name from output (e.g. "Successfully imported disk as 'unused0'")
-      const scsiSlot = `scsi${i}`
-      const importedMatch = sshResult.output?.match(/imported disk as '([^']+)'/) ||
-                            sshResult.output?.match(/(unused\d+)/)
+      // Parse curl stats
+      const curlStats = dlResult.output?.match(/\{[^}]+\}/)
+      let downloadedBytes = disk.capacityBytes
+      let downloadSpeed = ""
+      let downloadTime = 0
+      if (curlStats) {
+        try {
+          const stats = JSON.parse(curlStats[0])
+          downloadedBytes = stats.size || disk.capacityBytes
+          downloadSpeed = stats.speed > 1048576 ? `${(stats.speed / 1048576).toFixed(1)} MB/s` : `${(stats.speed / 1024).toFixed(0)} KB/s`
+          downloadTime = stats.time || 0
+        } catch {}
+      }
 
-      if (importedMatch) {
-        // Attach the disk to the VM
-        const diskRef = `${config.targetStorage}:${importedMatch[1].replace("unused", `vm-${targetVmid}-disk-`)}`
-        await pveFetch<any>(
-          pveConn,
-          `/nodes/${encodeURIComponent(config.targetNode)}/qemu/${targetVmid}/config`,
-          {
-            method: "PUT",
-            body: new URLSearchParams({
-              [scsiSlot]: `${config.targetStorage}:0`,
-            }),
-          }
-        ).catch(() => {
-          // If direct set fails, try setting from unused
-          // qm disk import already associates the disk
-        })
+      await updateJob(jobId, "transferring", {
+        bytesTransferred: BigInt(downloadedBytes),
+        transferSpeed: downloadSpeed,
+      })
+      await appendLog(jobId, `Download complete: ${(downloadedBytes / 1073741824).toFixed(1)} GB in ${downloadTime.toFixed(0)}s (${downloadSpeed})`, "success")
+
+      if (isCancelled(jobId)) throw new Error("Migration cancelled")
+
+      // Phase 2: Convert VMDK to target format
+      await appendLog(jobId, `Converting to ${importFormat} format...`)
+      await updateJob(jobId, "transferring", { currentStep: `converting_disk_${i + 1}` })
+
+      const convertResult = await executeSSHWithTimeout(
+        config.targetConnectionId, nodeIp,
+        `qemu-img convert -f raw -O ${importFormat} "${tmpFile}.vmdk" "${tmpFile}.${importFormat}" 2>&1 && echo CONVERT_OK`,
+        14400000
+      )
+      if (!convertResult.success || !convertResult.output?.includes("CONVERT_OK")) {
+        await executeSSH(config.targetConnectionId, nodeIp, `rm -f "${tmpFile}.vmdk" "${tmpFile}.${importFormat}"`)
+        throw new Error(`Conversion failed: ${convertResult.error || convertResult.output}`)
+      }
+      await appendLog(jobId, `Conversion to ${importFormat} complete`, "success")
+
+      // Remove downloaded VMDK (keep converted file)
+      await executeSSH(config.targetConnectionId, nodeIp, `rm -f "${tmpFile}.vmdk"`)
+
+      if (isCancelled(jobId)) throw new Error("Migration cancelled")
+
+      // Phase 3: Import disk into Proxmox storage
+      await appendLog(jobId, `Importing disk into storage "${config.targetStorage}"...`)
+      await updateJob(jobId, "transferring", { currentStep: `importing_disk_${i + 1}` })
+
+      const importResult = await executeSSHWithTimeout(
+        config.targetConnectionId, nodeIp,
+        `qm disk import ${targetVmid} "${tmpFile}.${importFormat}" ${config.targetStorage} --format ${importFormat} 2>&1`,
+        3600000
+      )
+
+      // Cleanup converted file
+      await executeSSH(config.targetConnectionId, nodeIp, `rm -f "${tmpFile}.${importFormat}"`)
+
+      if (!importResult.success) {
+        throw new Error(`Disk import failed: ${importResult.error}`)
       }
 
       // Attach unused disk to SCSI slot
-      const attachCmd = `qm set ${targetVmid} --${scsiSlot} ${config.targetStorage}:vm-${targetVmid}-disk-${i}${!isFileBased ? "" : ",discard=on"}`
+      const attachCmd = `qm set ${targetVmid} --${scsiSlot} ${config.targetStorage}:vm-${targetVmid}-disk-${i}${isFileBased ? ",discard=on" : ""}`
       const attachResult = await executeSSH(config.targetConnectionId, nodeIp, attachCmd)
       if (!attachResult.success) {
         await appendLog(jobId, `Warning: Could not auto-attach ${scsiSlot}: ${attachResult.error}`, "warn")

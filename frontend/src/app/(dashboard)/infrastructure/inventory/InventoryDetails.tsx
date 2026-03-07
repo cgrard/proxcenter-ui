@@ -214,6 +214,7 @@ export default function InventoryDetails({
   const [migStarting, setMigStarting] = useState(false)
   const [migJobId, setMigJobId] = useState<string | null>(null)
   const [migJob, setMigJob] = useState<any>(null)
+  const [vmMigJob, setVmMigJob] = useState<any>(null) // active migration job for current VM panel
   const [exitMaintenanceBusy, setExitMaintenanceBusy] = useState(false)
   const [exitMaintenanceError, setExitMaintenanceError] = useState<string | null>(null)
 
@@ -492,6 +493,33 @@ return next
     }, 3000)
     return () => clearInterval(interval)
   }, [migJobId])
+
+  // Fetch active migration job for the currently selected ESXi VM
+  useEffect(() => {
+    if (selection?.type !== 'extvm') { setVmMigJob(null); return }
+    const vmid = selection.id.split(':')[1]
+    if (!vmid) return
+    // Fetch all jobs and find the latest one for this VM
+    fetch('/api/v1/migrations').then(r => r.json()).then(d => {
+      const jobs = d.data || []
+      const match = jobs.find((j: any) => j.sourceVmId === vmid && !['cancelled'].includes(j.status))
+      setVmMigJob(match || null)
+    }).catch(() => {})
+  }, [selection])
+
+  // Poll active VM migration job
+  useEffect(() => {
+    if (!vmMigJob || ['completed', 'failed', 'cancelled'].includes(vmMigJob.status)) return
+    const interval = setInterval(() => {
+      fetch(`/api/v1/migrations/${vmMigJob.id}`).then(r => r.json()).then(d => {
+        if (d.data) setVmMigJob(d.data)
+        if (d.data?.status === 'completed' || d.data?.status === 'failed' || d.data?.status === 'cancelled') {
+          clearInterval(interval)
+        }
+      }).catch(() => {})
+    }, 3000)
+    return () => clearInterval(interval)
+  }, [vmMigJob?.id, vmMigJob?.status])
 
   // VMs sans templates (pour affichage dans les modes vms, tree, hosts, pools, tags)
   const displayVms = useMemo(() => allVms.filter(vm => !vm.template), [allVms])
@@ -5822,78 +5850,138 @@ return vm?.isCluster ?? false
                   </CardContent>
                 </Card>
 
-                {/* Transfer Metrics with fake data */}
+                {/* Transfer Metrics — real data from migration job */}
                 <Card variant="outlined" sx={{ borderRadius: 2, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
                   <CardContent sx={{ p: 0, '&:last-child': { pb: 0 }, flex: 1, display: 'flex', flexDirection: 'column' }}>
-                    <Box sx={{ px: 2, py: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}>
+                    <Box sx={{ px: 2, py: 1.5, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <Typography fontWeight={900} sx={{ display: 'flex', alignItems: 'center', gap: 1, fontSize: 13 }}>
                         <i className="ri-line-chart-line" style={{ fontSize: 16, opacity: 0.7 }} />
                         Transfer Metrics
                       </Typography>
+                      {vmMigJob && (
+                        <Chip
+                          size="small"
+                          label={vmMigJob.status === 'completed' ? 'Completed' : vmMigJob.status === 'failed' ? 'Failed' : vmMigJob.status === 'cancelled' ? 'Cancelled' : (vmMigJob.currentStep || vmMigJob.status).replace(/_/g, ' ')}
+                          color={vmMigJob.status === 'completed' ? 'success' : vmMigJob.status === 'failed' ? 'error' : 'primary'}
+                          sx={{ height: 20, fontSize: 10, fontWeight: 600 }}
+                        />
+                      )}
                     </Box>
                     <Box sx={{ p: 2, flex: 1 }}>
-                      {/* Progress */}
-                      <Box sx={{ mb: 2 }}>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                          <Typography variant="caption" color="text.secondary">Overall Progress</Typography>
-                          <Typography variant="caption" fontWeight={700}>68%</Typography>
-                        </Box>
-                        <LinearProgress variant="determinate" value={68} sx={{ height: 6, borderRadius: 3, bgcolor: 'action.hover', '& .MuiLinearProgress-bar': { borderRadius: 3 } }} />
-                      </Box>
+                      {vmMigJob ? (
+                        <>
+                          {/* Progress bar */}
+                          <Box sx={{ mb: 2 }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                              <Typography variant="caption" color="text.secondary">Overall Progress</Typography>
+                              <Typography variant="caption" fontWeight={700}>{vmMigJob.progress || 0}%</Typography>
+                            </Box>
+                            <LinearProgress
+                              variant={!['completed', 'failed', 'cancelled'].includes(vmMigJob.status) && vmMigJob.progress === 0 ? 'indeterminate' : 'determinate'}
+                              value={vmMigJob.progress || 0}
+                              color={vmMigJob.status === 'completed' ? 'success' : vmMigJob.status === 'failed' ? 'error' : 'primary'}
+                              sx={{ height: 6, borderRadius: 3, bgcolor: 'action.hover', '& .MuiLinearProgress-bar': { borderRadius: 3 } }}
+                            />
+                          </Box>
 
-                      {/* Metrics grid */}
-                      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
-                        <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)', border: '1px solid', borderColor: 'divider' }}>
-                          <Typography variant="caption" color="text.secondary" sx={{ fontSize: 10 }}>Transfer Speed</Typography>
-                          <Typography variant="body2" fontWeight={700}>245 MB/s</Typography>
-                        </Box>
-                        <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)', border: '1px solid', borderColor: 'divider' }}>
-                          <Typography variant="caption" color="text.secondary" sx={{ fontSize: 10 }}>ETA</Typography>
-                          <Typography variant="body2" fontWeight={700}>~4 min 32s</Typography>
-                        </Box>
-                        <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)', border: '1px solid', borderColor: 'divider' }}>
-                          <Typography variant="caption" color="text.secondary" sx={{ fontSize: 10 }}>Transferred</Typography>
-                          <Typography variant="body2" fontWeight={700}>13.6 GB <Typography component="span" variant="caption" color="text.secondary">/ 20 GB</Typography></Typography>
-                        </Box>
-                        <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)', border: '1px solid', borderColor: 'divider' }}>
-                          <Typography variant="caption" color="text.secondary" sx={{ fontSize: 10 }}>Elapsed</Typography>
-                          <Typography variant="body2" fontWeight={700}>2 min 18s</Typography>
-                        </Box>
-                      </Box>
+                          {/* Metrics grid */}
+                          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
+                            <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)', border: '1px solid', borderColor: 'divider' }}>
+                              <Typography variant="caption" color="text.secondary" sx={{ fontSize: 10 }}>Transfer Speed</Typography>
+                              <Typography variant="body2" fontWeight={700}>{vmMigJob.transferSpeed || '—'}</Typography>
+                            </Box>
+                            <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)', border: '1px solid', borderColor: 'divider' }}>
+                              <Typography variant="caption" color="text.secondary" sx={{ fontSize: 10 }}>Disk</Typography>
+                              <Typography variant="body2" fontWeight={700}>
+                                {vmMigJob.currentDisk != null && vmMigJob.totalDisks ? `${vmMigJob.currentDisk} / ${vmMigJob.totalDisks}` : '—'}
+                              </Typography>
+                            </Box>
+                            <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)', border: '1px solid', borderColor: 'divider' }}>
+                              <Typography variant="caption" color="text.secondary" sx={{ fontSize: 10 }}>Transferred</Typography>
+                              <Typography variant="body2" fontWeight={700}>
+                                {vmMigJob.bytesTransferred ? `${(vmMigJob.bytesTransferred / 1073741824).toFixed(1)} GB` : '—'}
+                                {vmMigJob.totalBytes ? <Typography component="span" variant="caption" color="text.secondary"> / {(vmMigJob.totalBytes / 1073741824).toFixed(1)} GB</Typography> : ''}
+                              </Typography>
+                            </Box>
+                            <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)', border: '1px solid', borderColor: 'divider' }}>
+                              <Typography variant="caption" color="text.secondary" sx={{ fontSize: 10 }}>Target VMID</Typography>
+                              <Typography variant="body2" fontWeight={700}>{vmMigJob.targetVmid || '—'}</Typography>
+                            </Box>
+                          </Box>
 
-                      {/* Fake speed graph bars */}
-                      <Box sx={{ mt: 2 }}>
-                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: 10, mb: 0.5, display: 'block' }}>Transfer Speed (last 60s)</Typography>
-                        <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: '2px', height: 48 }}>
-                          {[35, 42, 55, 60, 48, 72, 68, 80, 75, 90, 85, 78, 92, 88, 95, 82, 70, 65, 88, 92, 78, 85, 90, 72, 68, 80, 85, 90, 88, 82].map((v, i) => (
-                            <Box key={i} sx={{ flex: 1, height: `${v}%`, bgcolor: 'primary.main', borderRadius: '2px 2px 0 0', opacity: 0.6 + (v / 250) }} />
-                          ))}
+                          {/* Progress graph — SVG line chart from logs timestamps */}
+                          {vmMigJob.logs?.length > 1 && (() => {
+                            const logs = vmMigJob.logs as { ts: string; msg: string; level: string }[]
+                            const startTime = new Date(logs[0].ts).getTime()
+                            const points = logs.map((l: any, idx: number) => {
+                              const t = (new Date(l.ts).getTime() - startTime) / 1000
+                              const pct = Math.round((idx / (logs.length - 1)) * 100)
+                              return { t, pct }
+                            })
+                            const maxT = Math.max(points[points.length - 1]?.t || 1, 1)
+                            const w = 280
+                            const h = 50
+                            const pathD = points.map((p, i) => {
+                              const x = (p.t / maxT) * w
+                              const y = h - (p.pct / 100) * h
+                              return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`
+                            }).join(' ')
+                            const fillD = `${pathD} L${w},${h} L0,${h} Z`
+                            return (
+                              <Box sx={{ mt: 2 }}>
+                                <Typography variant="caption" color="text.secondary" sx={{ fontSize: 10, mb: 0.5, display: 'block' }}>Migration Progress Over Time</Typography>
+                                <svg viewBox={`0 0 ${w} ${h}`} width="100%" height={50} preserveAspectRatio="none">
+                                  <defs>
+                                    <linearGradient id="migGrad" x1="0" y1="0" x2="0" y2="1">
+                                      <stop offset="0%" stopColor={theme.palette.primary.main} stopOpacity={0.3} />
+                                      <stop offset="100%" stopColor={theme.palette.primary.main} stopOpacity={0.02} />
+                                    </linearGradient>
+                                  </defs>
+                                  <path d={fillD} fill="url(#migGrad)" />
+                                  <path d={pathD} fill="none" stroke={theme.palette.primary.main} strokeWidth="2" />
+                                </svg>
+                              </Box>
+                            )
+                          })()}
+                        </>
+                      ) : (
+                        <Box sx={{ py: 3, textAlign: 'center' }}>
+                          <i className="ri-bar-chart-grouped-line" style={{ fontSize: 36, opacity: 0.12 }} />
+                          <Typography variant="body2" sx={{ opacity: 0.35, mt: 0.5, fontSize: 12 }}>No migration started yet</Typography>
                         </Box>
-                      </Box>
+                      )}
                     </Box>
                   </CardContent>
                 </Card>
 
-                {/* Migration Logs with fake data */}
+                {/* Migration Logs — real data from migration job */}
                 <Card variant="outlined" sx={{ borderRadius: 2, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
                   <CardContent sx={{ p: 0, '&:last-child': { pb: 0 }, flex: 1, display: 'flex', flexDirection: 'column' }}>
                     <Box sx={{ px: 2, py: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}>
                       <Typography fontWeight={900} sx={{ display: 'flex', alignItems: 'center', gap: 1, fontSize: 13 }}>
                         <i className="ri-terminal-box-line" style={{ fontSize: 16, opacity: 0.7 }} />
                         Migration Logs
+                        {vmMigJob?.logs?.length > 0 && (
+                          <Typography component="span" variant="caption" sx={{ opacity: 0.4 }}>({vmMigJob.logs.length})</Typography>
+                        )}
                       </Typography>
                     </Box>
-                    <Box sx={{ p: 1.5, bgcolor: theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.03)', fontFamily: '"JetBrains Mono", monospace', fontSize: 11, flex: 1, overflow: 'auto', borderRadius: '0 0 8px 8px', lineHeight: 1.8 }}>
-                      <Box component="span" sx={{ color: 'text.secondary' }}>[14:32:01]</Box> Connecting to ESXi host 10.99.99.199...<br />
-                      <Box component="span" sx={{ color: 'text.secondary' }}>[14:32:02]</Box> <Box component="span" sx={{ color: 'success.main' }}>✓</Box> Authenticated as root<br />
-                      <Box component="span" sx={{ color: 'text.secondary' }}>[14:32:02]</Box> Retrieving VM configuration for &quot;{vm.name}&quot;...<br />
-                      <Box component="span" sx={{ color: 'text.secondary' }}>[14:32:03]</Box> <Box component="span" sx={{ color: 'success.main' }}>✓</Box> VM config retrieved ({vm.numCPU} vCPU, {memGB} GB RAM, {diskGB} GB disk)<br />
-                      <Box component="span" sx={{ color: 'text.secondary' }}>[14:32:03]</Box> Converting VMDK → QCOW2 format...<br />
-                      <Box component="span" sx={{ color: 'text.secondary' }}>[14:32:04]</Box> Connecting to Proxmox VE target node...<br />
-                      <Box component="span" sx={{ color: 'text.secondary' }}>[14:32:05]</Box> <Box component="span" sx={{ color: 'success.main' }}>✓</Box> Target storage &quot;local-lvm&quot; available (156 GB free)<br />
-                      <Box component="span" sx={{ color: 'text.secondary' }}>[14:32:05]</Box> Starting disk transfer: [scsi0] {vm.name}.vmdk ({diskGB} GB)<br />
-                      <Box component="span" sx={{ color: 'text.secondary' }}>[14:32:06]</Box> Transfer in progress... 245 MB/s<br />
-                      <Box component="span" sx={{ color: 'text.secondary' }}>[14:34:18]</Box> <Box component="span" sx={{ color: 'warning.main' }}>⟳</Box> Transferred 13.6 GB / {diskGB} GB (68%)<br />
+                    <Box sx={{ p: 1.5, bgcolor: theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.03)', fontFamily: '"JetBrains Mono", monospace', fontSize: 11, flex: 1, overflow: 'auto', borderRadius: '0 0 8px 8px', lineHeight: 1.8, minHeight: 80 }}>
+                      {vmMigJob?.logs?.length > 0 ? (
+                        vmMigJob.logs.map((log: any, i: number) => (
+                          <Box key={i}>
+                            <Box component="span" sx={{ color: 'text.secondary' }}>[{new Date(log.ts).toLocaleTimeString()}]</Box>{' '}
+                            {log.level === 'success' && <Box component="span" sx={{ color: 'success.main' }}>✓ </Box>}
+                            {log.level === 'error' && <Box component="span" sx={{ color: 'error.main' }}>✗ </Box>}
+                            {log.level === 'warn' && <Box component="span" sx={{ color: 'warning.main' }}>⚠ </Box>}
+                            {log.msg}
+                          </Box>
+                        ))
+                      ) : (
+                        <Typography variant="body2" sx={{ fontFamily: 'inherit', fontSize: 'inherit', opacity: 0.3, fontStyle: 'italic' }}>
+                          Logs will appear here when a migration is started...
+                        </Typography>
+                      )}
                     </Box>
                   </CardContent>
                 </Card>
