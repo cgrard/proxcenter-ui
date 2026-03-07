@@ -1,0 +1,267 @@
+/**
+ * Shared VMware ESXi SOAP helpers
+ * Used by both the VMware API routes and the migration pipeline
+ */
+
+export interface SoapSession {
+  baseUrl: string
+  cookie: string
+  insecureTLS: boolean
+}
+
+/** Send a SOAP request to the ESXi /sdk endpoint */
+export async function soapRequest(
+  baseUrl: string,
+  body: string,
+  cookie: string,
+  insecureTLS: boolean,
+  timeoutMs = 30000
+): Promise<{ text: string; cookie?: string }> {
+  const opts: any = {
+    method: "POST",
+    headers: {
+      "Content-Type": "text/xml; charset=utf-8",
+      SOAPAction: '"urn:vim25/8.0"',
+      ...(cookie ? { Cookie: cookie } : {}),
+    },
+    body,
+    signal: AbortSignal.timeout(timeoutMs),
+  }
+  if (insecureTLS) {
+    opts.dispatcher = new (await import("undici")).Agent({ connect: { rejectUnauthorized: false } })
+  }
+  const res = await fetch(`${baseUrl}/sdk`, opts)
+  const text = await res.text()
+  if (!res.ok && !text.includes("returnval")) {
+    throw new Error(`SOAP error ${res.status}: ${text.substring(0, 200)}`)
+  }
+  const rawCookie = res.headers.get("set-cookie") || ""
+  return { text, cookie: rawCookie.split(";")[0] || "" }
+}
+
+/** Login via SOAP and return a SoapSession */
+export async function soapLogin(
+  baseUrl: string,
+  username: string,
+  password: string,
+  insecureTLS: boolean
+): Promise<SoapSession> {
+  const escUser = username.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+  const escPass = password.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+
+  const loginBody = `<?xml version="1.0" encoding="UTF-8"?>
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:urn="urn:vim25">
+  <soapenv:Body>
+    <urn:Login>
+      <urn:_this type="SessionManager">ha-sessionmgr</urn:_this>
+      <urn:userName>${escUser}</urn:userName>
+      <urn:password>${escPass}</urn:password>
+    </urn:Login>
+  </soapenv:Body>
+</soapenv:Envelope>`
+
+  const result = await soapRequest(baseUrl, loginBody, "", insecureTLS)
+  if (result.text.includes("InvalidLogin") || (result.text.includes("faultstring") && !result.text.includes("returnval"))) {
+    const fault = result.text.match(/<faultstring>([^<]*)<\/faultstring>/)?.[1] || "Authentication failed"
+    throw new Error(`ESXi login failed: ${fault}`)
+  }
+  return { baseUrl, cookie: result.cookie || "", insecureTLS }
+}
+
+/** Logout the SOAP session */
+export async function soapLogout(session: SoapSession): Promise<void> {
+  const body = `<?xml version="1.0" encoding="UTF-8"?>
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:urn="urn:vim25">
+  <soapenv:Body><urn:Logout><urn:_this type="SessionManager">ha-sessionmgr</urn:_this></urn:Logout></soapenv:Body>
+</soapenv:Envelope>`
+  await soapRequest(session.baseUrl, body, session.cookie, session.insecureTLS).catch(() => {})
+}
+
+/** Extract a property value from SOAP XML */
+export function extractProp(xml: string, propName: string): string {
+  const regex = new RegExp(
+    `<propSet>\\s*<name>${propName.replace(/\./g, "\\.")}</name>\\s*<val[^>]*>([\\s\\S]*?)</val>\\s*</propSet>`
+  )
+  return regex.exec(xml)?.[1] || ""
+}
+
+/** Get full VM config via SOAP PropertyCollector */
+export async function soapGetVmConfig(session: SoapSession, vmid: string): Promise<string> {
+  const retrieveBody = `<?xml version="1.0" encoding="UTF-8"?>
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:urn="urn:vim25">
+  <soapenv:Body>
+    <urn:RetrievePropertiesEx>
+      <urn:_this type="PropertyCollector">ha-property-collector</urn:_this>
+      <urn:specSet>
+        <urn:propSet>
+          <urn:type>VirtualMachine</urn:type>
+          <urn:pathSet>name</urn:pathSet>
+          <urn:pathSet>config.guestFullName</urn:pathSet>
+          <urn:pathSet>config.guestId</urn:pathSet>
+          <urn:pathSet>config.hardware.numCPU</urn:pathSet>
+          <urn:pathSet>config.hardware.numCoresPerSocket</urn:pathSet>
+          <urn:pathSet>config.hardware.memoryMB</urn:pathSet>
+          <urn:pathSet>config.version</urn:pathSet>
+          <urn:pathSet>config.uuid</urn:pathSet>
+          <urn:pathSet>config.firmware</urn:pathSet>
+          <urn:pathSet>config.hardware.device</urn:pathSet>
+          <urn:pathSet>runtime.powerState</urn:pathSet>
+          <urn:pathSet>storage.perDatastoreUsage</urn:pathSet>
+          <urn:pathSet>snapshot</urn:pathSet>
+        </urn:propSet>
+        <urn:objectSet>
+          <urn:obj type="VirtualMachine">${vmid}</urn:obj>
+          <urn:skip>false</urn:skip>
+        </urn:objectSet>
+      </urn:specSet>
+      <urn:options/>
+    </urn:RetrievePropertiesEx>
+  </soapenv:Body>
+</soapenv:Envelope>`
+
+  const result = await soapRequest(session.baseUrl, retrieveBody, session.cookie, session.insecureTLS)
+  if (result.text.includes("ManagedObjectNotFound")) {
+    throw new Error("VM not found on ESXi host")
+  }
+  return result.text
+}
+
+/** Power off a VM via SOAP */
+export async function soapPowerOffVm(session: SoapSession, vmid: string): Promise<void> {
+  const body = `<?xml version="1.0" encoding="UTF-8"?>
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:urn="urn:vim25">
+  <soapenv:Body>
+    <urn:PowerOffVM_Task>
+      <urn:_this type="VirtualMachine">${vmid}</urn:_this>
+    </urn:PowerOffVM_Task>
+  </soapenv:Body>
+</soapenv:Envelope>`
+
+  const result = await soapRequest(session.baseUrl, body, session.cookie, session.insecureTLS)
+  if (result.text.includes("faultstring") && !result.text.includes("InvalidPowerState")) {
+    throw new Error("Failed to power off VM")
+  }
+
+  // Wait for power off (poll power state)
+  for (let i = 0; i < 30; i++) {
+    await new Promise(r => setTimeout(r, 2000))
+    const xml = await soapGetVmConfig(session, vmid)
+    if (extractProp(xml, "runtime.powerState") === "poweredOff") return
+  }
+  throw new Error("VM did not power off within 60s")
+}
+
+export interface EsxiDiskInfo {
+  label: string
+  fileName: string // e.g. "[datastore1] vmname/vmname.vmdk"
+  capacityBytes: number
+  thinProvisioned: boolean
+  datastoreName: string
+  relativePath: string
+}
+
+export interface EsxiNicInfo {
+  label: string
+  type: string // Vmxnet3, E1000, etc.
+  macAddress: string
+  network: string
+}
+
+export interface EsxiVmConfig {
+  name: string
+  guestOS: string
+  guestId: string
+  numCPU: number
+  numCoresPerSocket: number
+  sockets: number
+  memoryMB: number
+  firmware: string // "bios" | "efi"
+  uuid: string
+  vmxVersion: string
+  powerState: string
+  committed: number
+  disks: EsxiDiskInfo[]
+  nics: EsxiNicInfo[]
+  snapshotCount: number
+}
+
+/** Parse full VM config from SOAP XML */
+export function parseVmConfig(xml: string): EsxiVmConfig {
+  const name = extractProp(xml, "name")
+  const guestOS = extractProp(xml, "config.guestFullName")
+  const guestId = extractProp(xml, "config.guestId")
+  const numCPU = parseInt(extractProp(xml, "config.hardware.numCPU"), 10) || 1
+  const numCoresPerSocket = parseInt(extractProp(xml, "config.hardware.numCoresPerSocket"), 10) || 1
+  const memoryMB = parseInt(extractProp(xml, "config.hardware.memoryMB"), 10) || 512
+  const firmware = extractProp(xml, "config.firmware") || "bios"
+  const uuid = extractProp(xml, "config.uuid")
+  const vmxVersion = extractProp(xml, "config.version")
+  const powerState = extractProp(xml, "runtime.powerState")
+
+  // Storage
+  const storageXml = extractProp(xml, "storage.perDatastoreUsage")
+  const committedMatch = storageXml.match(/<committed>(\d+)<\/committed>/)
+  const committed = committedMatch ? parseInt(committedMatch[1], 10) : 0
+
+  // Disks
+  const devicesXml = extractProp(xml, "config.hardware.device")
+  const disks: EsxiDiskInfo[] = []
+  const diskRegex = /xsi:type="VirtualDisk">([\s\S]*?)(?=<VirtualDevice|$)/g
+  let diskMatch
+  while ((diskMatch = diskRegex.exec(devicesXml)) !== null) {
+    const d = diskMatch[1]
+    const label = d.match(/<label>([^<]*)<\/label>/)?.[1] || ""
+    const capacityBytes = parseInt(d.match(/<capacityInBytes>(\d+)<\/capacityInBytes>/)?.[1] || "0", 10) ||
+      (parseInt(d.match(/<capacityInKB>(\d+)<\/capacityInKB>/)?.[1] || "0", 10) * 1024)
+    const fileName = d.match(/<fileName>([^<]*)<\/fileName>/)?.[1] || ""
+    const thinProvisioned = d.includes("<thinProvisioned>true</thinProvisioned>")
+
+    // Parse "[datastoreName] relative/path.vmdk"
+    const dsMatch = fileName.match(/^\[([^\]]+)\]\s+(.+)$/)
+    const datastoreName = dsMatch?.[1] || ""
+    const relativePath = dsMatch?.[2] || ""
+
+    disks.push({ label, fileName, capacityBytes, thinProvisioned, datastoreName, relativePath })
+  }
+
+  // NICs
+  const nics: EsxiNicInfo[] = []
+  const nicTypes = ["Vmxnet3", "E1000e", "E1000", "Vmxnet2", "Vmxnet"]
+  for (const nicType of nicTypes) {
+    const nicRegex = new RegExp(`xsi:type="Virtual${nicType}">([\\s\\S]*?)(?=<VirtualDevice|$)`, "g")
+    let nicMatch
+    while ((nicMatch = nicRegex.exec(devicesXml)) !== null) {
+      const n = nicMatch[1]
+      nics.push({
+        label: n.match(/<label>([^<]*)<\/label>/)?.[1] || "",
+        type: nicType,
+        macAddress: n.match(/<macAddress>([^<]*)<\/macAddress>/)?.[1] || "",
+        network: n.match(/<summary>([^<]*)<\/summary>/)?.[1] || "",
+      })
+    }
+  }
+
+  // Snapshots
+  const snapshotXml = extractProp(xml, "snapshot")
+  const snapshotCount = (snapshotXml.match(/<snapshot type="VirtualMachineSnapshot"/g) || []).length
+
+  const sockets = numCPU > 0 && numCoresPerSocket > 0 ? Math.ceil(numCPU / numCoresPerSocket) : 1
+
+  return {
+    name, guestOS, guestId, numCPU, numCoresPerSocket, sockets, memoryMB,
+    firmware, uuid, vmxVersion, powerState, committed, disks, nics, snapshotCount,
+  }
+}
+
+/**
+ * Build the HTTPS URL to download a VMDK flat file from ESXi datastore browser.
+ * ESXi exposes files at: https://host/folder/<path>?dcPath=ha-datacenter&dsName=<datastore>
+ *
+ * For the flat disk data, we need the -flat.vmdk file (the actual raw data).
+ */
+export function buildVmdkDownloadUrl(esxiBaseUrl: string, disk: EsxiDiskInfo): string {
+  const host = esxiBaseUrl.replace(/^https?:\/\//, "").replace(/\/.*$/, "")
+  // Convert vmname.vmdk -> vmname-flat.vmdk for the raw data file
+  const flatPath = disk.relativePath.replace(/\.vmdk$/, "-flat.vmdk")
+  return `https://${host}/folder/${encodeURIComponent(flatPath).replace(/%2F/g, "/")}?dcPath=ha-datacenter&dsName=${encodeURIComponent(disk.datastoreName)}`
+}

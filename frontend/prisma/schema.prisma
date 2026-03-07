@@ -173,3 +173,49 @@ model Deployment {
   @@index([connectionId])
   @@map("deployments")
 }
+
+model MigrationJob {
+  id                  String    @id @default(cuid())
+
+  // Source (ESXi)
+  sourceConnectionId  String    @map("source_connection_id")
+  sourceVmId          String    @map("source_vm_id")
+  sourceVmName        String?   @map("source_vm_name")
+  sourceHost          String?   @map("source_host")
+
+  // Target (Proxmox)
+  targetConnectionId  String    @map("target_connection_id")
+  targetNode          String    @map("target_node")
+  targetStorage       String    @map("target_storage")
+  targetVmid          Int?      @map("target_vmid")
+
+  // Full config for retry
+  config              String?
+
+  // Status tracking
+  status              String    @default("pending") // pending|preflight|creating_vm|transferring|configuring|completed|failed|cancelled
+  currentStep         String?   @map("current_step")
+  progress            Int       @default(0)
+  totalDisks          Int?      @map("total_disks")
+  currentDisk         Int?      @map("current_disk")
+  bytesTransferred    BigInt?   @map("bytes_transferred")
+  totalBytes          BigInt?   @map("total_bytes")
+  transferSpeed       String?   @map("transfer_speed")
+  error               String?
+
+  // Logs
+  logs                String?   // JSON array of log entries
+
+  // Timing
+  startedAt           DateTime? @map("started_at")
+  completedAt         DateTime? @map("completed_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  createdBy           String?   @map("created_by")
+
+  @@index([status])
+  @@index([sourceConnectionId])
+  @@index([targetConnectionId])
+  @@map("migration_jobs")
+}

@@ -202,6 +202,17 @@ export default function InventoryDetails({
   const [actionBusy, setActionBusy] = useState(false)
   const [exitMaintenanceDialogOpen, setExitMaintenanceDialogOpen] = useState(false)
   const [esxiMigrateVm, setEsxiMigrateVm] = useState<{ vmid: string; name: string; connId: string; connName: string; cpu?: number; memoryMB?: number; committed?: number; guestOS?: string } | null>(null)
+  const [migTargetConn, setMigTargetConn] = useState('')
+  const [migTargetNode, setMigTargetNode] = useState('')
+  const [migTargetStorage, setMigTargetStorage] = useState('')
+  const [migNetworkBridge, setMigNetworkBridge] = useState('vmbr0')
+  const [migStartAfter, setMigStartAfter] = useState(false)
+  const [migPveConnections, setMigPveConnections] = useState<any[]>([])
+  const [migNodes, setMigNodes] = useState<any[]>([])
+  const [migStorages, setMigStorages] = useState<any[]>([])
+  const [migStarting, setMigStarting] = useState(false)
+  const [migJobId, setMigJobId] = useState<string | null>(null)
+  const [migJob, setMigJob] = useState<any>(null)
   const [exitMaintenanceBusy, setExitMaintenanceBusy] = useState(false)
   const [exitMaintenanceError, setExitMaintenanceError] = useState<string | null>(null)
 
@@ -419,6 +430,58 @@ return next
       loadFavorites()
     }
   }, [propFavorites, loadFavorites])
+
+  // Fetch PVE connections when migration dialog opens
+  useEffect(() => {
+    if (!esxiMigrateVm) return
+    setMigTargetConn(''); setMigTargetNode(''); setMigTargetStorage('')
+    setMigNodes([]); setMigStorages([]); setMigJobId(null); setMigJob(null)
+    fetch('/api/v1/connections').then(r => r.json()).then(d => {
+      const pveConns = (d.data || d || []).filter((c: any) => c.type === 'pve')
+      setMigPveConnections(pveConns)
+      if (pveConns.length === 1) setMigTargetConn(pveConns[0].id)
+    }).catch(() => {})
+  }, [esxiMigrateVm])
+
+  // Fetch nodes when PVE connection is selected
+  useEffect(() => {
+    if (!migTargetConn) { setMigNodes([]); setMigTargetNode(''); return }
+    fetch(`/api/v1/connections/${migTargetConn}/nodes`).then(r => r.json()).then(d => {
+      const nodes = d.data || d || []
+      setMigNodes(nodes)
+      if (nodes.length === 1) setMigTargetNode(nodes[0].node || nodes[0].name)
+    }).catch(() => {})
+  }, [migTargetConn])
+
+  // Fetch storages when node is selected
+  useEffect(() => {
+    if (!migTargetConn || !migTargetNode) { setMigStorages([]); setMigTargetStorage(''); return }
+    fetch(`/api/v1/connections/${migTargetConn}/nodes/${migTargetNode}/storage`).then(r => r.json()).then(d => {
+      const storages = (d.data || d || []).filter((s: any) => {
+        const content = s.content || ''
+        return content.includes('images')
+      })
+      setMigStorages(storages)
+      if (storages.length > 0) {
+        const localLvm = storages.find((s: any) => s.storage === 'local-lvm')
+        setMigTargetStorage(localLvm ? 'local-lvm' : storages[0].storage)
+      }
+    }).catch(() => {})
+  }, [migTargetConn, migTargetNode])
+
+  // Poll migration job status
+  useEffect(() => {
+    if (!migJobId) return
+    const interval = setInterval(() => {
+      fetch(`/api/v1/migrations/${migJobId}`).then(r => r.json()).then(d => {
+        setMigJob(d.data)
+        if (d.data?.status === 'completed' || d.data?.status === 'failed' || d.data?.status === 'cancelled') {
+          clearInterval(interval)
+        }
+      }).catch(() => {})
+    }, 3000)
+    return () => clearInterval(interval)
+  }, [migJobId])
 
   // VMs sans templates (pour affichage dans les modes vms, tree, hosts, pools, tags)
   const displayVms = useMemo(() => allVms.filter(vm => !vm.template), [allVms])
@@ -6618,13 +6681,13 @@ return
       </Dialog>
 
       {/* ESXi Migration Dialog */}
-      <Dialog open={!!esxiMigrateVm} onClose={() => setEsxiMigrateVm(null)} maxWidth="sm" fullWidth>
+      <Dialog open={!!esxiMigrateVm} onClose={() => { if (!migStarting && !migJobId) setEsxiMigrateVm(null) }} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
           <img src="/images/icons/esxi-logo.svg" alt="" width={22} height={22} />
           Migrate to Proxmox VE
         </DialogTitle>
         <DialogContent>
-          {esxiMigrateVm && (
+          {esxiMigrateVm && !migJobId && (
             <Stack spacing={2.5} sx={{ mt: 1 }}>
               {/* Source VM info */}
               <Box sx={{ p: 2, borderRadius: 1.5, bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)', border: '1px solid', borderColor: 'divider' }}>
@@ -6638,50 +6701,198 @@ return
 
               {/* Arrow */}
               <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-                <i className="ri-arrow-down-line" style={{ fontSize: 24, color: '#E65100' }} />
+                <i className="ri-arrow-down-line" style={{ fontSize: 24, color: theme.palette.primary.main }} />
               </Box>
 
               {/* Target config */}
               <Box sx={{ p: 2, borderRadius: 1.5, bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)', border: '1px solid', borderColor: 'divider' }}>
                 <Typography variant="subtitle2" sx={{ mb: 1.5, color: 'text.secondary', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>Target — Proxmox VE</Typography>
                 <Stack spacing={2}>
-                  <TextField select label="Target Cluster" size="small" defaultValue="" fullWidth disabled>
-                    <MenuItem value="">Select cluster...</MenuItem>
+                  <TextField
+                    select label="Target Cluster" size="small" fullWidth
+                    value={migTargetConn}
+                    onChange={e => setMigTargetConn(e.target.value)}
+                  >
+                    <MenuItem value="" disabled>Select cluster...</MenuItem>
+                    {migPveConnections.map((c: any) => (
+                      <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
+                    ))}
                   </TextField>
-                  <TextField select label="Target Node" size="small" defaultValue="" fullWidth disabled>
-                    <MenuItem value="">Select node...</MenuItem>
+                  <TextField
+                    select label="Target Node" size="small" fullWidth
+                    value={migTargetNode}
+                    onChange={e => setMigTargetNode(e.target.value)}
+                    disabled={!migTargetConn || migNodes.length === 0}
+                  >
+                    <MenuItem value="" disabled>Select node...</MenuItem>
+                    {migNodes.map((n: any) => (
+                      <MenuItem key={n.node || n.name} value={n.node || n.name}>{n.node || n.name}</MenuItem>
+                    ))}
                   </TextField>
-                  <TextField select label="Target Storage" size="small" defaultValue="" fullWidth disabled>
-                    <MenuItem value="">Select storage...</MenuItem>
+                  <TextField
+                    select label="Target Storage" size="small" fullWidth
+                    value={migTargetStorage}
+                    onChange={e => setMigTargetStorage(e.target.value)}
+                    disabled={!migTargetNode || migStorages.length === 0}
+                  >
+                    <MenuItem value="" disabled>Select storage...</MenuItem>
+                    {migStorages.map((s: any) => (
+                      <MenuItem key={s.storage} value={s.storage}>
+                        {s.storage} ({s.type}) — {s.avail ? `${(s.avail / 1073741824).toFixed(1)} GB free` : ''}
+                      </MenuItem>
+                    ))}
                   </TextField>
-                  <TextField select label="Migration Mode" size="small" defaultValue="cold" fullWidth>
-                    <MenuItem value="cold">Cold Migration (offline)</MenuItem>
-                    <MenuItem value="warm">Warm Migration (near-zero downtime)</MenuItem>
-                    <MenuItem value="live">Live Migration (zero downtime)</MenuItem>
+                  <TextField
+                    select label="Network Bridge" size="small" fullWidth
+                    value={migNetworkBridge}
+                    onChange={e => setMigNetworkBridge(e.target.value)}
+                  >
+                    <MenuItem value="vmbr0">vmbr0 (default)</MenuItem>
+                    <MenuItem value="vmbr1">vmbr1</MenuItem>
+                    <MenuItem value="vmbr2">vmbr2</MenuItem>
                   </TextField>
+                  <FormControlLabel
+                    control={<Switch size="small" checked={migStartAfter} onChange={(_, v) => setMigStartAfter(v)} />}
+                    label={<Typography variant="body2">Start VM after migration</Typography>}
+                  />
                 </Stack>
               </Box>
 
               {/* Info banner */}
-              <Box sx={{ p: 1.5, borderRadius: 1, bgcolor: 'rgba(230,81,0,0.08)', border: '1px solid rgba(230,81,0,0.2)', display: 'flex', alignItems: 'center', gap: 1 }}>
-                <i className="ri-information-line" style={{ fontSize: 18, color: '#E65100' }} />
-                <Typography variant="caption" sx={{ color: '#E65100' }}>
-                  Migration will convert VMDK disks to QCOW2/RAW format and adapt hardware configuration automatically.
+              <Box sx={{ p: 1.5, borderRadius: 1, bgcolor: theme.palette.mode === 'dark' ? 'rgba(var(--mui-palette-primary-mainChannel) / 0.08)' : 'rgba(var(--mui-palette-primary-mainChannel) / 0.06)', border: '1px solid', borderColor: 'primary.main', borderOpacity: 0.2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <i className="ri-information-line" style={{ fontSize: 18, color: theme.palette.primary.main }} />
+                <Typography variant="caption" color="primary">
+                  Cold migration: VM will be powered off. VMDK disks are converted to QCOW2/RAW and hardware config is mapped automatically.
                 </Typography>
               </Box>
             </Stack>
           )}
+
+          {/* Migration in progress / completed / failed */}
+          {esxiMigrateVm && migJobId && migJob && (
+            <Stack spacing={2} sx={{ mt: 1 }}>
+              {/* Status chip */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                {migJob.status === 'completed' && <Chip size="small" label="Completed" color="success" sx={{ fontWeight: 600 }} />}
+                {migJob.status === 'failed' && <Chip size="small" label="Failed" color="error" sx={{ fontWeight: 600 }} />}
+                {migJob.status === 'cancelled' && <Chip size="small" label="Cancelled" color="warning" sx={{ fontWeight: 600 }} />}
+                {!['completed', 'failed', 'cancelled'].includes(migJob.status) && (
+                  <Chip size="small" label={migJob.currentStep?.replace(/_/g, ' ') || migJob.status} color="primary" sx={{ fontWeight: 600 }} />
+                )}
+                {migJob.targetVmid && <Typography variant="caption" color="text.secondary">VMID: {migJob.targetVmid}</Typography>}
+              </Box>
+
+              {/* Progress bar */}
+              {!['completed', 'failed', 'cancelled'].includes(migJob.status) && (
+                <Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                    <Typography variant="caption" color="text.secondary">Progress</Typography>
+                    <Typography variant="caption" fontWeight={700}>{migJob.progress || 0}%</Typography>
+                  </Box>
+                  <LinearProgress variant="determinate" value={migJob.progress || 0} sx={{ height: 6, borderRadius: 3 }} />
+                </Box>
+              )}
+
+              {/* Error */}
+              {migJob.status === 'failed' && migJob.error && (
+                <Alert severity="error" sx={{ fontSize: 12 }}>{migJob.error}</Alert>
+              )}
+
+              {/* Logs */}
+              {migJob.logs?.length > 0 && (
+                <Box sx={{ p: 1.5, bgcolor: theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.03)', fontFamily: '"JetBrains Mono", monospace', fontSize: 11, maxHeight: 250, overflow: 'auto', borderRadius: 1.5, lineHeight: 1.8 }}>
+                  {migJob.logs.map((log: any, i: number) => (
+                    <Box key={i}>
+                      <Box component="span" sx={{ color: 'text.secondary' }}>[{new Date(log.ts).toLocaleTimeString()}]</Box>{' '}
+                      {log.level === 'success' && <Box component="span" sx={{ color: 'success.main' }}>✓ </Box>}
+                      {log.level === 'error' && <Box component="span" sx={{ color: 'error.main' }}>✗ </Box>}
+                      {log.level === 'warn' && <Box component="span" sx={{ color: 'warning.main' }}>⚠ </Box>}
+                      {log.msg}
+                    </Box>
+                  ))}
+                </Box>
+              )}
+            </Stack>
+          )}
+
+          {/* Loading state while starting */}
+          {esxiMigrateVm && migStarting && !migJobId && (
+            <Box sx={{ py: 4, textAlign: 'center' }}>
+              <CircularProgress size={32} />
+              <Typography variant="body2" sx={{ mt: 1, opacity: 0.6 }}>Starting migration...</Typography>
+            </Box>
+          )}
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setEsxiMigrateVm(null)}>Cancel</Button>
-          <Button
-            variant="contained"
-            disabled
-            sx={{ textTransform: 'none', bgcolor: '#E65100', '&:hover': { bgcolor: '#BF360C' } }}
-            startIcon={<i className="ri-play-circle-line" />}
-          >
-            Start Migration
-          </Button>
+          {!migJobId ? (
+            <>
+              <Button onClick={() => setEsxiMigrateVm(null)} disabled={migStarting}>Cancel</Button>
+              <Button
+                variant="contained"
+                disabled={!migTargetConn || !migTargetNode || !migTargetStorage || migStarting}
+                sx={{ textTransform: 'none' }}
+                startIcon={migStarting ? <CircularProgress size={16} color="inherit" /> : <i className="ri-play-circle-line" />}
+                onClick={async () => {
+                  if (!esxiMigrateVm) return
+                  setMigStarting(true)
+                  try {
+                    const res = await fetch('/api/v1/migrations', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        sourceConnectionId: esxiMigrateVm.connId,
+                        sourceVmId: esxiMigrateVm.vmid,
+                        targetConnectionId: migTargetConn,
+                        targetNode: migTargetNode,
+                        targetStorage: migTargetStorage,
+                        networkBridge: migNetworkBridge,
+                        startAfterMigration: migStartAfter,
+                      }),
+                    })
+                    const d = await res.json()
+                    if (d.data?.jobId) {
+                      setMigJobId(d.data.jobId)
+                    } else {
+                      throw new Error(d.error || 'Failed to start migration')
+                    }
+                  } catch (e: any) {
+                    alert(e.message || 'Migration failed to start')
+                  } finally {
+                    setMigStarting(false)
+                  }
+                }}
+              >
+                Start Migration
+              </Button>
+            </>
+          ) : (
+            <>
+              {migJob && !['completed', 'failed', 'cancelled'].includes(migJob.status) && (
+                <Button
+                  color="error"
+                  onClick={async () => {
+                    await fetch(`/api/v1/migrations/${migJobId}/cancel`, { method: 'POST' })
+                  }}
+                >
+                  Cancel Migration
+                </Button>
+              )}
+              {migJob && migJob.status === 'failed' && (
+                <Button
+                  onClick={async () => {
+                    const res = await fetch(`/api/v1/migrations/${migJobId}/retry`, { method: 'POST' })
+                    const d = await res.json()
+                    if (d.data?.jobId) setMigJobId(d.data.jobId)
+                  }}
+                >
+                  Retry
+                </Button>
+              )}
+              <Button onClick={() => { setEsxiMigrateVm(null); setMigJobId(null); setMigJob(null) }}>
+                Close
+              </Button>
+            </>
+          )}
         </DialogActions>
       </Dialog>
 

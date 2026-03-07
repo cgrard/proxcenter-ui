@@ -20,6 +20,7 @@ export type AuditCategory =
   | "system"         // Actions système
   | "security"       // Actions de sécurité (RBAC, permissions)
   | "templates"      // Actions cloud-init templates / blueprints
+  | "migration"      // Migration ESXi → Proxmox
 
 export type AuditAction =
 
