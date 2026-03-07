@@ -1538,6 +1538,8 @@
     "esxiHost": "Hôte ESXi",
     "noVmwareConnections": "Aucune connexion VMware ESXi",
     "noVmwareConnectionsDesc": "Ajoutez un hôte ESXi pour lister les VMs disponibles pour la migration vers Proxmox",
+    "hypervComingSoonDesc": "Le support des hyperviseurs Microsoft Hyper-V arrive bientôt. Vous pourrez connecter des hôtes Hyper-V et migrer les VMs vers Proxmox.",
+    "xcpngComingSoonDesc": "Le support des hyperviseurs XCP-ng / XenServer arrive bientôt. Vous pourrez connecter des hôtes XCP-ng et migrer les VMs vers Proxmox.",
     "errorPasswordRequired": "Le mot de passe est requis",
     "apiTokenHelperEdit": "Laissez vide pour conserver le token actuel",
     "errorNameRequired": "Le nom est requis",

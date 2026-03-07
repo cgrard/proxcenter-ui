@@ -32,7 +32,8 @@ import {
   Tooltip,
   Typography,
   LinearProgress,
-  InputAdornment
+  InputAdornment,
+  useTheme
 } from '@mui/material'
 
 import { DataGrid } from '@mui/x-data-grid'
@@ -215,6 +216,7 @@ function ConnectionVersion({ connection }) {
 
 function ConnectionsTab() {
   const t = useTranslations()
+  const theme = useTheme()
   const router = useRouter()
   const searchParams = useSearchParams()
   const isOnboarding = searchParams.get('onboarding') === 'true'
@@ -302,7 +304,7 @@ function ConnectionsTab() {
       })
     } else {
       // Create new
-      if (!formData.apiToken.trim()) {
+      if (!isVmware && !formData.apiToken.trim()) {
         throw new Error('API Token is required')
       }
       await fetchJson('/api/v1/connections', {
@@ -711,7 +713,7 @@ function ConnectionsTab() {
           <Tab
             label={
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <i className='ri-server-line' style={{ fontSize: 18 }} />
+                <img src={theme.palette.mode === 'dark' ? '/images/proxmox-logo-dark.svg' : '/images/proxmox-logo.svg'} alt='' width={18} height={18} />
                 <span>{t('settings.proxmoxVe')}</span>
                 <Chip size='small' label={pveConnections.length} color='primary' sx={{ height: 18, fontSize: 10, ml: 0.5 }} />
               </Box>
@@ -720,7 +722,7 @@ function ConnectionsTab() {
           <Tab
             label={
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <i className='ri-hard-drive-2-line' style={{ fontSize: 18 }} />
+                <img src={theme.palette.mode === 'dark' ? '/images/proxmox-logo-dark.svg' : '/images/proxmox-logo.svg'} alt='' width={18} height={18} />
                 <span>{t('settings.proxmoxBackupServer')}</span>
                 <Chip size='small' label={pbsConnections.length} color='secondary' sx={{ height: 18, fontSize: 10, ml: 0.5 }} />
               </Box>
@@ -729,9 +731,27 @@ function ConnectionsTab() {
           <Tab
             label={
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <i className='ri-cloud-line' style={{ fontSize: 18, color: '#638C1C' }} />
+                <img src='/images/esxi-logo.svg' alt='' width={18} height={18} />
                 <span>VMware ESXi</span>
                 <Chip size='small' label={vmwareConnections.length} sx={{ height: 18, fontSize: 10, ml: 0.5, bgcolor: '#638C1C', color: '#fff' }} />
+              </Box>
+            }
+          />
+          <Tab
+            label={
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <img src='/images/hyperv-logo.svg' alt='' width={18} height={18} />
+                <span>Microsoft Hyper-V</span>
+                <Chip size='small' label='Soon' sx={{ height: 18, fontSize: 10, ml: 0.5, bgcolor: '#00ADEF', color: '#fff' }} />
+              </Box>
+            }
+          />
+          <Tab
+            label={
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <img src='/images/xcpng-logo.svg' alt='' width={18} height={18} />
+                <span>XCP-ng</span>
+                <Chip size='small' label='Soon' sx={{ height: 18, fontSize: 10, ml: 0.5, bgcolor: '#00B9E6', color: '#fff' }} />
               </Box>
             }
           />
@@ -865,6 +885,30 @@ function ConnectionsTab() {
               sx={{ '& .MuiDataGrid-row:hover': { backgroundColor: 'action.hover' } }}
             />
           )}
+        </Box>
+      </SubTabPanel>
+
+      {/* Microsoft Hyper-V Tab - Coming Soon */}
+      <SubTabPanel value={connTab} index={3}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 8, gap: 2 }}>
+          <img src='/images/hyperv-logo.svg' alt='Hyper-V' width={64} height={64} style={{ opacity: 0.5 }} />
+          <Typography variant='h6' sx={{ opacity: 0.7 }}>Microsoft Hyper-V</Typography>
+          <Chip label='Coming Soon' color='info' />
+          <Typography variant='body2' sx={{ opacity: 0.5, maxWidth: 400, textAlign: 'center' }}>
+            {t('settings.hypervComingSoonDesc')}
+          </Typography>
+        </Box>
+      </SubTabPanel>
+
+      {/* XCP-ng Tab - Coming Soon */}
+      <SubTabPanel value={connTab} index={4}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 8, gap: 2 }}>
+          <img src='/images/xcpng-logo.svg' alt='XCP-ng' width={64} height={64} style={{ opacity: 0.5 }} />
+          <Typography variant='h6' sx={{ opacity: 0.7 }}>XCP-ng</Typography>
+          <Chip label='Coming Soon' color='info' />
+          <Typography variant='body2' sx={{ opacity: 0.5, maxWidth: 400, textAlign: 'center' }}>
+            {t('settings.xcpngComingSoonDesc')}
+          </Typography>
         </Box>
       </SubTabPanel>
 

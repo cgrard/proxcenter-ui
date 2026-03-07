@@ -1533,6 +1533,8 @@
     "esxiHost": "ESXi Host",
     "noVmwareConnections": "No VMware ESXi connections",
     "noVmwareConnectionsDesc": "Add an ESXi host to list VMs available for migration to Proxmox",
+    "hypervComingSoonDesc": "Support for Microsoft Hyper-V hypervisors is coming soon. You will be able to connect Hyper-V hosts and migrate VMs to Proxmox.",
+    "xcpngComingSoonDesc": "Support for XCP-ng / XenServer hypervisors is coming soon. You will be able to connect XCP-ng hosts and migrate VMs to Proxmox.",
     "errorPasswordRequired": "Password is required",
     "apiTokenHelperEdit": "Leave empty to keep the current token",
     "errorNameRequired": "Name is required",
