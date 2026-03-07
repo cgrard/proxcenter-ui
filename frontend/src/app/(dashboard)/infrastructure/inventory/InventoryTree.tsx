@@ -2926,10 +2926,10 @@ return (
 
         {/* External Hypervisors (VMware, Hyper-V, XCP-NG) — migration targets */}
         {(() => {
-          const hypervisorConfig: Record<string, { label: string; icon: string; color: string }> = {
-            vmware: { label: 'VMware ESXi', icon: 'ri-cloud-line', color: '#638C1C' },
-            hyperv: { label: 'Microsoft Hyper-V', icon: 'ri-microsoft-line', color: '#00BCF2' },
-            xcpng: { label: 'XCP-NG', icon: 'ri-server-line', color: '#00ADB5' },
+          const hypervisorConfig: Record<string, { label: string; icon: string; svgIcon?: string; vmIcon?: string; color: string }> = {
+            vmware: { label: 'VMware ESXi', icon: 'ri-cloud-line', svgIcon: '/images/esxi-logo.svg', vmIcon: '/images/esxi-vm.svg', color: '#638C1C' },
+            hyperv: { label: 'Microsoft Hyper-V', icon: 'ri-microsoft-line', svgIcon: '/images/hyperv-logo.svg', color: '#00BCF2' },
+            xcpng: { label: 'XCP-NG', icon: 'ri-server-line', svgIcon: '/images/xcpng-logo.svg', color: '#00ADB5' },
           }
 
           const grouped = externalHypervisors.reduce<Record<string, typeof externalHypervisors>>((acc, h) => {
@@ -2950,7 +2950,7 @@ return (
                   sx={{ display: 'flex', alignItems: 'center', gap: 0.75, px: 1, py: 0.5, mt: 1, opacity: 0.6, cursor: 'pointer', userSelect: 'none', '&:hover': { opacity: 0.9 } }}
                 >
                   <i className={collapsedSections.has(sectionKey) ? 'ri-arrow-right-s-line' : 'ri-arrow-down-s-line'} style={{ fontSize: 14, flexShrink: 0 }} />
-                  <i className={cfg.icon} style={{ fontSize: 12, color: cfg.color }} />
+                  {cfg.svgIcon ? <img src={cfg.svgIcon} alt="" width={12} height={12} /> : <i className={cfg.icon} style={{ fontSize: 12, color: cfg.color }} />}
                   <Typography variant="caption" fontWeight={600} sx={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5 }}>
                     {cfg.label}
                   </Typography>
@@ -2965,7 +2965,7 @@ return (
                       itemId={`ext:${conn.id}`}
                       label={
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                          <i className={cfg.icon} style={{ fontSize: 14, color: cfg.color, opacity: 0.8 }} />
+                          {cfg.svgIcon ? <img src={cfg.svgIcon} alt="" width={14} height={14} style={{ opacity: 0.8 }} /> : <i className={cfg.icon} style={{ fontSize: 14, color: cfg.color, opacity: 0.8 }} />}
                           <span style={{ fontSize: 14 }}>{conn.name}</span>
                           <span style={{ opacity: 0.5, fontSize: 12 }}>({conn.vms?.length || 0})</span>
                         </Box>
@@ -2993,7 +2993,7 @@ return (
                                   <StopIcon sx={{ fontSize: 14, color: 'text.disabled', opacity: 0.5 }} />
                                 )}
                               </Box>
-                              <i className="ri-computer-line" style={{ fontSize: 14, opacity: 0.6 }} />
+                              {cfg.vmIcon ? <img src={cfg.vmIcon} alt="" width={14} height={14} style={{ opacity: 0.6 }} /> : <i className="ri-computer-line" style={{ fontSize: 14, opacity: 0.6 }} />}
                               <span style={{ fontSize: 13 }}>{vm.name || vm.vmid}</span>
                               {vm.memory_size_MiB && (
                                 <span style={{ opacity: 0.4, fontSize: 11 }}>

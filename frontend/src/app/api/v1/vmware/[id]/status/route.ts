@@ -36,7 +36,7 @@ export async function GET(
 
     const fetchOpts: any = {
       method: 'POST',
-      headers: { 'Content-Type': 'text/xml; charset=utf-8' },
+      headers: { 'Content-Type': 'text/xml; charset=utf-8', 'SOAPAction': '"urn:vim25/8.0"' },
       signal: AbortSignal.timeout(15000),
     }
     if (conn.insecureTLS) {
@@ -72,14 +72,14 @@ export async function GET(
 
     if (text.includes('returnval') || text.includes('LoginResponse')) {
       // Logout to clean up
-      const cookie = res.headers.get('set-cookie') || ''
+      const cookie = (res.headers.get('set-cookie') || '').split(';')[0]
       const logoutBody = `<?xml version="1.0" encoding="UTF-8"?>
 <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:urn="urn:vim25">
   <soapenv:Body><urn:Logout><urn:_this type="SessionManager">ha-sessionmgr</urn:_this></urn:Logout></soapenv:Body>
 </soapenv:Envelope>`
       const logoutOpts: any = {
         method: 'POST',
-        headers: { 'Content-Type': 'text/xml; charset=utf-8', ...(cookie ? { Cookie: cookie } : {}) },
+        headers: { 'Content-Type': 'text/xml; charset=utf-8', 'SOAPAction': '"urn:vim25/8.0"', ...(cookie ? { Cookie: cookie } : {}) },
       }
       if (conn.insecureTLS) {
         logoutOpts.dispatcher = new (await import('undici')).Agent({ connect: { rejectUnauthorized: false } })

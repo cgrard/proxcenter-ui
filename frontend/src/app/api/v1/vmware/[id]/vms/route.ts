@@ -22,6 +22,7 @@ async function soapRequest(baseUrl: string, body: string, cookie: string, insecu
     method: 'POST',
     headers: {
       'Content-Type': 'text/xml; charset=utf-8',
+      'SOAPAction': '"urn:vim25/8.0"',
       ...(cookie ? { Cookie: cookie } : {}),
     },
     body,
@@ -35,8 +36,10 @@ async function soapRequest(baseUrl: string, body: string, cookie: string, insecu
   if (!res.ok && !text.includes('returnval')) {
     throw new Error(`SOAP error ${res.status}: ${text.substring(0, 200)}`)
   }
-  const setCookie = res.headers.get('set-cookie') || ''
-  return { text, cookie: setCookie }
+  // Extract just the cookie name=value part from set-cookie header
+  const rawCookie = res.headers.get('set-cookie') || ''
+  const cookieValue = rawCookie.split(';')[0] || ''
+  return { text, cookie: cookieValue }
 }
 
 /** Login via SOAP and return session cookie */
@@ -56,7 +59,7 @@ async function soapLogin(baseUrl: string, username: string, password: string, in
 </soapenv:Envelope>`
 
   const result = await soapRequest(baseUrl, loginBody, '', insecureTLS)
-  if (result.text.includes('InvalidLogin') || result.text.includes('faultstring')) {
+  if (result.text.includes('InvalidLogin') || (result.text.includes('faultstring') && !result.text.includes('returnval'))) {
     const fault = result.text.match(/<faultstring>([^<]*)<\/faultstring>/)?.[1] || 'Authentication failed'
     throw new Error(`ESXi login failed: ${fault}`)
   }
@@ -94,7 +97,6 @@ async function soapListVMs(baseUrl: string, cookie: string, insecureTLS: boolean
   const viewResult = await soapRequest(baseUrl, createViewBody, cookie, insecureTLS)
   const viewRef = viewResult.text.match(/<returnval type="ContainerView">([^<]+)<\/returnval>/)?.[1]
   if (!viewRef) {
-    // No ContainerView → probably no VMs
     return []
   }
 
@@ -131,7 +133,7 @@ async function soapListVMs(baseUrl: string, cookie: string, insecureTLS: boolean
 
   const propsResult = await soapRequest(baseUrl, retrieveBody, cookie, insecureTLS)
 
-  // Destroy the ContainerView
+  // Destroy the ContainerView (fire and forget)
   const destroyBody = `<?xml version="1.0" encoding="UTF-8"?>
 <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:urn="urn:vim25">
   <soapenv:Body>
@@ -142,7 +144,6 @@ async function soapListVMs(baseUrl: string, cookie: string, insecureTLS: boolean
 </soapenv:Envelope>`
   soapRequest(baseUrl, destroyBody, cookie, insecureTLS).catch(() => {})
 
-  // Parse the response — each <returnval> contains one VM's properties
   return parseVMProperties(propsResult.text)
 }
 
@@ -150,24 +151,23 @@ async function soapListVMs(baseUrl: string, cookie: string, insecureTLS: boolean
 function parseVMProperties(xml: string): EsxiVm[] {
   const vms: EsxiVm[] = []
 
-  // Split by <returnval> blocks — each is one VM
-  // Use regex to find all returnval sections in the objects array
-  const objRegex = /<returnval>([\s\S]*?)<\/returnval>/g
+  // Each VM is in an <objects> block inside <returnval>
+  const objRegex = /<objects>([\s\S]*?)<\/objects>/g
   let match: RegExpExecArray | null
 
   while ((match = objRegex.exec(xml)) !== null) {
     const block = match[1]
 
-    // Extract VM moid from <obj type="VirtualMachine">vm-XX</obj>
+    // Extract VM moid from <obj type="VirtualMachine">XX</obj>
     const vmid = block.match(/<obj type="VirtualMachine">([^<]+)<\/obj>/)?.[1] || ''
 
-    // Extract properties from <propSet> blocks
     let name = ''
     let powerState = ''
     let numCPU = 0
     let memoryMB = 0
     let guestOS = ''
 
+    // Extract properties — <val> may have xsi:type attribute
     const propRegex = /<propSet>\s*<name>([^<]+)<\/name>\s*<val[^>]*>([^<]*)<\/val>\s*<\/propSet>/g
     let propMatch: RegExpExecArray | null
 
