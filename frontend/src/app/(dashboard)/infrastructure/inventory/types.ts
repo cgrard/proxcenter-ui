@@ -379,6 +379,7 @@ export type DetailsPayload = {
       connected: boolean
     }>
     snapshotCount: number
+    licenseFull?: boolean
   }
 }
 
