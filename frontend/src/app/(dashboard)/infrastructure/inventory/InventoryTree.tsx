@@ -796,7 +796,7 @@ return migratingVmIds.has(`${connId}:${vmid}`)
   const favorites = propFavorites ?? localFavorites
   
   // Mode d'affichage: 'tree' (arbre), 'vms' (liste VMs), 'hosts' (par hôte), 'pools' (par pool), 'tags' (par tag), 'favorites' (favoris)
-  const [internalViewMode, setInternalViewMode] = useState<ViewMode>('vms')
+  const [internalViewMode, setInternalViewMode] = useState<ViewMode>(controlledViewMode ?? 'vms')
   
   // Utiliser le viewMode contrôlé s'il est fourni, sinon l'état interne
   const viewMode = controlledViewMode ?? internalViewMode
@@ -842,7 +842,7 @@ return next
   useEffect(() => {
     try {
       const savedView = localStorage.getItem('inventoryViewMode')
-      if (savedView) setInternalViewMode(savedView as ViewMode)
+      if (savedView && controlledViewMode === undefined) setInternalViewMode(savedView as ViewMode)
 
       const savedExpanded = localStorage.getItem('inventoryExpandedItems')
       if (savedExpanded) setManualExpandedItems(JSON.parse(savedExpanded))
@@ -1236,8 +1236,8 @@ return next
           } catch {}
         }))
       }
-      // Refresh tree after bulk action
-      setTimeout(() => setReloadTick(x => x + 1), 2000)
+      // Trigger immediate SSE poll — tree will be updated via persistent EventSource
+      setTimeout(() => fetch('/api/v1/inventory/poll', { method: 'POST' }).catch(() => {}), 2000)
     } finally {
       setBulkActionBusy(false)
       setBulkActionDialog({ open: false, action: null, connId: '', node: '', targetNode: '' })
@@ -1279,8 +1279,8 @@ return next
         throw new Error(err?.error || `HTTP ${res.status}`)
       }
 
-      // Rafraîchir l'arbre après l'action
-      setReloadTick(x => x + 1)
+      // Trigger immediate SSE poll — the persistent EventSource will push the update
+      fetch('/api/v1/inventory/poll', { method: 'POST' }).catch(() => {})
       setSnackbar({ open: true, message: `${action.charAt(0).toUpperCase() + action.slice(1)} — ${contextMenu.name}`, severity: 'success' })
     } catch (e: any) {
       setVmActionError(`${t('common.error')} (${action}): ${e?.message || e}`)
@@ -1649,6 +1649,134 @@ return next
       eventSource = null
     }
   }, [reloadTick, mapClusterToTree, mapPbsToTree, sortClusters])
+
+  // ---------- Persistent SSE for real-time updates ----------
+  useEffect(() => {
+    let alive = true
+    let es: EventSource | null = null
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+
+    function connect() {
+      if (!alive) return
+      es = new EventSource('/api/v1/inventory/events')
+
+      es.addEventListener('vm:update', (e) => {
+        if (!alive) return
+        try {
+          const d = JSON.parse(e.data)
+          setClusters(prev => prev.map(clu => {
+            if (clu.connId !== d.connId) return clu
+            let changed = false
+            const nodes = clu.nodes.map(n => {
+              // Handle node migration: VM moved to a different node
+              const vms = n.vms.map(vm => {
+                if (String(vm.vmid) !== String(d.vmid) || vm.type !== d.type) return vm
+                changed = true
+                return {
+                  ...vm,
+                  status: d.status,
+                  cpu: d.cpu ?? vm.cpu,
+                  mem: d.mem ?? vm.mem,
+                  maxmem: d.maxmem ?? vm.maxmem,
+                  disk: d.disk ?? vm.disk,
+                  maxdisk: d.maxdisk ?? vm.maxdisk,
+                  name: d.name ?? vm.name,
+                }
+              })
+              return changed ? { ...n, vms } : n
+            })
+            return changed ? { ...clu, nodes } : clu
+          }))
+        } catch { /* ignore */ }
+      })
+
+      es.addEventListener('node:update', (e) => {
+        if (!alive) return
+        try {
+          const d = JSON.parse(e.data)
+          setClusters(prev => prev.map(clu => {
+            if (clu.connId !== d.connId) return clu
+            let changed = false
+            const nodes = clu.nodes.map(n => {
+              if (n.node !== d.node) return n
+              changed = true
+              return { ...n, status: d.status }
+            })
+            return changed ? { ...clu, nodes } : clu
+          }))
+        } catch { /* ignore */ }
+      })
+
+      es.addEventListener('vm:added', (e) => {
+        if (!alive) return
+        try {
+          const d = JSON.parse(e.data)
+          setClusters(prev => prev.map(clu => {
+            if (clu.connId !== d.connId) return clu
+            const nodes = clu.nodes.map(n => {
+              if (n.node !== d.node) return n
+              // Check if VM already exists (avoid duplicates)
+              if (n.vms.some(vm => String(vm.vmid) === String(d.vmid) && vm.type === d.type)) return n
+              return {
+                ...n,
+                vms: [...n.vms, {
+                  type: d.type,
+                  vmid: String(d.vmid),
+                  name: d.name || `${d.type}/${d.vmid}`,
+                  status: d.status || 'unknown',
+                  cpu: d.cpu,
+                  mem: d.mem,
+                  maxmem: d.maxmem,
+                  pool: null,
+                  tags: null,
+                  template: false,
+                }].sort((a, b) => parseInt(a.vmid, 10) - parseInt(b.vmid, 10))
+              }
+            })
+            return { ...clu, nodes }
+          }))
+        } catch { /* ignore */ }
+      })
+
+      es.addEventListener('vm:removed', (e) => {
+        if (!alive) return
+        try {
+          const d = JSON.parse(e.data)
+          setClusters(prev => prev.map(clu => {
+            if (clu.connId !== d.connId) return clu
+            let changed = false
+            const nodes = clu.nodes.map(n => {
+              const before = n.vms.length
+              const vms = n.vms.filter(vm => !(String(vm.vmid) === String(d.vmid) && vm.type === d.type))
+              if (vms.length !== before) changed = true
+              return changed ? { ...n, vms } : n
+            })
+            return changed ? { ...clu, nodes } : clu
+          }))
+        } catch { /* ignore */ }
+      })
+
+      // Reconnect on error (network drop, server restart)
+      es.onerror = () => {
+        es?.close()
+        es = null
+        if (alive) {
+          reconnectTimer = setTimeout(connect, 5000)
+        }
+      }
+    }
+
+    // Start after a short delay to let the initial stream load finish first
+    const startTimer = setTimeout(connect, 3000)
+
+    return () => {
+      alive = false
+      clearTimeout(startTimer)
+      if (reconnectTimer) clearTimeout(reconnectTimer)
+      es?.close()
+      es = null
+    }
+  }, [])
 
   const selectedItemId = selected ? itemKey(selected) : undefined
 
