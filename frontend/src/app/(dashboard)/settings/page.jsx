@@ -740,15 +740,6 @@ function ConnectionsTab() {
           <Tab
             label={
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <img src='/images/hyperv-logo.svg' alt='' width={18} height={18} />
-                <span>Microsoft Hyper-V</span>
-                <Chip size='small' label='Soon' sx={{ height: 18, fontSize: 10, ml: 0.5, bgcolor: '#00ADEF', color: '#fff' }} />
-              </Box>
-            }
-          />
-          <Tab
-            label={
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <img src='/images/xcpng-logo.svg' alt='' width={18} height={18} />
                 <span>XCP-ng</span>
                 <Chip size='small' label='Soon' sx={{ height: 18, fontSize: 10, ml: 0.5, bgcolor: '#00B9E6', color: '#fff' }} />
@@ -760,7 +751,16 @@ function ConnectionsTab() {
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <img src='/images/nutanix-logo.svg' alt='' width={18} height={18} />
                 <span>Nutanix</span>
-                <Chip size='small' label='Soon' sx={{ height: 18, fontSize: 10, ml: 0.5, bgcolor: '#0D47A1', color: '#fff' }} />
+                <Chip size='small' label='Soon' sx={{ height: 18, fontSize: 10, ml: 0.5, bgcolor: '#00B9E6', color: '#fff' }} />
+              </Box>
+            }
+          />
+          <Tab
+            label={
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <img src='/images/hyperv-logo.svg' alt='' width={18} height={18} />
+                <span>Microsoft Hyper-V</span>
+                <Chip size='small' label='Soon' sx={{ height: 18, fontSize: 10, ml: 0.5, bgcolor: '#00B9E6', color: '#fff' }} />
               </Box>
             }
           />
@@ -897,20 +897,8 @@ function ConnectionsTab() {
         </Box>
       </SubTabPanel>
 
-      {/* Microsoft Hyper-V Tab - Coming Soon */}
-      <SubTabPanel value={connTab} index={3}>
-        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 8, gap: 2 }}>
-          <img src='/images/hyperv-logo.svg' alt='Hyper-V' width={64} height={64} style={{ opacity: 0.5 }} />
-          <Typography variant='h6' sx={{ opacity: 0.7 }}>Microsoft Hyper-V</Typography>
-          <Chip label='Coming Soon' color='info' />
-          <Typography variant='body2' sx={{ opacity: 0.5, maxWidth: 400, textAlign: 'center' }}>
-            {t('settings.hypervComingSoonDesc')}
-          </Typography>
-        </Box>
-      </SubTabPanel>
-
       {/* XCP-ng Tab - Coming Soon */}
-      <SubTabPanel value={connTab} index={4}>
+      <SubTabPanel value={connTab} index={3}>
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 8, gap: 2 }}>
           <img src='/images/xcpng-logo.svg' alt='XCP-ng' width={64} height={64} style={{ opacity: 0.5 }} />
           <Typography variant='h6' sx={{ opacity: 0.7 }}>XCP-ng</Typography>
@@ -922,13 +910,25 @@ function ConnectionsTab() {
       </SubTabPanel>
 
       {/* Nutanix Tab - Coming Soon */}
-      <SubTabPanel value={connTab} index={5}>
+      <SubTabPanel value={connTab} index={4}>
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 8, gap: 2 }}>
           <img src='/images/nutanix-logo.svg' alt='Nutanix' width={64} height={64} style={{ opacity: 0.5 }} />
           <Typography variant='h6' sx={{ opacity: 0.7 }}>Nutanix</Typography>
           <Chip label='Coming Soon' color='info' />
           <Typography variant='body2' sx={{ opacity: 0.5, maxWidth: 400, textAlign: 'center' }}>
             {t('settings.nutanixComingSoonDesc')}
+          </Typography>
+        </Box>
+      </SubTabPanel>
+
+      {/* Microsoft Hyper-V Tab - Coming Soon */}
+      <SubTabPanel value={connTab} index={5}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 8, gap: 2 }}>
+          <img src='/images/hyperv-logo.svg' alt='Hyper-V' width={64} height={64} style={{ opacity: 0.5 }} />
+          <Typography variant='h6' sx={{ opacity: 0.7 }}>Microsoft Hyper-V</Typography>
+          <Chip label='Coming Soon' color='info' />
+          <Typography variant='body2' sx={{ opacity: 0.5, maxWidth: 400, textAlign: 'center' }}>
+            {t('settings.hypervComingSoonDesc')}
           </Typography>
         </Box>
       </SubTabPanel>
