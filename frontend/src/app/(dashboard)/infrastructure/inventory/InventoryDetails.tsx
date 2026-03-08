@@ -4605,7 +4605,7 @@ return vm?.isCluster ?? false
       ) : null}
 
       {selection && data ? (
-        <Stack spacing={2} sx={{ width: '100%' }}>
+        <Stack spacing={2} sx={{ width: '100%', flex: 1, overflow: 'auto', minHeight: 0 }}>
           {/* Header title + tags (VM only) + ACTIONS TOP RIGHT */}
           {selection?.type === 'vm' ? (
 
@@ -5926,20 +5926,6 @@ return vm?.isCluster ?? false
                         </Box>
                       </Box>
 
-                      {/* Linear bar below */}
-                      <Box sx={{ mt: 2, height: 8, bgcolor: 'action.hover', borderRadius: 1, overflow: 'hidden' }}>
-                        <Box sx={{
-                          width: `${si.usedPct}%`,
-                          height: '100%',
-                          background: si.usedPct > 90
-                            ? 'linear-gradient(90deg, #ef4444 0%, #dc2626 100%)'
-                            : si.usedPct > 70
-                            ? 'linear-gradient(90deg, #22c55e 0%, #eab308 100%)'
-                            : 'linear-gradient(90deg, #22c55e 0%, #16a34a 100%)',
-                          borderRadius: 1,
-                          transition: 'width 0.3s ease',
-                        }} />
-                      </Box>
                     </CardContent>
                   </Card>
                 )}

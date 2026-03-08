@@ -3137,16 +3137,40 @@ return (
                 </Box>
               )
 
+              // Standalone (1 node) : flatten — no intermediate node level
+              if (!cs.isCluster && cs.nodes.length <= 1) {
+                const allStorages = [...cs.sharedStorages, ...(cs.nodes[0]?.storages || [])]
+                return (
+                  <TreeItem
+                    key={`storage-cluster:${cs.connId}`}
+                    itemId={`storage-cluster:${cs.connId}`}
+                    label={
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                        <img src={theme.palette.mode === 'dark' ? '/images/proxmox-logo-dark.svg' : '/images/proxmox-logo.svg'} alt="" width={14} height={14} style={{ opacity: 0.8 }} />
+                        <span style={{ fontSize: 14 }}>{cs.connName}</span>
+                        <span style={{ opacity: 0.4, fontSize: 11 }}>({allStorages.length})</span>
+                      </Box>
+                    }
+                  >
+                    {allStorages.map(s => (
+                      <TreeItem
+                        key={`storage:${cs.connId}:${s.storage}:${s.node}`}
+                        itemId={`storage:${cs.connId}:${s.storage}:${s.node}`}
+                        label={storageLabel(s)}
+                      />
+                    ))}
+                  </TreeItem>
+                )
+              }
+
+              // Cluster (multi-nodes) : cluster > shared + per-node local storages
               return (
                 <TreeItem
                   key={`storage-cluster:${cs.connId}`}
                   itemId={`storage-cluster:${cs.connId}`}
                   label={
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                      {cs.isCluster
-                        ? <i className="ri-server-fill" style={{ opacity: 0.8, fontSize: 14 }} />
-                        : <img src={theme.palette.mode === 'dark' ? '/images/proxmox-logo-dark.svg' : '/images/proxmox-logo.svg'} alt="" width={14} height={14} style={{ opacity: 0.8 }} />
-                      }
+                      <i className="ri-server-fill" style={{ opacity: 0.8, fontSize: 14 }} />
                       <span style={{ fontSize: 14 }}>{cs.connName}</span>
                     </Box>
                   }
