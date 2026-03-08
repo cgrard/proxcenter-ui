@@ -85,6 +85,32 @@ type ClusterData = {
   nodes: Array<NodeData & { guests: GuestData[] }>
 }
 
+type StorageItem = {
+  storage: string
+  node: string
+  type: string           // dir, lvm, lvmthin, zfspool, rbd, cephfs, nfs, cifs, etc.
+  shared: boolean
+  content: string[]      // images, rootdir, iso, backup, snippets, vztmpl
+  used: number
+  total: number
+  usedPct: number
+  status: string         // active, inactive
+  enabled: boolean
+  path?: string
+}
+
+type StorageData = {
+  connId: string
+  connName: string
+  isCluster: boolean
+  nodes: Array<{
+    node: string
+    status: string
+    storages: StorageItem[]
+  }>
+  sharedStorages: StorageItem[]
+}
+
 type PbsDatastoreData = {
   name: string
   path?: string
@@ -276,6 +302,100 @@ async function fetchOneCluster(conn: {
   }
 }
 
+async function fetchStoragesForCluster(conn: {
+  id: string; name: string; type: string
+}, clusterData: ClusterData): Promise<StorageData> {
+  try {
+    const connConfig = await getConnectionById(conn.id)
+
+    // Fetch storage resources (per-node status) and storage config (content types, shared flag)
+    const [resourcesResult, configResult] = await Promise.allSettled([
+      pveFetch<any[]>(connConfig, '/cluster/resources?type=storage'),
+      pveFetch<any[]>(connConfig, '/storage'),
+    ])
+
+    const resources: any[] = resourcesResult.status === 'fulfilled' ? resourcesResult.value || [] : []
+    const configs: any[] = configResult.status === 'fulfilled' ? configResult.value || [] : []
+
+    // Build config lookup map
+    const configMap = new Map<string, any>()
+    for (const cfg of configs) {
+      if (cfg?.storage) configMap.set(cfg.storage, cfg)
+    }
+
+    // Build storage items from resources (these have per-node usage data)
+    const allItems: StorageItem[] = []
+    for (const r of resources) {
+      if (!r?.storage || !r?.node) continue
+      const cfg = configMap.get(r.storage)
+      const contentStr: string = cfg?.content || r?.content || ''
+      const shared = cfg?.shared === 1 || cfg?.shared === true || false
+      const enabled = r?.status === 'available' || r?.enabled !== 0
+
+      allItems.push({
+        storage: r.storage,
+        node: r.node,
+        type: cfg?.type || r?.plugintype || 'unknown',
+        shared,
+        content: contentStr ? contentStr.split(',').map((s: string) => s.trim()).filter(Boolean) : [],
+        used: r.used || r.disk || 0,
+        total: r.maxdisk || r.total || 0,
+        usedPct: r.maxdisk > 0 ? Math.round((r.used || r.disk || 0) / r.maxdisk * 100) : 0,
+        status: r.status === 'available' ? 'active' : 'inactive',
+        enabled,
+        path: cfg?.path,
+      })
+    }
+
+    // Separate shared vs local storages
+    // For shared storages, pick one representative entry (they have same config but per-node usage)
+    const sharedSet = new Map<string, StorageItem>()
+    const nodeStorages = new Map<string, StorageItem[]>()
+
+    for (const item of allItems) {
+      if (item.shared) {
+        // For shared storages, aggregate usage across nodes
+        if (!sharedSet.has(item.storage)) {
+          sharedSet.set(item.storage, { ...item, node: '' })
+        } else {
+          // Keep max usage info
+          const existing = sharedSet.get(item.storage)!
+          existing.used = Math.max(existing.used, item.used)
+          existing.total = Math.max(existing.total, item.total)
+          existing.usedPct = existing.total > 0 ? Math.round(existing.used / existing.total * 100) : 0
+        }
+      } else {
+        if (!nodeStorages.has(item.node)) nodeStorages.set(item.node, [])
+        nodeStorages.get(item.node)!.push(item)
+      }
+    }
+
+    // Build nodes array from cluster data
+    const nodes = clusterData.nodes.map(n => ({
+      node: n.node,
+      status: n.status,
+      storages: (nodeStorages.get(n.node) || []).sort((a, b) => a.storage.localeCompare(b.storage)),
+    }))
+
+    return {
+      connId: conn.id,
+      connName: conn.name,
+      isCluster: clusterData.isCluster,
+      nodes: nodes.sort((a, b) => a.node.localeCompare(b.node)),
+      sharedStorages: Array.from(sharedSet.values()).sort((a, b) => a.storage.localeCompare(b.storage)),
+    }
+  } catch (e: any) {
+    console.error(`[inventory-stream] Failed to load storages for ${conn.name}:`, e?.message)
+    return {
+      connId: conn.id,
+      connName: conn.name,
+      isCluster: false,
+      nodes: [],
+      sharedStorages: [],
+    }
+  }
+}
+
 async function fetchOnePbs(conn: { id: string; name: string }): Promise<PbsServerData> {
   try {
     const connConfig = await getPbsConnectionById(conn.id)
@@ -419,6 +539,11 @@ export async function GET(request: NextRequest) {
         for (const pbs of cached.pbsServers) {
           send('pbs', pbs)
         }
+        if (cached.storages) {
+          for (const storage of cached.storages) {
+            send('storage', storage)
+          }
+        }
         if (cached.externalHypervisors.length > 0) {
           send('external', cached.externalHypervisors)
         }
@@ -488,11 +613,17 @@ export async function GET(request: NextRequest) {
         // Fire all fetches concurrently — each sends its event as soon as ready
         const allClusters: ClusterData[] = []
         const allPbsServers: PbsServerData[] = []
+        const allStorages: StorageData[] = []
 
         const clusterPromises = pveConnections.map(async (conn) => {
           const cluster = await fetchOneCluster(conn)
           allClusters.push(cluster)
           send('cluster', applyRbacToCluster(cluster, rbacCtx))
+
+          // Fetch storage data for this cluster and emit immediately
+          const storageData = await fetchStoragesForCluster(conn, cluster)
+          allStorages.push(storageData)
+          send('storage', storageData)
         })
 
         const pbsPromises = pbsConnections.map(async (conn) => {
@@ -535,6 +666,7 @@ export async function GET(request: NextRequest) {
           clusters: allClusters,
           pbsServers: allPbsServers,
           externalHypervisors: externalConnections,
+          storages: allStorages,
           stats,
         })
 

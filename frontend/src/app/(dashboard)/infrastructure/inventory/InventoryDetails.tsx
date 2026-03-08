@@ -113,6 +113,119 @@ import NodeTabs from './tabs/NodeTabs'
 
 
 /* ------------------------------------------------------------------ */
+/* Storage content group with search + sort                           */
+/* ------------------------------------------------------------------ */
+
+function StorageContentGroup({ group, formatBytes: fmt }: {
+  group: { label: string; icon: string; items: any[] }
+  formatBytes: (n: number) => string
+}) {
+  const [search, setSearch] = React.useState('')
+  const [sortDir, setSortDir] = React.useState<'asc' | 'desc' | null>(null)
+
+  const filtered = React.useMemo(() => {
+    let items = group.items
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      items = items.filter((item: any) => {
+        const volid = String(item.volid || '').toLowerCase()
+        const vmid = item.vmid ? String(item.vmid) : ''
+        return volid.includes(q) || vmid.includes(q)
+      })
+    }
+    if (sortDir) {
+      items = [...items].sort((a: any, b: any) =>
+        sortDir === 'asc' ? (a.size || 0) - (b.size || 0) : (b.size || 0) - (a.size || 0)
+      )
+    }
+    return items
+  }, [group.items, search, sortDir])
+
+  return (
+    <Card variant="outlined" sx={{ borderRadius: 2 }}>
+      <CardContent sx={{ p: 0, '&:last-child': { pb: 0 } }}>
+        <Box sx={{ px: 2, py: 1.5, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Typography fontWeight={900} sx={{ display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
+            <i className={group.icon} style={{ fontSize: 18, opacity: 0.7 }} />
+            {group.label} ({group.items.length})
+          </Typography>
+          <Box sx={{ flex: 1 }} />
+          <IconButton
+            size="small"
+            onClick={() => setSortDir(prev => prev === 'asc' ? 'desc' : prev === 'desc' ? null : 'asc')}
+            sx={{ opacity: sortDir ? 1 : 0.4, p: 0.5 }}
+            title="Sort by size"
+          >
+            <i className={sortDir === 'asc' ? 'ri-sort-asc' : sortDir === 'desc' ? 'ri-sort-desc' : 'ri-arrow-up-down-line'} style={{ fontSize: 16 }} />
+          </IconButton>
+          <Box sx={{
+            display: 'flex', alignItems: 'center', gap: 0.5,
+            border: '1px solid', borderColor: 'divider', borderRadius: 1,
+            px: 1, py: 0.25, maxWidth: 180,
+          }}>
+            <i className="ri-search-line" style={{ fontSize: 13, opacity: 0.4 }} />
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search..."
+              style={{
+                border: 'none', outline: 'none', background: 'transparent',
+                fontSize: 12, width: '100%', color: 'inherit',
+                fontFamily: 'Inter, sans-serif',
+              }}
+            />
+            {search && (
+              <i className="ri-close-line" style={{ fontSize: 13, opacity: 0.4, cursor: 'pointer' }} onClick={() => setSearch('')} />
+            )}
+          </Box>
+        </Box>
+        <Box sx={{ maxHeight: 400, overflow: 'auto' }}>
+          {filtered.length === 0 ? (
+            <Box sx={{ px: 2, py: 2, textAlign: 'center' }}>
+              <Typography variant="caption" sx={{ opacity: 0.4 }}>No results</Typography>
+            </Box>
+          ) : filtered.map((item: any, idx: number) => {
+            const volParts = String(item.volid || '').split(':')
+            const volPath = volParts.length > 1 ? volParts.slice(1).join(':') : item.volid
+            const fileName = volPath?.split('/')?.pop() || volPath
+
+            return (
+              <Box
+                key={item.volid || idx}
+                sx={{
+                  px: 2, py: 0.5,
+                  borderBottom: '1px solid', borderColor: 'divider',
+                  '&:last-child': { borderBottom: 'none' },
+                  '&:hover': { bgcolor: 'action.hover' },
+                  display: 'flex', alignItems: 'center', gap: 1,
+                }}
+              >
+                <i className={group.icon} style={{ fontSize: 12, opacity: 0.4, flexShrink: 0 }} />
+                <Typography variant="body2" sx={{ flex: 1, minWidth: 0, fontSize: 12, fontFamily: 'JetBrains Mono, monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {fileName}
+                </Typography>
+                {item.vmid && (
+                  <Typography variant="caption" sx={{ opacity: 0.4, flexShrink: 0, fontSize: 10 }}>
+                    VM {item.vmid}
+                  </Typography>
+                )}
+                <Typography variant="caption" sx={{ opacity: 0.4, flexShrink: 0, fontFamily: 'JetBrains Mono, monospace', fontSize: 10 }}>
+                  {item.format || ''}
+                </Typography>
+                <Typography variant="body2" sx={{ opacity: 0.6, flexShrink: 0, fontFamily: 'JetBrains Mono, monospace', fontSize: 11 }}>
+                  {item.size ? fmt(item.size) : ''}
+                </Typography>
+              </Box>
+            )
+          })}
+        </Box>
+      </CardContent>
+    </Card>
+  )
+}
+
+/* ------------------------------------------------------------------ */
 /* Main component                                                     */
 /* ------------------------------------------------------------------ */
 
@@ -4799,7 +4912,7 @@ return vm?.isCluster ?? false
             </>
           )}
 
-          {selection?.type !== 'ext' && selection?.type !== 'extvm' && (<>
+          {selection?.type !== 'ext' && selection?.type !== 'extvm' && selection?.type !== 'storage' && (<>
           <Divider />
 
           <InventorySummary
@@ -5704,6 +5817,180 @@ return vm?.isCluster ?? false
               </CardContent>
             </Card>
           )}
+
+          {/* ── Storage Detail Panel ── */}
+          {selection?.type === 'storage' && data.storageInfo && (() => {
+            const si = data.storageInfo
+            const isCeph = si.type === 'rbd' || si.type === 'cephfs'
+            const typeLabels: Record<string, string> = {
+              rbd: 'Ceph RBD', cephfs: 'CephFS', nfs: 'NFS', cifs: 'SMB/CIFS',
+              zfspool: 'ZFS', zfs: 'ZFS over iSCSI', lvm: 'LVM', lvmthin: 'LVM-Thin',
+              dir: 'Directory', iscsi: 'iSCSI', glusterfs: 'GlusterFS', pbs: 'PBS',
+            }
+            const storageTypeIcon = (type: string) => {
+              if (type === 'rbd' || type === 'cephfs') return null // use img
+              if (type === 'nfs' || type === 'cifs') return 'ri-folder-shared-fill'
+              if (type === 'zfspool' || type === 'zfs') return 'ri-stack-fill'
+              if (type === 'lvm' || type === 'lvmthin') return 'ri-hard-drive-2-fill'
+              if (type === 'dir') return 'ri-folder-fill'
+              return 'ri-hard-drive-fill'
+            }
+            const storageTypeColor = (type: string) => {
+              if (type === 'nfs' || type === 'cifs') return '#3498db'
+              if (type === 'zfspool' || type === 'zfs') return '#2ecc71'
+              if (type === 'lvm' || type === 'lvmthin') return '#e67e22'
+              return '#95a5a6'
+            }
+
+            // Group content items by type
+            const groups: Record<string, { label: string; icon: string; items: any[] }> = {}
+            const contentLabelMap: Record<string, { label: string; icon: string }> = {
+              images: { label: t('inventory.storageVmDisks'), icon: 'ri-hard-drive-3-line' },
+              rootdir: { label: t('inventory.storageCtVolumes'), icon: 'ri-archive-line' },
+              iso: { label: t('inventory.storageIsoImages'), icon: 'ri-disc-line' },
+              backup: { label: t('inventory.storageBackups'), icon: 'ri-shield-check-line' },
+              snippets: { label: t('inventory.storageSnippets'), icon: 'ri-code-s-slash-line' },
+              vztmpl: { label: t('inventory.storageTemplates'), icon: 'ri-file-copy-line' },
+            }
+
+            for (const item of si.contentItems || []) {
+              const ct = item.content || 'other'
+              if (!groups[ct]) {
+                const cfg = contentLabelMap[ct] || { label: ct, icon: 'ri-file-line' }
+                groups[ct] = { label: cfg.label, icon: cfg.icon, items: [] }
+              }
+              groups[ct].items.push(item)
+            }
+
+            // Sort items in each group
+            for (const g of Object.values(groups)) {
+              g.items.sort((a: any, b: any) => (b.ctime || 0) - (a.ctime || 0))
+            }
+
+            return (
+              <Stack spacing={2}>
+                {/* Usage chart card */}
+                {si.total > 0 && (
+                  <Card variant="outlined" sx={{ borderRadius: 2 }}>
+                    <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                      <Typography fontWeight={900} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                        {isCeph
+                          ? <img src="/images/ceph-logo.svg" alt="" width={18} height={18} />
+                          : <i className={storageTypeIcon(si.type) || 'ri-hard-drive-fill'} style={{ fontSize: 18, color: storageTypeColor(si.type) }} />
+                        }
+                        {t('inventory.storageUsage')}
+                      </Typography>
+
+                      {/* Donut-style usage bar */}
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                        {/* Circular gauge */}
+                        <Box sx={{ position: 'relative', width: 100, height: 100, flexShrink: 0 }}>
+                          <CircularProgress
+                            variant="determinate"
+                            value={100}
+                            size={100}
+                            thickness={6}
+                            sx={{ color: 'action.hover', position: 'absolute' }}
+                          />
+                          <CircularProgress
+                            variant="determinate"
+                            value={si.usedPct}
+                            size={100}
+                            thickness={6}
+                            sx={{
+                              color: si.usedPct > 90 ? 'error.main' : si.usedPct > 70 ? 'warning.main' : 'success.main',
+                              position: 'absolute',
+                            }}
+                          />
+                          <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column' }}>
+                            <Typography variant="h6" fontWeight={900} sx={{ lineHeight: 1 }}>{si.usedPct}%</Typography>
+                            <Typography variant="caption" sx={{ opacity: 0.5, fontSize: 10 }}>used</Typography>
+                          </Box>
+                        </Box>
+
+                        {/* Legend */}
+                        <Box sx={{ flex: 1 }}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                            <Typography variant="body2" sx={{ opacity: 0.7 }}>Used</Typography>
+                            <Typography variant="body2" fontWeight={600}>{formatBytes(si.used)}</Typography>
+                          </Box>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                            <Typography variant="body2" sx={{ opacity: 0.7 }}>Free</Typography>
+                            <Typography variant="body2" fontWeight={600}>{formatBytes(si.total - si.used)}</Typography>
+                          </Box>
+                          <Divider sx={{ my: 0.5 }} />
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <Typography variant="body2" sx={{ opacity: 0.7 }}>Total</Typography>
+                            <Typography variant="body2" fontWeight={700}>{formatBytes(si.total)}</Typography>
+                          </Box>
+                        </Box>
+                      </Box>
+
+                      {/* Linear bar below */}
+                      <Box sx={{ mt: 2, height: 8, bgcolor: 'action.hover', borderRadius: 1, overflow: 'hidden' }}>
+                        <Box sx={{
+                          width: `${si.usedPct}%`,
+                          height: '100%',
+                          background: si.usedPct > 90
+                            ? 'linear-gradient(90deg, #ef4444 0%, #dc2626 100%)'
+                            : si.usedPct > 70
+                            ? 'linear-gradient(90deg, #22c55e 0%, #eab308 100%)'
+                            : 'linear-gradient(90deg, #22c55e 0%, #16a34a 100%)',
+                          borderRadius: 1,
+                          transition: 'width 0.3s ease',
+                        }} />
+                      </Box>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Properties card */}
+                <Card variant="outlined" sx={{ borderRadius: 2 }}>
+                  <CardContent sx={{ p: 0, '&:last-child': { pb: 0 } }}>
+                    <Box sx={{ px: 2, py: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}>
+                      <Typography fontWeight={900} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <i className="ri-information-line" style={{ fontSize: 18, opacity: 0.7 }} />
+                        {t('inventory.storageProperties')}
+                      </Typography>
+                    </Box>
+                    <Box>
+                      {[
+                        { k: 'Type', v: typeLabels[si.type] || si.type },
+                        { k: 'Shared', v: si.shared ? 'Yes' : 'No' },
+                        { k: 'Status', v: si.enabled ? 'Enabled' : 'Disabled' },
+                        { k: 'Content types', v: si.content.join(', ') || '-' },
+                        ...(si.node && !si.shared ? [{ k: 'Node', v: si.node }] : []),
+                        ...(si.nodes && si.nodes.length > 1 ? [{ k: 'Nodes', v: si.nodes.join(', ') }] : []),
+                        ...(si.path ? [{ k: 'Path', v: si.path }] : []),
+                        ...(si.server ? [{ k: 'Server', v: si.server }] : []),
+                        ...(si.pool ? [{ k: 'Pool', v: si.pool }] : []),
+                        ...(si.monhost ? [{ k: 'Monitor Host', v: si.monhost }] : []),
+                      ].map(({ k, v }) => (
+                        <Box key={k} sx={{ display: 'flex', px: 2, py: 1, borderBottom: '1px solid', borderColor: 'divider', '&:last-child': { borderBottom: 'none' } }}>
+                          <Typography variant="body2" sx={{ opacity: 0.5, width: 130, flexShrink: 0, fontSize: 13 }}>{k}</Typography>
+                          <Typography variant="body2" sx={{ fontSize: 13, fontFamily: 'JetBrains Mono, monospace' }}>{v}</Typography>
+                        </Box>
+                      ))}
+                    </Box>
+                  </CardContent>
+                </Card>
+
+                {/* Content items grouped by type */}
+                {Object.keys(groups).length > 0 ? Object.entries(groups).map(([contentType, group]) => (
+                  <StorageContentGroup key={contentType} group={group} formatBytes={formatBytes} />
+                )) : (si.contentItems || []).length === 0 && (
+                  <Card variant="outlined" sx={{ borderRadius: 2 }}>
+                    <CardContent sx={{ p: 3, textAlign: 'center' }}>
+                      <i className="ri-folder-open-line" style={{ fontSize: 36, opacity: 0.2 }} />
+                      <Typography variant="body2" sx={{ opacity: 0.5, mt: 1 }}>
+                        {t('inventory.storageEmpty')}
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                )}
+              </Stack>
+            )
+          })()}
 
           {/* External Host — VM List with Migrate buttons */}
           {selection?.type === 'ext' && data.esxiHostInfo && (() => {

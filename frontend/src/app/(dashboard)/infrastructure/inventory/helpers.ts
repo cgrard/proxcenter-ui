@@ -1158,11 +1158,134 @@ return Number.isFinite(num) ? num.toFixed(2) : String(v)
     }
   }
 
+  // Storage item: id = connId:storageName or connId:storageName:node
+  if (sel.type === 'storage') {
+    const parts = sel.id.split(':')
+    const connId = parts[0]
+    const storageName = parts[1]
+    const nodeHint = parts[2] || null // null for shared storages
+
+    // Fetch connection info + storage details
+    const [connR, storageR, nodesR] = await Promise.all([
+      fetch(`/api/v1/connections/${encodeURIComponent(connId)}`, { cache: 'no-store' }).catch(() => null),
+      fetch(`/api/v1/connections/${encodeURIComponent(connId)}/storage`, { cache: 'no-store' }).catch(() => null),
+      fetch(`/api/v1/connections/${encodeURIComponent(connId)}/nodes`, { cache: 'no-store' }).catch(() => null),
+    ])
+
+    let connName = connId
+    if (connR?.ok) {
+      try {
+        const json = await connR.json()
+        connName = json?.name || json?.data?.name || connId
+      } catch {}
+    }
+
+    let storageData: any = null
+    if (storageR?.ok) {
+      try {
+        const json = await storageR.json()
+        const storages = json?.data || []
+        // Match by storage name (+ node for local storages)
+        storageData = storages.find((s: any) =>
+          s.storage === storageName && (nodeHint ? s.node === nodeHint : s.shared)
+        ) || storages.find((s: any) => s.storage === storageName)
+      } catch {}
+    }
+
+    // Determine a node to use for content listing
+    let contentNode = nodeHint
+    if (!contentNode && nodesR?.ok) {
+      try {
+        const json = await nodesR.json()
+        const nodes = asArray<any>(safeJson(json))
+        const onlineNode = nodes.find((n: any) => n.status === 'online')
+        contentNode = onlineNode?.node || nodes[0]?.node || null
+      } catch {}
+    }
+
+    // Fetch storage content (volumes, ISOs, etc.)
+    let contentItems: any[] = []
+    if (contentNode) {
+      try {
+        const contentR = await fetch(
+          `/api/v1/connections/${encodeURIComponent(connId)}/nodes/${encodeURIComponent(contentNode)}/storage/${encodeURIComponent(storageName)}/content`,
+          { cache: 'no-store' }
+        )
+        if (contentR.ok) {
+          const json = await contentR.json()
+          contentItems = json?.data || []
+        }
+      } catch {}
+    }
+
+    const used = storageData?.used || 0
+    const total = storageData?.total || 0
+    const usedPct = storageData?.usedPct || (total > 0 ? Math.round((used / total) * 100) : 0)
+    const storageType = storageData?.type || 'unknown'
+    const shared = storageData?.shared || false
+    const content = storageData?.content || []
+    const enabled = storageData?.enabled !== false
+
+    const typeLabels: Record<string, string> = {
+      rbd: 'Ceph RBD', cephfs: 'CephFS', nfs: 'NFS', cifs: 'SMB/CIFS',
+      zfspool: 'ZFS', zfs: 'ZFS over iSCSI', lvm: 'LVM', lvmthin: 'LVM-Thin',
+      dir: 'Directory', iscsi: 'iSCSI', iscsidirect: 'iSCSI Direct',
+      glusterfs: 'GlusterFS', pbs: 'Proxmox Backup Server',
+    }
+
+    return {
+      kindLabel: 'STORAGE',
+      title: storageName,
+      subtitle: `${typeLabels[storageType] || storageType}${shared ? ' (shared)' : ''} — ${connName}`,
+      breadcrumb: ['Infrastructure', 'Inventaire', 'Storage', connName, storageName],
+      status: enabled ? 'ok' : 'warn',
+      tags: content,
+      kpis: [
+        { label: 'Type', value: typeLabels[storageType] || storageType },
+        { label: 'Shared', value: shared ? 'Yes' : 'No' },
+        ...(contentNode && !shared ? [{ label: 'Node', value: contentNode }] : []),
+        ...(storageData?.nodes?.length > 1 ? [{ label: 'Nodes', value: String(storageData.nodes.length) }] : []),
+      ],
+      metrics: total > 0 ? {
+        storage: { label: 'Storage', pct: usedPct, used, max: total },
+      } : undefined,
+      properties: [
+        ...(storageData?.path ? [{ k: 'Path', v: storageData.path }] : []),
+        ...(storageData?.server ? [{ k: 'Server', v: storageData.server }] : []),
+        ...(storageData?.pool ? [{ k: 'Pool', v: storageData.pool }] : []),
+        ...(storageData?.monhost ? [{ k: 'Monitor Host', v: storageData.monhost }] : []),
+        ...(storageData?.nodes ? [{ k: 'Available on', v: storageData.nodes.join(', ') }] : []),
+        { k: 'Content types', v: content.join(', ') || 'none' },
+      ],
+      lastUpdated,
+      storageInfo: {
+        connId,
+        connName,
+        storage: storageName,
+        node: contentNode || '',
+        type: storageType,
+        shared,
+        content,
+        enabled,
+        status: enabled ? 'available' : 'disabled',
+        used,
+        total,
+        usedPct,
+        path: storageData?.path,
+        server: storageData?.server,
+        pool: storageData?.pool,
+        monhost: storageData?.monhost,
+        nodes: storageData?.nodes,
+        contentItems,
+      },
+    }
+  }
+
   return {
-    kindLabel: 'STORAGE',
+    kindLabel: 'UNKNOWN',
     title: sel.id,
     subtitle: '',
-    breadcrumb: ['Infrastructure', 'Inventaire', 'Storage', sel.id],
+    breadcrumb: ['Infrastructure', 'Inventaire', sel.id],
     status: 'ok',
     tags: [],
     kpis: [],

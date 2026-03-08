@@ -319,6 +319,32 @@ type TreeCluster = {
   }[]
 }
 
+type TreeStorageItem = {
+  storage: string
+  node: string
+  type: string
+  shared: boolean
+  content: string[]
+  used: number
+  total: number
+  usedPct: number
+  status: string
+  enabled: boolean
+  path?: string
+}
+
+type TreeClusterStorage = {
+  connId: string
+  connName: string
+  isCluster: boolean
+  nodes: Array<{
+    node: string
+    status: string
+    storages: TreeStorageItem[]
+  }>
+  sharedStorages: TreeStorageItem[]
+}
+
 type TreePbsDatastore = {
   name: string
   path?: string
@@ -776,6 +802,7 @@ export default function InventoryTree({ selected, onSelect, onRefreshRef, viewMo
   const [clusters, setClusters] = useState<TreeCluster[]>([])
   const [pbsServers, setPbsServers] = useState<TreePbsServer[]>([])
   const [externalHypervisors, setExternalHypervisors] = useState<{ id: string; name: string; type: string; vms?: { vmid: string; name: string; status: string; cpu?: number; memory_size_MiB?: number; guest_OS?: string }[] }[]>([])
+  const [clusterStorages, setClusterStorages] = useState<TreeClusterStorage[]>([])
   const [reloadTick, setReloadTick] = useState(0)
   
   // Helper pour vérifier si une VM est en migration
@@ -1578,11 +1605,13 @@ return next
       const isRefresh = reloadTick > 0
       const accClusters: TreeCluster[] = []
       const accPbs: TreePbsServer[] = []
+      const accStorages: TreeClusterStorage[] = []
 
       if (!isRefresh) {
         setClusters([])
         setPbsServers([])
         setExternalHypervisors([])
+        setClusterStorages([])
         setLoading(true)
       }
 
@@ -1606,6 +1635,15 @@ return next
           accPbs.push(tree)
           if (!gotFirstData) { gotFirstData = true; setLoading(false) }
           if (!isRefresh) setPbsServers([...accPbs].sort((a, b) => a.name.localeCompare(b.name)))
+        } catch { /* ignore */ }
+      })
+
+      eventSource.addEventListener('storage', (e) => {
+        if (!alive) return
+        try {
+          const storageData: TreeClusterStorage = JSON.parse(e.data)
+          accStorages.push(storageData)
+          if (!isRefresh) setClusterStorages([...accStorages].sort((a, b) => a.connName.localeCompare(b.connName)))
         } catch { /* ignore */ }
       })
 
@@ -1646,6 +1684,7 @@ return next
         if (isRefresh) {
           setClusters(sortClusters([...accClusters]))
           setPbsServers([...accPbs].sort((a, b) => a.name.localeCompare(b.name)))
+          setClusterStorages([...accStorages].sort((a, b) => a.connName.localeCompare(b.connName)))
         }
         eventSource?.close()
         eventSource = null
@@ -2836,18 +2875,21 @@ return (
           </Box>
         ) : null}
 
-        {/* Séparateur Proxmox VE */}
+        {/* ── Proxmox VE Section ── */}
         {filteredClusters.length > 0 && (
           <Box
             onClick={() => toggleSection('pve')}
-            sx={{ display: 'flex', alignItems: 'center', gap: 0.75, px: 1, py: 0.5, opacity: 0.6, cursor: 'pointer', userSelect: 'none', '&:hover': { opacity: 0.9 } }}
+            sx={{
+              display: 'flex', alignItems: 'center', gap: 1, px: 1.5, py: 0.75, mt: 1,
+              bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',
+              borderTop: '1px solid', borderBottom: '1px solid', borderColor: 'divider',
+              cursor: 'pointer', '&:hover': { bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.09)' },
+            }}
           >
-            <i className={collapsedSections.has('pve') ? 'ri-arrow-right-s-line' : 'ri-arrow-down-s-line'} style={{ fontSize: 14, flexShrink: 0 }} />
-            <img src={theme.palette.mode === 'dark' ? '/images/proxmox-logo-dark.svg' : '/images/proxmox-logo.svg'} alt="" style={{ width: 12, height: 12 }} />
-            <Typography variant="caption" fontWeight={600} sx={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-              Proxmox VE
-            </Typography>
-            <Typography variant="caption" sx={{ fontSize: 10, opacity: 0.8 }}>
+            <i className={collapsedSections.has('pve') ? 'ri-add-line' : 'ri-subtract-line'} style={{ fontSize: 14, opacity: 0.7 }} />
+            <img src={theme.palette.mode === 'dark' ? '/images/proxmox-logo-dark.svg' : '/images/proxmox-logo.svg'} alt="" style={{ width: 14, height: 14 }} />
+            <Typography variant="body2" sx={{ fontWeight: 700 }}>{t('inventory.headerProxmoxVe')}</Typography>
+            <Typography variant="caption" sx={{ opacity: 0.5 }}>
               ({(() => {
                 const realClusters = filteredClusters.filter(c => c.isCluster).length
                 const totalNodes = filteredClusters.reduce((acc, c) => acc + c.nodes.length, 0)
@@ -3034,20 +3076,134 @@ return (
         })}
         </Collapse>
 
-        {/* Serveurs PBS (Proxmox Backup Server) */}
+        {/* ── Proxmox Storage Section ── */}
+        {clusterStorages.length > 0 && (
+          <>
+            <Box
+              onClick={() => toggleSection('storage')}
+              sx={{
+                display: 'flex', alignItems: 'center', gap: 1, px: 1.5, py: 0.75, mt: 1,
+                bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',
+                borderTop: '1px solid', borderBottom: '1px solid', borderColor: 'divider',
+                cursor: 'pointer', '&:hover': { bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.09)' },
+              }}
+            >
+              <i className={collapsedSections.has('storage') ? 'ri-add-line' : 'ri-subtract-line'} style={{ fontSize: 14, opacity: 0.7 }} />
+              <i className="ri-hard-drive-3-fill" style={{ fontSize: 14, opacity: 0.7 }} />
+              <Typography variant="body2" sx={{ fontWeight: 700 }}>{t('inventory.headerProxmoxStorage')}</Typography>
+              <Typography variant="caption" sx={{ opacity: 0.5 }}>
+                ({clusterStorages.reduce((acc, cs) => acc + cs.sharedStorages.length + cs.nodes.reduce((a, n) => a + n.storages.length, 0), 0)})
+              </Typography>
+            </Box>
+            <Collapse in={!collapsedSections.has('storage')}>
+            {clusterStorages.map(cs => {
+              const isCeph = (type: string) => type === 'rbd' || type === 'cephfs'
+              const storageIcon = (type: string) => {
+                if (isCeph(type)) return '' // handled by <img>
+                if (type === 'nfs' || type === 'cifs') return 'ri-folder-shared-fill'
+                if (type === 'zfspool' || type === 'zfs') return 'ri-stack-fill'
+                if (type === 'lvm' || type === 'lvmthin') return 'ri-hard-drive-2-fill'
+                if (type === 'dir') return 'ri-folder-fill'
+                return 'ri-hard-drive-fill'
+              }
+              const storageColor = (type: string) => {
+                if (type === 'nfs' || type === 'cifs') return '#3498db'
+                if (type === 'zfspool' || type === 'zfs') return '#2ecc71'
+                if (type === 'lvm' || type === 'lvmthin') return '#e67e22'
+                return '#95a5a6'
+              }
+              const formatSize = (bytes: number) => {
+                if (bytes >= 1099511627776) return `${(bytes / 1099511627776).toFixed(1)}T`
+                if (bytes >= 1073741824) return `${(bytes / 1073741824).toFixed(0)}G`
+                if (bytes >= 1048576) return `${(bytes / 1048576).toFixed(0)}M`
+                return `${bytes}B`
+              }
+              const storageLabel = (s: TreeStorageItem) => (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, width: '100%' }}>
+                  {isCeph(s.type)
+                    ? <img src="/images/ceph-logo.svg" alt="" width={14} height={14} style={{ flexShrink: 0, opacity: 0.8 }} />
+                    : <i className={storageIcon(s.type)} style={{ fontSize: 14, color: storageColor(s.type), opacity: 0.8, flexShrink: 0 }} />
+                  }
+                  <span style={{ fontSize: 13 }}>{s.storage}</span>
+                  <span style={{ opacity: 0.4, fontSize: 10, flexShrink: 0 }}>{s.type}</span>
+                  {s.total > 0 && (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 'auto', flexShrink: 0 }}>
+                      <Box sx={{ width: 30, height: 3, bgcolor: 'action.hover', borderRadius: 1, overflow: 'hidden' }}>
+                        <Box sx={{ width: `${s.usedPct}%`, height: '100%', bgcolor: s.usedPct > 90 ? 'error.main' : s.usedPct > 70 ? 'warning.main' : 'success.main' }} />
+                      </Box>
+                      <span style={{ fontSize: 10, opacity: 0.5 }}>{s.usedPct}%</span>
+                    </Box>
+                  )}
+                </Box>
+              )
+
+              return (
+                <TreeItem
+                  key={`storage-cluster:${cs.connId}`}
+                  itemId={`storage-cluster:${cs.connId}`}
+                  label={
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                      {cs.isCluster
+                        ? <i className="ri-server-fill" style={{ opacity: 0.8, fontSize: 14 }} />
+                        : <img src={theme.palette.mode === 'dark' ? '/images/proxmox-logo-dark.svg' : '/images/proxmox-logo.svg'} alt="" width={14} height={14} style={{ opacity: 0.8 }} />
+                      }
+                      <span style={{ fontSize: 14 }}>{cs.connName}</span>
+                    </Box>
+                  }
+                >
+                  {/* Shared storages at cluster level */}
+                  {cs.sharedStorages.map(s => (
+                    <TreeItem
+                      key={`storage:${cs.connId}:${s.storage}`}
+                      itemId={`storage:${cs.connId}:${s.storage}`}
+                      label={storageLabel(s)}
+                    />
+                  ))}
+                  {/* Per-node local storages */}
+                  {cs.nodes.filter(n => n.storages.length > 0).map(n => (
+                    <TreeItem
+                      key={`storage-node:${cs.connId}:${n.node}`}
+                      itemId={`storage-node:${cs.connId}:${n.node}`}
+                      label={
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                          <img src={theme.palette.mode === 'dark' ? '/images/proxmox-logo-dark.svg' : '/images/proxmox-logo.svg'} alt="" width={14} height={14} style={{ opacity: n.status === 'online' ? 0.8 : 0.3 }} />
+                          <span style={{ fontSize: 13, opacity: n.status === 'online' ? 1 : 0.5 }}>{n.node}</span>
+                          <span style={{ opacity: 0.4, fontSize: 11 }}>({n.storages.length})</span>
+                        </Box>
+                      }
+                    >
+                      {n.storages.map(s => (
+                        <TreeItem
+                          key={`storage:${cs.connId}:${s.storage}:${n.node}`}
+                          itemId={`storage:${cs.connId}:${s.storage}:${n.node}`}
+                          label={storageLabel(s)}
+                        />
+                      ))}
+                    </TreeItem>
+                  ))}
+                </TreeItem>
+              )
+            })}
+            </Collapse>
+          </>
+        )}
+
+        {/* ── Proxmox Backup Server Section ── */}
         {pbsServers.length > 0 && (
           <>
-            {/* Séparateur Proxmox Backup Server */}
             <Box
               onClick={() => toggleSection('pbs')}
-              sx={{ display: 'flex', alignItems: 'center', gap: 0.75, px: 1, py: 0.5, mt: 1, opacity: 0.6, cursor: 'pointer', userSelect: 'none', '&:hover': { opacity: 0.9 } }}
+              sx={{
+                display: 'flex', alignItems: 'center', gap: 1, px: 1.5, py: 0.75, mt: 1,
+                bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',
+                borderTop: '1px solid', borderBottom: '1px solid', borderColor: 'divider',
+                cursor: 'pointer', '&:hover': { bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.09)' },
+              }}
             >
-              <i className={collapsedSections.has('pbs') ? 'ri-arrow-right-s-line' : 'ri-arrow-down-s-line'} style={{ fontSize: 14, flexShrink: 0 }} />
-              <i className="ri-hard-drive-2-fill" style={{ fontSize: 12, color: '#2196f3' }} />
-              <Typography variant="caption" fontWeight={600} sx={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                Proxmox Backup Server
-              </Typography>
-              <Typography variant="caption" sx={{ fontSize: 10, opacity: 0.8 }}>
+              <i className={collapsedSections.has('pbs') ? 'ri-add-line' : 'ri-subtract-line'} style={{ fontSize: 14, opacity: 0.7 }} />
+              <i className="ri-hard-drive-2-fill" style={{ fontSize: 14, color: '#2196f3', opacity: 0.7 }} />
+              <Typography variant="body2" sx={{ fontWeight: 700 }}>{t('inventory.headerProxmoxBackup')}</Typography>
+              <Typography variant="caption" sx={{ opacity: 0.5 }}>
                 ({pbsServers.length} PBS, {pbsServers.reduce((acc, p) => acc + p.stats.backupCount, 0)} backups)
               </Typography>
             </Box>
@@ -3077,10 +3233,10 @@ return (
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
                         <i className='ri-database-2-line' style={{ opacity: 0.6, fontSize: 14 }} />
                         <span style={{ fontSize: 13 }}>{ds.name}</span>
-                        <Box 
-                          sx={{ 
-                            display: 'flex', 
-                            alignItems: 'center', 
+                        <Box
+                          sx={{
+                            display: 'flex',
+                            alignItems: 'center',
                             gap: 0.5,
                             ml: 'auto',
                             opacity: 0.6
@@ -3118,8 +3274,8 @@ return (
           </>
         )}
 
-        {/* External Hypervisors (VMware, Hyper-V, XCP-NG) — migration targets */}
-        {(() => {
+        {/* ── Migration Section ── */}
+        {externalHypervisors.length > 0 && (() => {
           const hypervisorConfig: Record<string, { label: string; icon: string; svgIcon?: string; vmIcon?: string; color: string }> = {
             vmware: { label: 'VMware ESXi', icon: 'ri-cloud-line', svgIcon: '/images/esxi-logo.svg', vmIcon: '/images/esxi-vm.svg', color: '#638C1C' },
             hyperv: { label: 'Microsoft Hyper-V', icon: 'ri-microsoft-line', svgIcon: '/images/hyperv-logo.svg', color: '#00BCF2' },
@@ -3132,78 +3288,92 @@ return (
             return acc
           }, {})
 
-          return Object.entries(grouped).map(([type, conns]) => {
-            const cfg = hypervisorConfig[type] || { label: type, icon: 'ri-server-line', color: '#999' }
-            const sectionKey = `ext-${type}`
-            const totalVms = conns.reduce((acc, c) => acc + (c.vms?.length || 0), 0)
-            return (
-              <React.Fragment key={sectionKey}>
-                {/* Section header — same style as PVE / PBS */}
-                <Box
-                  onClick={() => toggleSection(sectionKey)}
-                  sx={{ display: 'flex', alignItems: 'center', gap: 0.75, px: 1, py: 0.5, mt: 1, opacity: 0.6, cursor: 'pointer', userSelect: 'none', '&:hover': { opacity: 0.9 } }}
-                >
-                  <i className={collapsedSections.has(sectionKey) ? 'ri-arrow-right-s-line' : 'ri-arrow-down-s-line'} style={{ fontSize: 14, flexShrink: 0 }} />
-                  {cfg.svgIcon ? <img src={cfg.svgIcon} alt="" width={12} height={12} /> : <i className={cfg.icon} style={{ fontSize: 12, color: cfg.color }} />}
-                  <Typography variant="caption" fontWeight={600} sx={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                    {cfg.label}
-                  </Typography>
-                  <Typography variant="caption" sx={{ fontSize: 10, opacity: 0.8 }}>
-                    ({conns.length} hosts{totalVms > 0 ? `, ${totalVms} VMs` : ''})
-                  </Typography>
-                </Box>
-                <Collapse in={!collapsedSections.has(sectionKey)}>
-                  {conns.map(conn => (
-                    <TreeItem
-                      key={`ext:${conn.id}`}
-                      itemId={`ext:${conn.id}`}
-                      label={
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                          {cfg.svgIcon ? <img src={cfg.svgIcon} alt="" width={14} height={14} style={{ opacity: 0.8 }} /> : <i className={cfg.icon} style={{ fontSize: 14, color: cfg.color, opacity: 0.8 }} />}
-                          <span style={{ fontSize: 14 }}>{conn.name}</span>
-                          <span style={{ opacity: 0.5, fontSize: 12 }}>({conn.vms?.length || 0})</span>
-                        </Box>
-                      }
-                    >
-                      {(conn.vms || []).map(vm => (
-                        <TreeItem
-                          key={`extvm:${conn.id}:${vm.vmid}`}
-                          itemId={`extvm:${conn.id}:${vm.vmid}`}
-                          label={
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                              <Box
-                                component="span"
-                                sx={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  width: 14,
-                                  height: 14,
-                                }}
-                              >
-                                {vm.status === 'running' ? (
-                                  <PlayArrowIcon sx={{ fontSize: 14, color: '#4caf50', filter: 'drop-shadow(0 0 2px rgba(76, 175, 80, 0.5))' }} />
-                                ) : (
-                                  <StopIcon sx={{ fontSize: 14, color: 'text.disabled', opacity: 0.5 }} />
-                                )}
+          const totalExtVms = externalHypervisors.reduce((acc, h) => acc + (h.vms?.length || 0), 0)
+
+          return (
+            <>
+              <Box
+                onClick={() => toggleSection('migrate-ext')}
+                sx={{
+                  display: 'flex', alignItems: 'center', gap: 1, px: 1.5, py: 0.75, mt: 1,
+                  bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',
+                  borderTop: '1px solid', borderBottom: '1px solid', borderColor: 'divider',
+                  cursor: 'pointer', '&:hover': { bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.09)' },
+                }}
+              >
+                <i className={collapsedSections.has('migrate-ext') ? 'ri-add-line' : 'ri-subtract-line'} style={{ fontSize: 14, opacity: 0.7 }} />
+                <i className="ri-swap-box-line" style={{ fontSize: 14, opacity: 0.7 }} />
+                <Typography variant="body2" sx={{ fontWeight: 700 }}>{t('inventory.headerMigration')}</Typography>
+                <Typography variant="caption" sx={{ opacity: 0.5 }}>
+                  ({externalHypervisors.length} hosts{totalExtVms > 0 ? `, ${totalExtVms} VMs` : ''})
+                </Typography>
+              </Box>
+              <Collapse in={!collapsedSections.has('migrate-ext')}>
+                {Object.entries(grouped).map(([type, conns]) => {
+                  const cfg = hypervisorConfig[type] || { label: type, icon: 'ri-server-line', color: '#999' }
+                  const sectionKey = `ext-${type}`
+                  const totalVms = conns.reduce((acc, c) => acc + (c.vms?.length || 0), 0)
+                  return (
+                    <React.Fragment key={sectionKey}>
+                      <Box
+                        onClick={() => toggleSection(sectionKey)}
+                        sx={{ display: 'flex', alignItems: 'center', gap: 0.75, px: 1, py: 0.5, mt: 0.5, ml: 1, opacity: 0.6, cursor: 'pointer', userSelect: 'none', '&:hover': { opacity: 0.9 } }}
+                      >
+                        <i className={collapsedSections.has(sectionKey) ? 'ri-arrow-right-s-line' : 'ri-arrow-down-s-line'} style={{ fontSize: 14, flexShrink: 0 }} />
+                        {cfg.svgIcon ? <img src={cfg.svgIcon} alt="" width={12} height={12} /> : <i className={cfg.icon} style={{ fontSize: 12, color: cfg.color }} />}
+                        <Typography variant="caption" fontWeight={600} sx={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                          {cfg.label}
+                        </Typography>
+                        <Typography variant="caption" sx={{ fontSize: 10, opacity: 0.8 }}>
+                          ({conns.length}{totalVms > 0 ? `, ${totalVms} VMs` : ''})
+                        </Typography>
+                      </Box>
+                      <Collapse in={!collapsedSections.has(sectionKey)}>
+                        {conns.map(conn => (
+                          <TreeItem
+                            key={`ext:${conn.id}`}
+                            itemId={`ext:${conn.id}`}
+                            label={
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                                {cfg.svgIcon ? <img src={cfg.svgIcon} alt="" width={14} height={14} style={{ opacity: 0.8 }} /> : <i className={cfg.icon} style={{ fontSize: 14, color: cfg.color, opacity: 0.8 }} />}
+                                <span style={{ fontSize: 14 }}>{conn.name}</span>
+                                <span style={{ opacity: 0.5, fontSize: 12 }}>({conn.vms?.length || 0})</span>
                               </Box>
-                              {cfg.vmIcon ? <img src={cfg.vmIcon} alt="" width={14} height={14} style={{ opacity: 0.6 }} /> : <i className="ri-computer-line" style={{ fontSize: 14, opacity: 0.6 }} />}
-                              <span style={{ fontSize: 13 }}>{vm.name || vm.vmid}</span>
-                              {vm.memory_size_MiB && (
-                                <span style={{ opacity: 0.4, fontSize: 11 }}>
-                                  {vm.cpu ? `${vm.cpu}c` : ''}{vm.memory_size_MiB ? `${vm.cpu ? '/' : ''}${Math.round(vm.memory_size_MiB / 1024)}G` : ''}
-                                </span>
-                              )}
-                            </Box>
-                          }
-                        />
-                      ))}
-                    </TreeItem>
-                  ))}
-                </Collapse>
-              </React.Fragment>
-            )
-          })
+                            }
+                          >
+                            {(conn.vms || []).map(vm => (
+                              <TreeItem
+                                key={`extvm:${conn.id}:${vm.vmid}`}
+                                itemId={`extvm:${conn.id}:${vm.vmid}`}
+                                label={
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                                    <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 14, height: 14 }}>
+                                      {vm.status === 'running' ? (
+                                        <PlayArrowIcon sx={{ fontSize: 14, color: '#4caf50', filter: 'drop-shadow(0 0 2px rgba(76, 175, 80, 0.5))' }} />
+                                      ) : (
+                                        <StopIcon sx={{ fontSize: 14, color: 'text.disabled', opacity: 0.5 }} />
+                                      )}
+                                    </Box>
+                                    {cfg.vmIcon ? <img src={cfg.vmIcon} alt="" width={14} height={14} style={{ opacity: 0.6 }} /> : <i className="ri-computer-line" style={{ fontSize: 14, opacity: 0.6 }} />}
+                                    <span style={{ fontSize: 13 }}>{vm.name || vm.vmid}</span>
+                                    {vm.memory_size_MiB && (
+                                      <span style={{ opacity: 0.4, fontSize: 11 }}>
+                                        {vm.cpu ? `${vm.cpu}c` : ''}{vm.memory_size_MiB ? `${vm.cpu ? '/' : ''}${Math.round(vm.memory_size_MiB / 1024)}G` : ''}
+                                      </span>
+                                    )}
+                                  </Box>
+                                }
+                              />
+                            ))}
+                          </TreeItem>
+                        ))}
+                      </Collapse>
+                    </React.Fragment>
+                  )
+                })}
+              </Collapse>
+            </>
+          )
         })()}
 
         </TreeItem>

@@ -323,6 +323,35 @@ export type DetailsPayload = {
     }>
   }
 
+  storageInfo?: {
+    connId: string
+    connName: string
+    storage: string
+    node: string
+    type: string
+    shared: boolean
+    content: string[]
+    enabled: boolean
+    status: string
+    used: number
+    total: number
+    usedPct: number
+    path?: string
+    server?: string
+    pool?: string
+    monhost?: string
+    nodes?: string[]
+    contentItems?: Array<{
+      volid: string
+      content: string
+      format: string
+      size: number
+      ctime?: number
+      vmid?: number
+      notes?: string
+    }>
+  }
+
   esxiHostInfo?: {
     connectionId: string
     connectionName: string
