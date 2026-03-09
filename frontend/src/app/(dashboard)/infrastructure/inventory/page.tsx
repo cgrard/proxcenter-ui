@@ -17,7 +17,7 @@ type Connection = {
   id: string
   name: string
   baseUrl: string
-  uiUrl?: string
+  behindProxy?: boolean
   insecureTLS?: boolean
 }
 

@@ -17,6 +17,7 @@ export type ProxmoxClientOptions = {
   baseUrl: string
   apiToken: string
   insecureDev?: boolean
+  behindProxy?: boolean
   id?: string
 }
 
@@ -30,17 +31,31 @@ function isNetworkError(err: unknown): boolean {
   return codes.some(c => msg.includes(c) || causeCode.includes(c))
 }
 
-/** Update the connection's baseUrl in the database after a successful failover */
+/**
+ * In-memory cache for failover URLs.
+ * We do NOT persist failover URLs to the database — this preserves the
+ * user-configured baseUrl (which may use DNS + valid SSL certs).
+ * The console proxy and other features rely on the original baseUrl.
+ */
+const failoverUrlCache = new Map<string, string>()
+
+function getFailoverUrl(connId: string): string | null {
+  return failoverUrlCache.get(connId) || null
+}
+
+function setFailoverUrl(connId: string, url: string): void {
+  failoverUrlCache.set(connId, url)
+  console.log(`[failover] Cached failover URL for connection ${connId}: ${url}`)
+}
+
+function clearFailoverUrl(connId: string): void {
+  failoverUrlCache.delete(connId)
+}
+
+/** @deprecated No longer persists — kept for reference */
 async function updateConnectionBaseUrl(connId: string, newUrl: string): Promise<void> {
   try {
-    // Dynamic import to avoid circular deps
-    const { prisma } = await import("../db/prisma")
-    await prisma.connection.update({
-      where: { id: connId },
-      data: { baseUrl: newUrl },
-    })
-    invalidateConnectionCache(connId)
-    console.log(`[failover] Updated connection ${connId} baseUrl to ${newUrl}`)
+    setFailoverUrl(connId, newUrl)
   } catch (e) {
     console.error(`[failover] Failed to update connection ${connId} baseUrl:`, e)
   }
@@ -113,8 +128,25 @@ export async function pveFetch<T>(
 
   // Try primary baseUrl first
   try {
-    return await doRequest(opts.baseUrl)
+    const result = await doRequest(opts.baseUrl)
+    // Original URL works — clear any failover cache
+    if (opts.id) clearFailoverUrl(opts.id)
+    return result
   } catch (err) {
+    // If original fails and we have a cached failover URL, try it
+    if (opts.id) {
+      const cachedUrl = getFailoverUrl(opts.id)
+      if (cachedUrl) {
+        try {
+          return await doRequest(cachedUrl)
+        } catch {
+          // cached failover also failed, clear it and continue to full failover
+          clearFailoverUrl(opts.id)
+        }
+      }
+    }
+    // Skip failover entirely when behind a reverse proxy (IPs are not reachable)
+    if (opts.behindProxy) throw err
     // Only attempt failover for network errors when we have a connection ID
     if (!opts.id || !isNetworkError(err)) throw err
 

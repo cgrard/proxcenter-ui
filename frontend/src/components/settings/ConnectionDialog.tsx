@@ -33,7 +33,7 @@ import {
 export type ConnectionFormData = {
   name: string
   baseUrl: string
-  uiUrl: string
+  behindProxy: boolean
   insecureTLS: boolean
   hasCeph: boolean
   apiToken: string
@@ -71,7 +71,7 @@ type ConnectionDialogProps = {
 const defaultFormData: ConnectionFormData = {
   name: '',
   baseUrl: '',
-  uiUrl: '',
+  behindProxy: false,
   insecureTLS: true,
   hasCeph: false,
   apiToken: '',
@@ -123,8 +123,7 @@ export default function ConnectionDialog({
         setForm({
           ...defaultFormData,
           ...initialData,
-          // Ensure nullable string fields fallback to '' (prevent null spreading)
-          uiUrl: initialData.uiUrl || '',
+          behindProxy: initialData.behindProxy ?? false,
           // Ne pas pré-remplir les secrets en mode edit
           apiToken: '',
           sshKey: '',
@@ -351,17 +350,6 @@ export default function ConnectionDialog({
           required
         />
 
-        {!isExternalHypervisor && (
-          <TextField
-            fullWidth
-            label={t('settings.webInterfaceUrl')}
-            value={form.uiUrl}
-            onChange={e => handleChange('uiUrl', e.target.value)}
-            helperText={t('settings.webInterfaceUrlHelper')}
-            sx={{ mt: 2 }}
-          />
-        )}
-
         <FormControlLabel
           sx={{ mt: 2 }}
           control={
@@ -372,6 +360,24 @@ export default function ConnectionDialog({
           }
           label={t('settings.ignoreTlsErrors')}
         />
+
+        {!isExternalHypervisor && (
+          <FormControlLabel
+            sx={{ mt: 1 }}
+            control={
+              <Switch
+                checked={form.behindProxy}
+                onChange={e => handleChange('behindProxy', e.target.checked)}
+              />
+            }
+            label={
+              <Box>
+                <Typography variant="body2">{t('settings.behindProxy')}</Typography>
+                <Typography variant="caption" color="text.secondary">{t('settings.behindProxyHelper')}</Typography>
+              </Box>
+            }
+          />
+        )}
 
         <Divider sx={{ my: 3 }} />
 

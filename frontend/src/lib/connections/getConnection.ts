@@ -7,6 +7,7 @@ export type PveConn = {
   baseUrl: string
   apiToken: string
   insecureDev: boolean
+  behindProxy: boolean
 }
 
 export type PbsConn = {
@@ -47,6 +48,7 @@ export async function getConnectionById(id: string): Promise<PveConn> {
       id: true,
       name: true,
       baseUrl: true,
+      behindProxy: true,
       insecureTLS: true,
       apiTokenEnc: true,
     },
@@ -62,6 +64,7 @@ export async function getConnectionById(id: string): Promise<PveConn> {
     baseUrl: c.baseUrl,
     apiToken: decryptSecret(c.apiTokenEnc),
     insecureDev: !!c.insecureTLS,
+    behindProxy: !!c.behindProxy,
   }
 
   connectionCache.set(id, { data: result, expiry: Date.now() + CACHE_TTL })

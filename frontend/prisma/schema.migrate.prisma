@@ -20,9 +20,9 @@ model Connection {
   id          String  @id @default(cuid())
   name        String
   type        String  @default("pve")
-  baseUrl     String
-  uiUrl       String?
-  insecureTLS Boolean @default(false)
+  baseUrl      String
+  behindProxy  Boolean @default(false)
+  insecureTLS  Boolean @default(false)
   hasCeph     Boolean @default(false)
   latitude      Float?
   longitude     Float?

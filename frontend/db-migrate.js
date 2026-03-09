@@ -25,7 +25,7 @@ try {
       "name"          TEXT NOT NULL,
       "type"          TEXT NOT NULL DEFAULT 'pve',
       "baseUrl"       TEXT NOT NULL,
-      "uiUrl"         TEXT,
+      "behindProxy"   INTEGER NOT NULL DEFAULT 0,
       "insecureTLS"   INTEGER NOT NULL DEFAULT 0,
       "hasCeph"       INTEGER NOT NULL DEFAULT 0,
       "apiTokenEnc"   TEXT NOT NULL,
@@ -211,6 +211,8 @@ try {
     { table: 'Connection', column: 'sshUseSudo', type: 'INTEGER DEFAULT 0' },
     // SSH address override per node (2026-03-06)
     { table: 'ManagedHost', column: 'sshAddress', type: 'TEXT' },
+    // Behind proxy flag — replaces uiUrl (2026-03-09)
+    { table: 'Connection', column: 'behindProxy', type: 'INTEGER DEFAULT 0' },
   ]
 
   let applied = 0

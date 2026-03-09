@@ -31,7 +31,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
         name: true,
         type: true,
         baseUrl: true,
-        uiUrl: true,
+        behindProxy: true,
         insecureTLS: true,
         hasCeph: true,
         latitude: true,
@@ -103,7 +103,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     if (body.name !== undefined) data.name = body.name
     if (body.type !== undefined) data.type = body.type
     if (body.baseUrl !== undefined) data.baseUrl = body.baseUrl
-    if (body.uiUrl !== undefined) data.uiUrl = body.uiUrl || null
+    if (body.behindProxy !== undefined) data.behindProxy = !!body.behindProxy
     if (body.insecureTLS !== undefined) data.insecureTLS = body.insecureTLS
     if (body.latitude !== undefined) data.latitude = body.latitude
     if (body.longitude !== undefined) data.longitude = body.longitude
@@ -224,7 +224,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
         name: true,
         type: true,
         baseUrl: true,
-        uiUrl: true,
+        behindProxy: true,
         insecureTLS: true,
         hasCeph: true,
         latitude: true,

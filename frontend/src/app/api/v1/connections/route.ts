@@ -38,7 +38,7 @@ export async function GET(req: Request) {
         name: true,
         type: true,
         baseUrl: true,
-        uiUrl: true,
+        behindProxy: true,
         insecureTLS: true,
         hasCeph: true,
         latitude: true,
@@ -102,7 +102,7 @@ export async function POST(req: Request) {
     }
 
     const {
-      name, type, baseUrl, uiUrl, insecureTLS, hasCeph, apiToken,
+      name, type, baseUrl, behindProxy, insecureTLS, hasCeph, apiToken,
       vmwareUser, vmwarePassword,
       latitude, longitude, locationLabel,
       sshEnabled, sshPort, sshUser, sshAuthMethod,
@@ -114,7 +114,7 @@ export async function POST(req: Request) {
       name,
       type,
       baseUrl,
-      uiUrl,
+      behindProxy,
       insecureTLS,
       hasCeph: false,
       latitude: latitude ?? null,
@@ -260,7 +260,7 @@ export async function POST(req: Request) {
         name: true,
         type: true,
         baseUrl: true,
-        uiUrl: true,
+        behindProxy: true,
         insecureTLS: true,
         hasCeph: true,
         latitude: true,

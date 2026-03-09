@@ -277,7 +277,7 @@ function ConnectionsTab() {
       name: formData.name.trim(),
       type: addConnType,
       baseUrl: formData.baseUrl.trim(),
-      uiUrl: isExtHypervisor ? null : (formData.uiUrl || '').trim() || null,
+      behindProxy: isExtHypervisor ? false : !!formData.behindProxy,
       insecureTLS: !!formData.insecureTLS,
       // Location fields
       latitude: formData.latitude !== '' && !isNaN(parseFloat(formData.latitude)) ? parseFloat(formData.latitude) : null,
@@ -344,7 +344,7 @@ function ConnectionsTab() {
       name: addConn.name.trim(),
       type: addConnType,
       baseUrl: addConn.baseUrl.trim(),
-      uiUrl: (addConn.uiUrl || '').trim() || null,
+      behindProxy: !!addConn.behindProxy,
       insecureTLS: !!addConn.insecureTLS,
       apiToken: addConn.apiToken.trim()
     }
@@ -356,7 +356,7 @@ function ConnectionsTab() {
     })
 
     setAddConnOpen(false)
-    setAddConn({ name: '', baseUrl: '', uiUrl: '', insecureTLS: true, apiToken: '' })
+    setAddConn({ name: '', baseUrl: '', behindProxy: false, insecureTLS: true, apiToken: '' })
 
     if (addConnType === 'pve') {
       await loadPveConnections()
