@@ -419,8 +419,16 @@ export async function runMigrationPipeline(jobId: string, config: MigrationConfi
         throw new Error(`Disk import failed: ${importResult.error}`)
       }
 
+      // Parse the actual disk volume name from qm disk import output
+      // Output format: "Successfully imported disk as 'unused0:storage:vm-XXX-disk-N'"
+      let diskVolume = `${config.targetStorage}:vm-${targetVmid}-disk-${i}`
+      const importMatch = importResult.output?.match(/Successfully imported disk as '(?:unused\d+:)?(.+?)'/)
+      if (importMatch?.[1]) {
+        diskVolume = importMatch[1]
+      }
+
       // Attach unused disk to SCSI slot
-      const attachCmd = `qm set ${targetVmid} --${scsiSlot} ${config.targetStorage}:vm-${targetVmid}-disk-${i}${isFileBased ? ",discard=on" : ""}`
+      const attachCmd = `qm set ${targetVmid} --${scsiSlot} ${diskVolume}${isFileBased ? ",discard=on" : ""}`
       const attachResult = await executeSSH(config.targetConnectionId, nodeIp, attachCmd)
       if (!attachResult.success) {
         await appendLog(jobId, `Warning: Could not auto-attach ${scsiSlot}: ${attachResult.error}`, "warn")
