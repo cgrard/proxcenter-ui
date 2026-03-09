@@ -850,6 +850,9 @@ return migratingVmIds.has(`${connId}:${vmid}`)
   // Sections collapsed (pour les modes hosts, pools, tags)
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set())
 
+  // Storage tree expanded items (persisted)
+  const [storageExpandedItems, setStorageExpandedItems] = useState<string[]>([])
+
   const toggleSection = (key: string) => {
     setCollapsedSections(prev => {
       const next = new Set(prev)
@@ -873,6 +876,9 @@ return next
 
       const savedCollapsed = localStorage.getItem('inventoryCollapsedSections')
       if (savedCollapsed) setCollapsedSections(new Set(JSON.parse(savedCollapsed)))
+
+      const savedStorageExpanded = localStorage.getItem('inventoryStorageExpandedItems')
+      if (savedStorageExpanded) setStorageExpandedItems(JSON.parse(savedStorageExpanded))
     } catch {}
     setIsHydrated(true)
   }, [])
@@ -891,6 +897,11 @@ return next
   useEffect(() => {
     if (isHydrated) localStorage.setItem('inventoryCollapsedSections', JSON.stringify([...collapsedSections]))
   }, [collapsedSections, isHydrated])
+
+  // Persist storageExpandedItems
+  useEffect(() => {
+    if (isHydrated) localStorage.setItem('inventoryStorageExpandedItems', JSON.stringify(storageExpandedItems))
+  }, [storageExpandedItems, isHydrated])
 
   // Exposer la fonction refresh au parent
   useEffect(() => {
@@ -3179,6 +3190,8 @@ return (
           <Collapse in={!collapsedSections.has('storage')}>
           <SimpleTreeView
             selectedItems={selectedItemId || ''}
+            expandedItems={storageExpandedItems}
+            onExpandedItemsChange={(_event, itemIds) => setStorageExpandedItems(itemIds)}
             onSelectedItemsChange={(_event, ids) => {
               const picked = Array.isArray(ids) ? ids[0] : ids
               if (!picked) return
