@@ -1946,12 +1946,33 @@ return items
     })
     setManualExpandedItems(items)
     requestAnimationFrame(() => { programmaticExpand.current = false })
-  }, [clusters])
+
+    // Also expand Storage section header + all storage tree items
+    setCollapsedSections(prev => {
+      if (!prev.has('storage')) return prev
+      const next = new Set(prev)
+      next.delete('storage')
+      return next
+    })
+    const storageItems: string[] = []
+    clusterStorages.forEach(cs => {
+      storageItems.push(`storage-cluster:${cs.connId}`)
+      if (cs.isCluster) {
+        cs.nodes.filter(n => n.storages.length > 0).forEach(n => {
+          storageItems.push(`storage-node:${cs.connId}:${n.node}`)
+        })
+      }
+    })
+    setStorageExpandedItems(storageItems)
+  }, [clusters, clusterStorages])
 
   const collapseAll = useCallback(() => {
     programmaticExpand.current = true
     setManualExpandedItems([])
     requestAnimationFrame(() => { programmaticExpand.current = false })
+
+    // Also collapse Storage tree items (but keep section header as-is)
+    setStorageExpandedItems([])
   }, [])
 
   // Expand/Collapse all for grouped modes (hosts, pools, tags)
@@ -2320,7 +2341,7 @@ return favorites.has(vmKey)
     overscan: 10,
   })
 
-  const isTreeExpanded = manualExpandedItems.length > 1
+  const isTreeExpanded = manualExpandedItems.length > 1 || storageExpandedItems.length > 0
   const isSectionsAllExpanded = collapsedSections.size === 0
 
   const header = useMemo(
