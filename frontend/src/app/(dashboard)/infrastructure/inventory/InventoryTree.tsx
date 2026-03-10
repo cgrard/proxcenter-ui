@@ -3091,6 +3091,7 @@ return (
 
         <Collapse in={!collapsedSections.has('pve')}>
         <SimpleTreeView
+          expansionTrigger="iconContainer"
           selectedItems={selectedItemId || ''}
           expandedItems={search.trim() ? expandedItems : manualExpandedItems}
           onExpandedItemsChange={(_event, itemIds) => {
@@ -3324,6 +3325,7 @@ return (
           </Box>
           <Collapse in={!collapsedSections.has('storage')}>
           <SimpleTreeView
+            expansionTrigger="iconContainer"
             selectedItems={selectedItemId || ''}
             expandedItems={storageExpandedItems}
             onExpandedItemsChange={(_event, itemIds) => setStorageExpandedItems(itemIds)}
@@ -3493,6 +3495,7 @@ return (
               </Box>
             ) : (
               <SimpleTreeView
+                expansionTrigger="iconContainer"
                 selectedItems={selectedItemId || ''}
                 expandedItems={networkTreeExpandedItems}
                 onExpandedItemsChange={(_event, itemIds) => setNetworkTreeExpandedItems(itemIds)}
@@ -3602,6 +3605,7 @@ return (
 
           <Collapse in={!collapsedSections.has('pbs')}>
           <SimpleTreeView
+            expansionTrigger="iconContainer"
             selectedItems={selectedItemId || ''}
             expandedItems={backupExpandedItems}
             onExpandedItemsChange={(_event, itemIds) => setBackupExpandedItems(itemIds)}
@@ -3714,6 +3718,7 @@ return (
             </Box>
             <Collapse in={!collapsedSections.has('migrate-ext')}>
               <SimpleTreeView
+                expansionTrigger="iconContainer"
                 selectedItems={selectedItemId || ''}
                 expandedItems={migrationExpandedItems}
                 onExpandedItemsChange={(_event, itemIds) => setMigrationExpandedItems(itemIds)}
