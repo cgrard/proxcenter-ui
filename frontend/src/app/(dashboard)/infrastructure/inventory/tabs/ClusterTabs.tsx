@@ -263,7 +263,7 @@ export default function ClusterTabs(props: any) {
   // Fetch Ceph OSD flags when in summary tab and ceph is available
   const connId = selection?.type === 'cluster' ? selection.id : ''
   useEffect(() => {
-    if (clusterTab !== 0 || !data.cephHealth || !connId) return
+    if (clusterTab !== 0 || !['HEALTH_OK', 'HEALTH_WARN', 'HEALTH_ERR'].includes(data.cephHealth) || !connId) return
     let cancelled = false
     setCephOsdFlagsLoading(true)
     fetch(`/api/v1/connections/${connId}/ceph/flags`)
@@ -720,12 +720,12 @@ export default function ClusterTabs(props: any) {
                     </Box>
 
                     {/* Ceph OSD Flags */}
-                    {data.cephHealth && (
+                    {['HEALTH_OK', 'HEALTH_WARN', 'HEALTH_ERR'].includes(data.cephHealth) && (
                       <Card variant="outlined" sx={{ mb: 2 }}>
                         <CardContent sx={{ py: 1.5, px: 2 }}>
                           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <i className="ri-flag-line" style={{ fontSize: 18 }} />
+                              <img src="/images/ceph-logo.svg" alt="Ceph" width={18} height={18} />
                               <Typography variant="subtitle2" fontWeight={700}>{t('ceph.osdFlags')}</Typography>
                             </Box>
                             {cephOsdFlagsLoading && <CircularProgress size={16} />}
