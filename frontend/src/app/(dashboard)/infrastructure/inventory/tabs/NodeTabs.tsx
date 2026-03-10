@@ -777,24 +777,45 @@ export default function NodeTabs(props: any) {
                       </Button>
                     </Box>
                     {data.vmsData.length > 0 ? (
-                      <VmsTable
-                        vms={data.vmsData as VmRow[]}
-                        compact={!expandedVmsTable}
-                        expanded={expandedVmsTable}
-                        maxHeight={expandedVmsTable ? 500 : 400}
-                        showTrends={expandedVmsTable}
-                        showActions={true}
-                        onLoadTrendsBatch={loadVmTrendsBatch}
-                        onVmClick={(vm) => {
-                          if (vm.template) return
-                          onSelect?.({ type: 'vm', id: vm.id })
-                        }}
-                        onVmAction={handleTableVmAction}
-                        onMigrate={handleTableMigrate}
-                        favorites={favorites}
-                        onToggleFavorite={toggleFavorite}
-                        migratingVmIds={migratingVmIds}
-                      />
+                      <Box sx={{
+                        resize: 'vertical',
+                        overflow: 'hidden',
+                        minHeight: 200,
+                        height: expandedVmsTable ? 500 : 400,
+                        pb: '6px',
+                        position: 'relative',
+                        '&::after': {
+                          content: '""',
+                          position: 'absolute',
+                          bottom: 0,
+                          left: '50%',
+                          transform: 'translateX(-50%)',
+                          width: 32,
+                          height: 4,
+                          borderRadius: 2,
+                          bgcolor: 'divider',
+                          opacity: 0.6,
+                        },
+                      }}>
+                        <VmsTable
+                          vms={data.vmsData as VmRow[]}
+                          compact={!expandedVmsTable}
+                          expanded={expandedVmsTable}
+                          maxHeight="auto"
+                          showTrends={expandedVmsTable}
+                          showActions={true}
+                          onLoadTrendsBatch={loadVmTrendsBatch}
+                          onVmClick={(vm) => {
+                            if (vm.template) return
+                            onSelect?.({ type: 'vm', id: vm.id })
+                          }}
+                          onVmAction={handleTableVmAction}
+                          onMigrate={handleTableMigrate}
+                          favorites={favorites}
+                          onToggleFavorite={toggleFavorite}
+                          migratingVmIds={migratingVmIds}
+                        />
+                      </Box>
                     ) : (
                       <Box sx={{ p: 4, textAlign: 'center', opacity: 0.5 }}>
                         <i className="ri-computer-line" style={{ fontSize: 48, marginBottom: 8 }} />

@@ -1178,11 +1178,31 @@ export default function ClusterTabs(props: any) {
                               
                               {/* Liste des VMs du node (collapsible) */}
                               {isExpanded && nodeVms.length > 0 && (
-                                <Box sx={{ bgcolor: 'background.default' }}>
+                                <Box sx={{
+                                  bgcolor: 'background.default',
+                                  resize: 'vertical',
+                                  overflow: 'hidden',
+                                  minHeight: 200,
+                                  height: 400,
+                                  pb: '6px',
+                                  position: 'relative',
+                                  '&::after': {
+                                    content: '""',
+                                    position: 'absolute',
+                                    bottom: 0,
+                                    left: '50%',
+                                    transform: 'translateX(-50%)',
+                                    width: 32,
+                                    height: 4,
+                                    borderRadius: 2,
+                                    bgcolor: 'divider',
+                                    opacity: 0.6,
+                                  },
+                                }}>
                                   <VmsTable
                                     vms={nodeVms as VmRow[]}
                                     compact
-                                    maxHeight={400}
+                                    maxHeight="auto"
                                     showActions={true}
                                     onVmClick={(vm) => {
                                       if (vm.template) return
