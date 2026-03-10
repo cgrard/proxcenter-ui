@@ -101,7 +101,7 @@ export async function executeSSH(
     if (res.ok) {
       const data = await res.json()
       console.log(`[ssh] executed via orchestrator on ${nodeIp}`)
-      return { success: true, output: data.output }
+      return { success: data.success !== false, output: data.output, error: data.error }
     }
 
     const err = await res.json().catch(() => ({}))

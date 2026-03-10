@@ -427,13 +427,19 @@ export async function runMigrationPipeline(jobId: string, config: MigrationConfi
         diskVolume = importMatch[1]
       }
 
-      // Attach unused disk to SCSI slot
-      const attachCmd = `qm set ${targetVmid} --${scsiSlot} ${diskVolume}${isFileBased ? ",discard=on" : ""}`
-      const attachResult = await executeSSH(config.targetConnectionId, nodeIp, attachCmd)
-      if (!attachResult.success) {
-        await appendLog(jobId, `Warning: Could not auto-attach ${scsiSlot}: ${attachResult.error}`, "warn")
-      } else {
+      // Attach unused disk to SCSI slot via PVE API (more reliable than qm set via SSH)
+      const attachBody = new URLSearchParams({
+        [scsiSlot]: `${diskVolume}${isFileBased ? ",discard=on" : ""}`,
+      })
+      try {
+        await pveFetch<any>(
+          pveConn,
+          `/nodes/${encodeURIComponent(config.targetNode)}/qemu/${targetVmid}/config`,
+          { method: "PUT", body: attachBody }
+        )
         await appendLog(jobId, `Disk ${i + 1} imported and attached as ${scsiSlot}`, "success")
+      } catch (attachErr: any) {
+        await appendLog(jobId, `Warning: Could not auto-attach ${scsiSlot}: ${attachErr.message}`, "warn")
       }
 
       await updateJob(jobId, "transferring", {
