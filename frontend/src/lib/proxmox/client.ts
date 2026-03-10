@@ -99,8 +99,7 @@ export async function pveFetch<T>(
 
   /** Core request logic against a specific baseUrl */
   async function doRequest(baseUrl: string): Promise<T> {
-    const cleanBase = baseUrl.replace(/\/+$/, "").replace(/\/api2(\/json)?$/, "")
-    const url = `${cleanBase}/api2/json${path}`
+    const url = `${baseUrl.replace(/\/$/, "")}/api2/json${path}`
 
     const res = await request(url, {
       method,

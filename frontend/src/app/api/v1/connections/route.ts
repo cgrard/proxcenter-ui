@@ -109,14 +109,11 @@ export async function POST(req: Request) {
       sshKey, sshPassphrase, sshPassword, sshUseSudo,
     } = parseResult.data
 
-    // Normalize baseUrl: strip trailing slash and /api2/json or /api2 suffix
-    const cleanBaseUrl = baseUrl.replace(/\/+$/, "").replace(/\/api2(\/json)?$/, "")
-
     // Préparer les données
     const data: any = {
       name,
       type,
-      baseUrl: cleanBaseUrl,
+      baseUrl,
       behindProxy,
       insecureTLS,
       hasCeph: false,
