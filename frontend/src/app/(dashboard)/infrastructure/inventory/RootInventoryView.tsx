@@ -67,6 +67,8 @@ function RootInventoryView({
   onCreateVm,
   onCreateLxc,
   onBulkAction,
+  clusterStorages = [],
+  externalHypervisors = [],
 }: {
   allVms: AllVmItem[]
   hosts: HostItem[]
@@ -86,6 +88,8 @@ function RootInventoryView({
   onCreateVm?: () => void
   onCreateLxc?: () => void
   onBulkAction?: (host: HostItem, action: BulkAction) => void
+  clusterStorages?: import('./InventoryTree').TreeClusterStorage[]
+  externalHypervisors?: { id: string; name: string; type: string; vms?: { vmid: string; name: string; status: string }[] }[]
 }) {
   const t = useTranslations()
   const theme = useTheme()
@@ -881,33 +885,96 @@ function RootInventoryView({
           )
         })}
 
-        {/* Séparateur PBS */}
+        {/* ── STORAGE Section ── */}
+        {clusterStorages.length > 0 && (
+          <>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 3, mb: 1 }}>
+              <i className="ri-database-2-fill" style={{ fontSize: 16, opacity: 0.7 }} />
+              <Typography variant="subtitle2" fontWeight={700} sx={{ opacity: 0.7 }}>STORAGE</Typography>
+              <Chip size="small" label={clusterStorages.reduce((acc, cs) => acc + cs.sharedStorages.length + cs.nodes.reduce((a, n) => a + n.storages.length, 0), 0)} sx={{ height: 18, fontSize: 10, ml: 1 }} />
+              <Box sx={{ flex: 1, height: 1, bgcolor: 'divider', ml: 1 }} />
+            </Box>
+            <Stack spacing={1}>
+              {clusterStorages.map(cs => {
+                const allStorages = cs.sharedStorages.concat(cs.nodes.flatMap(n => n.storages))
+                const totalUsed = allStorages.reduce((a, s) => a + s.used, 0)
+                const totalSize = allStorages.reduce((a, s) => a + s.total, 0)
+                const usedPct = totalSize > 0 ? Math.round((totalUsed / totalSize) * 100) : 0
+                const formatSize = (bytes: number) => {
+                  if (bytes >= 1099511627776) return `${(bytes / 1099511627776).toFixed(1)}T`
+                  if (bytes >= 1073741824) return `${(bytes / 1073741824).toFixed(0)}G`
+                  return `${(bytes / 1048576).toFixed(0)}M`
+                }
+                return (
+                  <Card key={cs.connId} variant="outlined">
+                    <Box sx={{
+                      px: 2, py: 1.5, display: 'flex', alignItems: 'center', gap: 1.5,
+                      bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)',
+                    }}>
+                      <img src={theme.palette.mode === 'dark' ? '/images/proxmox-logo-dark.svg' : '/images/proxmox-logo.svg'} alt="" style={{ width: 16, height: 16 }} />
+                      <Typography fontWeight={700} sx={{ fontSize: 14 }}>{cs.connName}</Typography>
+                      <Chip size="small" label={`${allStorages.length} storages`} sx={{ height: 18, fontSize: 10 }} />
+                      {totalSize > 0 && (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, ml: 'auto' }}>
+                          <Box sx={{ width: 60, height: 6, bgcolor: 'action.hover', borderRadius: 1, overflow: 'hidden' }}>
+                            <Box sx={{ width: `${usedPct}%`, height: '100%', bgcolor: usedPct > 90 ? 'error.main' : usedPct > 70 ? 'warning.main' : 'success.main' }} />
+                          </Box>
+                          <Typography variant="caption" sx={{ opacity: 0.6, fontSize: 11 }}>
+                            {formatSize(totalUsed)} / {formatSize(totalSize)} ({usedPct}%)
+                          </Typography>
+                        </Box>
+                      )}
+                    </Box>
+                  </Card>
+                )
+              })}
+            </Stack>
+          </>
+        )}
+
+        {/* ── NETWORK Section (header only — data is lazy-loaded in tree) ── */}
+        <Box
+          onClick={() => onSelect?.({ type: 'root', id: 'root' })}
+          sx={{
+            display: 'flex', alignItems: 'center', gap: 1, mt: 3, mb: 1,
+            cursor: 'pointer', '&:hover': { opacity: 0.8 },
+          }}
+        >
+          <i className="ri-router-fill" style={{ fontSize: 16, opacity: 0.7 }} />
+          <Typography variant="subtitle2" fontWeight={700} sx={{ opacity: 0.7 }}>NETWORK</Typography>
+          <Typography variant="caption" sx={{ opacity: 0.4, ml: 0.5 }}>
+            {t('inventory.expandInTree')}
+          </Typography>
+          <Box sx={{ flex: 1, height: 1, bgcolor: 'divider', ml: 1 }} />
+        </Box>
+
+        {/* ── BACKUP Section ── */}
         {pbsServers && pbsServers.length > 0 && (
           <>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 3, mb: 1 }}>
-              <i className="ri-hard-drive-2-fill" style={{ fontSize: 16, color: '#2196f3' }} />
-              <Typography variant="subtitle2" fontWeight={700} sx={{ opacity: 0.7 }}>{t('inventory.proxmoxBackupServer')}</Typography>
+              <i className="ri-hard-drive-2-fill" style={{ fontSize: 16, opacity: 0.7 }} />
+              <Typography variant="subtitle2" fontWeight={700} sx={{ opacity: 0.7 }}>BACKUP</Typography>
               <Chip size="small" label={t('inventory.nBackups', { count: pbsServers.reduce((acc, pbs) => acc + pbs.backupCount, 0) })} sx={{ height: 18, fontSize: 10, ml: 1 }} />
               <Box sx={{ flex: 1, height: 1, bgcolor: 'divider', ml: 1 }} />
             </Box>
 
             <Stack spacing={1}>
               {pbsServers.map(pbs => (
-                <Card 
+                <Card
                   key={pbs.connId}
                   variant="outlined"
                   onClick={() => onSelect?.({ type: 'pbs', id: pbs.connId })}
-                  sx={{ 
+                  sx={{
                     cursor: 'pointer',
                     '&:hover': { bgcolor: 'action.hover' }
                   }}
                 >
-                  <Box 
-                    sx={{ 
-                      px: 2, 
-                      py: 1.5, 
-                      display: 'flex', 
-                      alignItems: 'center', 
+                  <Box
+                    sx={{
+                      px: 2,
+                      py: 1.5,
+                      display: 'flex',
+                      alignItems: 'center',
                       gap: 1.5,
                       bgcolor: theme.palette.mode === 'dark' ? 'rgba(33, 150, 243, 0.08)' : 'rgba(33, 150, 243, 0.05)',
                     }}
@@ -923,6 +990,58 @@ function RootInventoryView({
             </Stack>
           </>
         )}
+
+        {/* ── MIGRATIONS Section ── */}
+        {externalHypervisors.length > 0 && (() => {
+          const hypervisorConfig: Record<string, { label: string; icon: string; svgIcon?: string; color: string }> = {
+            vmware: { label: 'VMware ESXi', icon: 'ri-cloud-line', svgIcon: '/images/esxi-logo.svg', color: '#638C1C' },
+            hyperv: { label: 'Microsoft Hyper-V', icon: 'ri-microsoft-line', svgIcon: '/images/hyperv-logo.svg', color: '#00BCF2' },
+            xcpng: { label: 'XCP-NG', icon: 'ri-server-line', svgIcon: '/images/xcpng-logo.svg', color: '#00ADB5' },
+          }
+          const grouped = externalHypervisors.reduce<Record<string, typeof externalHypervisors>>((acc, h) => {
+            if (!acc[h.type]) acc[h.type] = []
+            acc[h.type].push(h)
+            return acc
+          }, {})
+          const totalExtVms = externalHypervisors.reduce((acc, h) => acc + (h.vms?.length || 0), 0)
+
+          return (
+            <>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 3, mb: 1 }}>
+                <img src="/images/esxi-logo.svg" alt="" width={16} height={16} style={{ opacity: 0.7 }} />
+                <Typography variant="subtitle2" fontWeight={700} sx={{ opacity: 0.7 }}>MIGRATIONS</Typography>
+                <Chip size="small" label={`${externalHypervisors.length} hosts${totalExtVms > 0 ? `, ${totalExtVms} VMs` : ''}`} sx={{ height: 18, fontSize: 10, ml: 1 }} />
+                <Box sx={{ flex: 1, height: 1, bgcolor: 'divider', ml: 1 }} />
+              </Box>
+              <Stack spacing={1}>
+                {Object.entries(grouped).map(([type, conns]) => {
+                  const cfg = hypervisorConfig[type] || { label: type, icon: 'ri-server-line', color: '#999' }
+                  const typeVms = conns.reduce((acc, c) => acc + (c.vms?.length || 0), 0)
+                  return (
+                    <Card key={type} variant="outlined">
+                      <Box sx={{
+                        px: 2, py: 1.5, display: 'flex', alignItems: 'center', gap: 1.5,
+                        bgcolor: theme.palette.mode === 'dark' ? `${cfg.color}15` : `${cfg.color}08`,
+                      }}>
+                        {cfg.svgIcon
+                          ? <img src={cfg.svgIcon} alt="" width={18} height={18} style={{ opacity: 0.8 }} />
+                          : <i className={cfg.icon} style={{ fontSize: 18, color: cfg.color }} />
+                        }
+                        <Typography fontWeight={700}>{cfg.label}</Typography>
+                        <Chip size="small" label={`${conns.length} hosts`} sx={{ height: 18, fontSize: 10 }} />
+                        {typeVms > 0 && (
+                          <Typography variant="caption" sx={{ opacity: 0.6, ml: 'auto' }}>
+                            {typeVms} VMs
+                          </Typography>
+                        )}
+                      </Box>
+                    </Card>
+                  )
+                })}
+              </Stack>
+            </>
+          )
+        })()}
       </Stack>
 
       {/* Context menu for host bulk actions */}

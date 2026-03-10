@@ -283,6 +283,10 @@ type Props = {
   onCollapse?: () => void  // callback pour collapse/expand le panneau
   isCollapsed?: boolean  // état collapsed du panneau
   allowedViewModes?: Set<ViewMode>  // RBAC-filtered view modes (all if not provided)
+  onCreateVm?: (connId: string, node: string) => void  // callback to open Create VM dialog
+  onCreateLxc?: (connId: string, node: string) => void  // callback to open Create LXC dialog
+  onStoragesChange?: (storages: TreeClusterStorage[]) => void
+  onExternalHypervisorsChange?: (hypervisors: { id: string; name: string; type: string; vms?: { vmid: string; name: string; status: string; cpu?: number; memory_size_MiB?: number; guest_OS?: string }[] }[]) => void
 }
 
 type Connection = {
@@ -319,7 +323,7 @@ type TreeCluster = {
   }[]
 }
 
-type TreeStorageItem = {
+export type TreeStorageItem = {
   storage: string
   node: string
   type: string
@@ -333,7 +337,7 @@ type TreeStorageItem = {
   path?: string
 }
 
-type TreeClusterStorage = {
+export type TreeClusterStorage = {
   connId: string
   connName: string
   isCluster: boolean
@@ -792,7 +796,7 @@ function safeJson<T>(x: any): T {
   return (x?.data ?? x) as T
 }
 
-export default function InventoryTree({ selected, onSelect, onRefreshRef, viewMode: controlledViewMode, onViewModeChange, onAllVmsChange, onHostsChange, onPoolsChange, onTagsChange, onPbsServersChange, favorites: propFavorites, onToggleFavorite, migratingVmIds, pendingActionVmIds, onRefresh, refreshLoading, onCollapse, isCollapsed, allowedViewModes }: Props) {
+export default function InventoryTree({ selected, onSelect, onRefreshRef, viewMode: controlledViewMode, onViewModeChange, onAllVmsChange, onHostsChange, onPoolsChange, onTagsChange, onPbsServersChange, favorites: propFavorites, onToggleFavorite, migratingVmIds, pendingActionVmIds, onRefresh, refreshLoading, onCollapse, isCollapsed, allowedViewModes, onCreateVm, onCreateLxc, onStoragesChange, onExternalHypervisorsChange }: Props) {
   const t = useTranslations()
   const theme = useTheme()
   const router = useRouter()
@@ -1040,6 +1044,25 @@ return next
       setConvertingTemplate(false)
     }
   }, [templateTarget, onRefresh, trackTask, t])
+
+  // Node shell dialog state
+  const [shellDialog, setShellDialog] = useState<{ open: boolean; connId: string; node: string; loading: boolean; data: any | null; error: string | null }>({ open: false, connId: '', node: '', loading: false, data: null, error: null })
+
+  const handleOpenShell = async (connId: string, node: string) => {
+    setShellDialog({ open: true, connId, node, loading: true, data: null, error: null })
+    try {
+      const res = await fetch(`/api/v1/connections/${encodeURIComponent(connId)}/nodes/${encodeURIComponent(node)}/terminal`, { method: 'POST' })
+      if (res.ok) {
+        const json = await res.json()
+        setShellDialog(prev => ({ ...prev, loading: false, data: { ...json.data, node } }))
+      } else {
+        const err = await res.json().catch(() => ({}))
+        setShellDialog(prev => ({ ...prev, loading: false, error: err.error || res.statusText }))
+      }
+    } catch (e: any) {
+      setShellDialog(prev => ({ ...prev, loading: false, error: e.message || 'Connection failed' }))
+    }
+  }
 
   const [migrateDialogOpen, setMigrateDialogOpen] = useState(false)
   const [migrateTarget, setMigrateTarget] = useState<VmContextMenu>(null)
@@ -2405,6 +2428,16 @@ return favorites.has(vmKey)
   useEffect(() => {
     onPbsServersChange?.(pbsServers)
   }, [pbsServers, onPbsServersChange])
+
+  // Notifier le parent quand les storages changent
+  useEffect(() => {
+    onStoragesChange?.(clusterStorages)
+  }, [clusterStorages, onStoragesChange])
+
+  // Notifier le parent quand les hyperviseurs externes changent
+  useEffect(() => {
+    onExternalHypervisorsChange?.(externalHypervisors)
+  }, [externalHypervisors, onExternalHypervisorsChange])
 
   const flatItems = useMemo(() => {
     if (viewMode === 'vms') return displayVms
@@ -3983,6 +4016,38 @@ return (
             NODE
           </Typography>
         </Box>
+        {onCreateVm && (
+          <MenuItem onClick={() => {
+            if (nodeContextMenu) onCreateVm(nodeContextMenu.connId, nodeContextMenu.node)
+            handleCloseNodeContextMenu()
+          }}>
+            <ListItemIcon sx={{ minWidth: 32 }}>
+              <i className="ri-computer-line" style={{ fontSize: 18, color: '#3b82f6' }} />
+            </ListItemIcon>
+            <ListItemText>{t('inventory.createVm.title')}</ListItemText>
+          </MenuItem>
+        )}
+        {onCreateLxc && (
+          <MenuItem onClick={() => {
+            if (nodeContextMenu) onCreateLxc(nodeContextMenu.connId, nodeContextMenu.node)
+            handleCloseNodeContextMenu()
+          }}>
+            <ListItemIcon sx={{ minWidth: 32 }}>
+              <i className="ri-instance-line" style={{ fontSize: 18, color: '#a855f7' }} />
+            </ListItemIcon>
+            <ListItemText>{t('inventory.createLxc.title')}</ListItemText>
+          </MenuItem>
+        )}
+        <MenuItem onClick={() => {
+          if (nodeContextMenu) handleOpenShell(nodeContextMenu.connId, nodeContextMenu.node)
+          handleCloseNodeContextMenu()
+        }}>
+          <ListItemIcon sx={{ minWidth: 32 }}>
+            <i className="ri-terminal-box-line" style={{ fontSize: 18 }} />
+          </ListItemIcon>
+          <ListItemText>{t('inventory.tabShell')}</ListItemText>
+        </MenuItem>
+        <Divider />
         <MenuItem onClick={() => handleBulkActionClick('start-all')}>
           <ListItemIcon sx={{ minWidth: 32 }}>
             <PlayArrowIcon fontSize="small" sx={{ color: 'success.main' }} />
@@ -4497,6 +4562,60 @@ return (
           </DialogActions>
         </Dialog>
       )}
+
+      {/* Node Shell Dialog */}
+      <Dialog
+        open={shellDialog.open}
+        onClose={() => setShellDialog({ open: false, connId: '', node: '', loading: false, data: null, error: null })}
+        maxWidth="lg"
+        fullWidth
+        PaperProps={{ sx: { height: '80vh', bgcolor: '#0c0c0c' } }}
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1.5, bgcolor: '#1a1a1a', color: '#fff', py: 1.5 }}>
+          <i className="ri-terminal-box-line" style={{ fontSize: 20 }} />
+          <Typography variant="subtitle1" fontWeight={700} sx={{ flex: 1 }}>
+            {t('inventory.tabShell')} — {shellDialog.node}
+          </Typography>
+          <IconButton size="small" onClick={() => setShellDialog({ open: false, connId: '', node: '', loading: false, data: null, error: null })} sx={{ color: '#888' }}>
+            <i className="ri-close-line" style={{ fontSize: 18 }} />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent sx={{ p: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          {shellDialog.loading ? (
+            <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <CircularProgress size={32} sx={{ color: '#888' }} />
+              <Typography sx={{ ml: 2, color: '#888' }}>{t('inventory.connecting')}...</Typography>
+            </Box>
+          ) : shellDialog.error ? (
+            <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 2 }}>
+              <i className="ri-error-warning-line" style={{ fontSize: 48, color: '#ef4444' }} />
+              <Typography sx={{ color: '#ef4444' }}>{shellDialog.error}</Typography>
+              <Button variant="outlined" color="error" onClick={() => setShellDialog({ open: false, connId: '', node: '', loading: false, data: null, error: null })}>
+                {t('common.close')}
+              </Button>
+            </Box>
+          ) : shellDialog.data ? (
+            <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+              {(() => {
+                const XTermShell = require('@/components/xterm/XTermShell').default
+                return (
+                  <XTermShell
+                    wsUrl={shellDialog.data.wsUrl}
+                    host={shellDialog.data.host}
+                    port={shellDialog.data.port}
+                    ticket={shellDialog.data.ticket}
+                    node={shellDialog.data.node}
+                    user={shellDialog.data.user}
+                    pvePort={shellDialog.data.nodePort}
+                    apiToken={shellDialog.data.apiToken}
+                    onDisconnect={() => setShellDialog(prev => ({ ...prev, data: null, error: 'Disconnected' }))}
+                  />
+                )
+              })()}
+            </Box>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </Box>
   )
 }

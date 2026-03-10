@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { useLocale, useTranslations } from 'next-intl'
 
@@ -575,6 +575,10 @@ export default function InventoryDetails({
   onVmActionStart,
   onVmActionEnd,
   onOptimisticVmStatus,
+  clusterStorages = [],
+  externalHypervisors = [],
+  externalDialogRequest,
+  onExternalDialogHandled,
 }: {
   selection: InventorySelection | null
   onSelect?: (sel: InventorySelection) => void
@@ -597,6 +601,10 @@ export default function InventoryDetails({
   onVmActionStart?: (connId: string, vmid: string) => void
   onVmActionEnd?: (connId: string, vmid: string) => void
   onOptimisticVmStatus?: (connId: string, vmid: string, status: string) => void
+  clusterStorages?: import('./InventoryTree').TreeClusterStorage[]
+  externalHypervisors?: { id: string; name: string; type: string; vms?: { vmid: string; name: string; status: string }[] }[]
+  externalDialogRequest?: { type: 'createVm' | 'createLxc'; connId: string; node: string; ts: number } | null
+  onExternalDialogHandled?: () => void
 }) {
   const t = useTranslations()
   const dateLocale = getDateLocale(useLocale())
@@ -707,6 +715,34 @@ export default function InventoryDetails({
     }
     return {}
   }, [selection])
+
+  // External dialog request (e.g. from tree context menu)
+  const [externalCreateDefaults, setExternalCreateDefaults] = useState<{ connId?: string; node?: string }>({})
+  const lastHandledTs = useRef(0)
+
+  useEffect(() => {
+    if (externalDialogRequest && externalDialogRequest.ts !== lastHandledTs.current) {
+      lastHandledTs.current = externalDialogRequest.ts
+      setExternalCreateDefaults({ connId: externalDialogRequest.connId, node: externalDialogRequest.node })
+      if (externalDialogRequest.type === 'createVm') {
+        setActiveDialog('createVm')
+      } else {
+        setActiveDialog('createLxc')
+      }
+      onExternalDialogHandled?.()
+    }
+  }, [externalDialogRequest, onExternalDialogHandled])
+
+  // Merge createDefaults with external overrides
+  const effectiveCreateDefaults = useMemo(() => {
+    if (externalCreateDefaults.connId) return externalCreateDefaults
+    return createDefaults
+  }, [createDefaults, externalCreateDefaults])
+
+  // Clear external defaults when dialog closes
+  useEffect(() => {
+    if (activeDialog === 'none') setExternalCreateDefaults({})
+  }, [activeDialog])
 
   const [highlightedVmId, setHighlightedVmId] = useState<string | null>(null)
   const [creationPending, setCreationPending] = useState<{ vmid: string; connId: string; node: string; type: 'qemu' | 'lxc' } | null>(null)
@@ -5010,6 +5046,8 @@ return vm?.isCluster ?? false
           onCreateVm={() => setCreateVmDialogOpen(true)}
           onCreateLxc={() => setCreateLxcDialogOpen(true)}
           onBulkAction={handleHostBulkAction}
+          clusterStorages={clusterStorages}
+          externalHypervisors={externalHypervisors}
         />
       ) : !selection || selection?.type === 'root' ? (
         viewMode === 'vms' && displayVms.length > 0 ? (
@@ -7495,8 +7533,8 @@ return vm?.isCluster ?? false
         onClose={() => setCreateVmDialogOpen(false)}
         allVms={allVms}
         onCreated={handleVmCreated}
-        defaultConnId={createDefaults.connId}
-        defaultNode={createDefaults.node}
+        defaultConnId={effectiveCreateDefaults.connId}
+        defaultNode={effectiveCreateDefaults.node}
       />
 
       {/* Dialog Créer LXC */}
@@ -7505,8 +7543,8 @@ return vm?.isCluster ?? false
         onClose={() => setCreateLxcDialogOpen(false)}
         allVms={allVms}
         onCreated={handleLxcCreated}
-        defaultConnId={createDefaults.connId}
-        defaultNode={createDefaults.node}
+        defaultConnId={effectiveCreateDefaults.connId}
+        defaultNode={effectiveCreateDefaults.node}
       />
 
       {/* Dialogs Hardware */}

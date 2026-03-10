@@ -10,7 +10,7 @@ import { useTranslations } from 'next-intl'
 import { usePageTitle } from '@/contexts/PageTitleContext'
 import { useRBACScopeProfile } from '@/hooks/useRBACScopeProfile'
 
-import InventoryTree, { InventorySelection, ViewMode, AllVmItem, HostItem, PoolItem, TagItem, TreePbsServer } from './InventoryTree'
+import InventoryTree, { InventorySelection, ViewMode, AllVmItem, HostItem, PoolItem, TagItem, TreePbsServer, TreeClusterStorage } from './InventoryTree'
 import InventoryDetails from './InventoryDetails'
 
 type Connection = {
@@ -54,6 +54,8 @@ export default function InventoryPage() {
   const [pools, setPools] = useState<PoolItem[]>([])
   const [tags, setTags] = useState<TagItem[]>([])
   const [pbsServers, setPbsServers] = useState<TreePbsServer[]>([])
+  const [clusterStorages, setClusterStorages] = useState<TreeClusterStorage[]>([])
+  const [externalHypervisors, setExternalHypervisors] = useState<any[]>([])
   
   // État pour IP/Snapshots
   const [ipSnapLoading, setIpSnapLoading] = useState(false)
@@ -64,6 +66,10 @@ export default function InventoryPage() {
   
   // État pour collapse la tree
   const [isTreeCollapsed, setIsTreeCollapsed] = useState(false)
+
+  // Create VM/LXC dialog requests from tree context menu
+  const [createDialogRequest, setCreateDialogRequest] = useState<{ type: 'createVm' | 'createLxc'; connId: string; node: string; ts: number } | null>(null)
+
 
   // Données brutes des VMs (depuis InventoryTree) et données enrichies (IP, snapshots, uptime)
   const [rawVms, setRawVms] = useState<AllVmItem[]>([])
@@ -554,6 +560,10 @@ return () => setPageInfo('', '', '')
               onCollapse={() => setIsTreeCollapsed(!isTreeCollapsed)}
               isCollapsed={isTreeCollapsed}
               allowedViewModes={allowedViewModes}
+              onCreateVm={(connId, node) => setCreateDialogRequest({ type: 'createVm', connId, node, ts: Date.now() })}
+              onCreateLxc={(connId, node) => setCreateDialogRequest({ type: 'createLxc', connId, node, ts: Date.now() })}
+              onStoragesChange={setClusterStorages}
+              onExternalHypervisorsChange={setExternalHypervisors}
             />
           )}
         </Box>
@@ -630,6 +640,10 @@ return () => setPageInfo('', '', '')
             onVmActionStart={onVmActionStart}
             onVmActionEnd={onVmActionEnd}
             onOptimisticVmStatus={onOptimisticVmStatus}
+            clusterStorages={clusterStorages}
+            externalHypervisors={externalHypervisors}
+            externalDialogRequest={createDialogRequest}
+            onExternalDialogHandled={() => setCreateDialogRequest(null)}
             onRefresh={async () => {
               if (refreshTree) {
                 refreshTree()

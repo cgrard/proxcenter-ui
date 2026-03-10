@@ -419,6 +419,7 @@
     "clusters": "Clusters",
     "expandAll": "Tout déplier",
     "collapseAll": "Tout replier",
+    "expandInTree": "— voir dans l'arbre",
     "headerProxmoxVe": "Proxmox VE",
     "headerProxmoxStorage": "Stockage Proxmox",
     "headerProxmoxBackup": "Proxmox Backup Server",
