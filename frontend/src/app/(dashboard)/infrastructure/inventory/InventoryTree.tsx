@@ -3068,17 +3068,18 @@ return (
         {/* ── Proxmox VE Section ── */}
         {filteredClusters.length > 0 && (
           <Box
-            onClick={() => toggleSection('pve')}
             sx={{
               display: 'flex', alignItems: 'center', gap: 1, px: 1.5, py: 0.75,
               bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',
               borderTop: '1px solid', borderBottom: '1px solid', borderColor: 'divider',
-              cursor: 'pointer', '&:hover': { bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.09)' },
+              cursor: 'default', '&:hover': { bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.09)' },
             }}
           >
-            <i className={collapsedSections.has('pve') ? 'ri-add-line' : 'ri-subtract-line'} style={{ fontSize: 14, opacity: 0.7 }} />
-            <img src={theme.palette.mode === 'dark' ? '/images/proxmox-logo-dark.svg' : '/images/proxmox-logo.svg'} alt="" style={{ width: 14, height: 14 }} />
-            <Typography variant="body2" sx={{ fontWeight: 700 }}>{t('inventory.headerProxmoxVe')}</Typography>
+            <i className={collapsedSections.has('pve') ? 'ri-add-line' : 'ri-subtract-line'} style={{ fontSize: 14, opacity: 0.7, cursor: 'pointer' }} onClick={() => toggleSection('pve')} />
+            <Box onClick={() => onSelect({ type: 'root', id: 'root' })} sx={{ display: 'flex', alignItems: 'center', gap: 1, cursor: 'pointer' }}>
+              <img src={theme.palette.mode === 'dark' ? '/images/proxmox-logo-dark.svg' : '/images/proxmox-logo.svg'} alt="" style={{ width: 14, height: 14 }} />
+              <Typography variant="body2" sx={{ fontWeight: 700 }}>{t('inventory.headerProxmoxVe')}</Typography>
+            </Box>
             <Typography variant="caption" sx={{ opacity: 0.5 }}>
               ({(() => {
                 const realClusters = filteredClusters.filter(c => c.isCluster).length
