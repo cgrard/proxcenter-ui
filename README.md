@@ -19,7 +19,6 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Proxmox-8.x%20%7C%209.x-E57000" alt="Proxmox">
   <img src="https://img.shields.io/badge/License-Community%20%7C%20Enterprise-blue" alt="License">
-  <a href="https://github.com/adminsyspro/proxcenter-ui/pkgs/container/proxcenter-frontend"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fipitio.github.io%2Fbackage%2Fadminsyspro%2Fproxcenter-frontend%2Fproxcenter-frontend.json&query=%24.downloads&label=Docker%20Pulls&color=2496ED&logo=docker&logoColor=white" alt="Docker Pulls"></a>
   <a href="https://github.com/adminsyspro/proxcenter-ui/actions/workflows/codeql.yml"><img src="https://github.com/adminsyspro/proxcenter-ui/actions/workflows/codeql.yml/badge.svg" alt="CodeQL"></a>
   <a href="https://github.com/adminsyspro/proxcenter-ui/actions/workflows/security-scan.yml"><img src="https://github.com/adminsyspro/proxcenter-ui/actions/workflows/security-scan.yml/badge.svg" alt="Security Scan"></a>
   <a href="https://github.com/adminsyspro/proxcenter-ui/stargazers"><img src="https://img.shields.io/github/stars/adminsyspro/proxcenter-ui?style=flat&color=f5c542&logo=github" alt="Stars"></a>
