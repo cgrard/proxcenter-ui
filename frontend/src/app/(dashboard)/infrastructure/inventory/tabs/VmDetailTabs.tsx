@@ -29,6 +29,7 @@ import {
   ListItemButton,
   ListItemIcon,
   ListItemText,
+  ListSubheader,
   Menu,
   MenuItem,
   Select,
@@ -641,16 +642,91 @@ export default function VmDetailTabs(props: any) {
                               label={t('inventory.cpuType')}
                               onChange={(e) => setCpuType(e.target.value)}
                             >
+                              <ListSubheader>Special</ListSubheader>
                               <MenuItem value="host">host ({t('inventory.maxPerformance')})</MenuItem>
+                              <MenuItem value="max">max</MenuItem>
                               <MenuItem value="kvm64">kvm64 ({t('inventory.compatible')})</MenuItem>
+                              <MenuItem value="kvm32">kvm32</MenuItem>
                               <MenuItem value="qemu64">qemu64 ({t('inventory.emulation')})</MenuItem>
-                              <MenuItem value="Broadwell">Intel Broadwell</MenuItem>
-                              <MenuItem value="Haswell">Intel Haswell</MenuItem>
-                              <MenuItem value="IvyBridge">Intel IvyBridge</MenuItem>
-                              <MenuItem value="SandyBridge">Intel SandyBridge</MenuItem>
-                              <MenuItem value="Skylake-Client">Intel Skylake</MenuItem>
-                              <MenuItem value="EPYC">AMD EPYC</MenuItem>
-                              <MenuItem value="Opteron_G5">AMD Opteron G5</MenuItem>
+                              <MenuItem value="qemu32">qemu32</MenuItem>
+                              <ListSubheader>x86-64 Microarchitecture Levels</ListSubheader>
+                              <MenuItem value="x86-64-v2">x86-64-v2</MenuItem>
+                              <MenuItem value="x86-64-v2-AES">x86-64-v2-AES (Recommended)</MenuItem>
+                              <MenuItem value="x86-64-v3">x86-64-v3</MenuItem>
+                              <MenuItem value="x86-64-v4">x86-64-v4</MenuItem>
+                              <ListSubheader>Intel</ListSubheader>
+                              <MenuItem value="486">486</MenuItem>
+                              <MenuItem value="pentium">Pentium</MenuItem>
+                              <MenuItem value="pentium2">Pentium 2</MenuItem>
+                              <MenuItem value="pentium3">Pentium 3</MenuItem>
+                              <MenuItem value="Conroe">Conroe</MenuItem>
+                              <MenuItem value="Penryn">Penryn</MenuItem>
+                              <MenuItem value="Nehalem">Nehalem</MenuItem>
+                              <MenuItem value="Nehalem-IBRS">Nehalem-IBRS</MenuItem>
+                              <MenuItem value="Westmere">Westmere</MenuItem>
+                              <MenuItem value="Westmere-IBRS">Westmere-IBRS</MenuItem>
+                              <MenuItem value="SandyBridge">SandyBridge</MenuItem>
+                              <MenuItem value="SandyBridge-IBRS">SandyBridge-IBRS</MenuItem>
+                              <MenuItem value="IvyBridge">IvyBridge</MenuItem>
+                              <MenuItem value="IvyBridge-IBRS">IvyBridge-IBRS</MenuItem>
+                              <MenuItem value="Haswell">Haswell</MenuItem>
+                              <MenuItem value="Haswell-IBRS">Haswell-IBRS</MenuItem>
+                              <MenuItem value="Haswell-noTSX">Haswell-noTSX</MenuItem>
+                              <MenuItem value="Haswell-noTSX-IBRS">Haswell-noTSX-IBRS</MenuItem>
+                              <MenuItem value="Broadwell">Broadwell</MenuItem>
+                              <MenuItem value="Broadwell-IBRS">Broadwell-IBRS</MenuItem>
+                              <MenuItem value="Broadwell-noTSX">Broadwell-noTSX</MenuItem>
+                              <MenuItem value="Broadwell-noTSX-IBRS">Broadwell-noTSX-IBRS</MenuItem>
+                              <MenuItem value="Skylake-Client">Skylake-Client</MenuItem>
+                              <MenuItem value="Skylake-Client-IBRS">Skylake-Client-IBRS</MenuItem>
+                              <MenuItem value="Skylake-Client-noTSX-IBRS">Skylake-Client-noTSX-IBRS</MenuItem>
+                              <MenuItem value="Skylake-Client-v4">Skylake-Client-v4</MenuItem>
+                              <MenuItem value="Skylake-Server">Skylake-Server</MenuItem>
+                              <MenuItem value="Skylake-Server-IBRS">Skylake-Server-IBRS</MenuItem>
+                              <MenuItem value="Skylake-Server-noTSX-IBRS">Skylake-Server-noTSX-IBRS</MenuItem>
+                              <MenuItem value="Skylake-Server-v4">Skylake-Server-v4</MenuItem>
+                              <MenuItem value="Skylake-Server-v5">Skylake-Server-v5</MenuItem>
+                              <MenuItem value="Cascadelake-Server">Cascadelake-Server</MenuItem>
+                              <MenuItem value="Cascadelake-Server-noTSX">Cascadelake-Server-noTSX</MenuItem>
+                              <MenuItem value="Cascadelake-Server-v2">Cascadelake-Server-v2</MenuItem>
+                              <MenuItem value="Cascadelake-Server-v4">Cascadelake-Server-v4</MenuItem>
+                              <MenuItem value="Cascadelake-Server-v5">Cascadelake-Server-v5</MenuItem>
+                              <MenuItem value="Cooperlake">Cooperlake</MenuItem>
+                              <MenuItem value="Cooperlake-v2">Cooperlake-v2</MenuItem>
+                              <MenuItem value="Icelake-Client">Icelake-Client</MenuItem>
+                              <MenuItem value="Icelake-Client-noTSX">Icelake-Client-noTSX</MenuItem>
+                              <MenuItem value="Icelake-Server">Icelake-Server</MenuItem>
+                              <MenuItem value="Icelake-Server-noTSX">Icelake-Server-noTSX</MenuItem>
+                              <MenuItem value="Icelake-Server-v3">Icelake-Server-v3</MenuItem>
+                              <MenuItem value="Icelake-Server-v4">Icelake-Server-v4</MenuItem>
+                              <MenuItem value="Icelake-Server-v5">Icelake-Server-v5</MenuItem>
+                              <MenuItem value="Icelake-Server-v6">Icelake-Server-v6</MenuItem>
+                              <MenuItem value="SapphireRapids">SapphireRapids</MenuItem>
+                              <MenuItem value="SapphireRapids-v2">SapphireRapids-v2</MenuItem>
+                              <MenuItem value="GraniteRapids">GraniteRapids</MenuItem>
+                              <MenuItem value="KnightsMill">KnightsMill</MenuItem>
+                              <ListSubheader>AMD</ListSubheader>
+                              <MenuItem value="athlon">Athlon</MenuItem>
+                              <MenuItem value="phenom">Phenom</MenuItem>
+                              <MenuItem value="Opteron_G1">Opteron G1</MenuItem>
+                              <MenuItem value="Opteron_G2">Opteron G2</MenuItem>
+                              <MenuItem value="Opteron_G3">Opteron G3</MenuItem>
+                              <MenuItem value="Opteron_G4">Opteron G4</MenuItem>
+                              <MenuItem value="Opteron_G5">Opteron G5</MenuItem>
+                              <MenuItem value="EPYC">EPYC</MenuItem>
+                              <MenuItem value="EPYC-IBPB">EPYC-IBPB</MenuItem>
+                              <MenuItem value="EPYC-v3">EPYC-v3</MenuItem>
+                              <MenuItem value="EPYC-v4">EPYC-v4</MenuItem>
+                              <MenuItem value="EPYC-Rome">EPYC-Rome</MenuItem>
+                              <MenuItem value="EPYC-Rome-v2">EPYC-Rome-v2</MenuItem>
+                              <MenuItem value="EPYC-Rome-v3">EPYC-Rome-v3</MenuItem>
+                              <MenuItem value="EPYC-Rome-v4">EPYC-Rome-v4</MenuItem>
+                              <MenuItem value="EPYC-Milan">EPYC-Milan</MenuItem>
+                              <MenuItem value="EPYC-Milan-v2">EPYC-Milan-v2</MenuItem>
+                              <MenuItem value="EPYC-Genoa">EPYC-Genoa</MenuItem>
+                              <ListSubheader>Legacy</ListSubheader>
+                              <MenuItem value="coreduo">Core Duo</MenuItem>
+                              <MenuItem value="core2duo">Core 2 Duo</MenuItem>
                             </Select>
                           </FormControl>
 

@@ -20,6 +20,7 @@ import {
   IconButton,
   InputAdornment,
   InputLabel,
+  ListSubheader,
   MenuItem,
   Select,
   Slider,
@@ -1159,11 +1160,40 @@ return
             <FormControl fullWidth size="small">
               <InputLabel>{t('inventory.createVm.cpuType')}</InputLabel>
               <Select value={cpuType} onChange={(e) => setCpuType(e.target.value)} label={t('inventory.createVm.cpuType')}>
-                <MenuItem value="x86-64-v2-AES">x86-64-v2-AES</MenuItem>
+                <ListSubheader>Special</ListSubheader>
                 <MenuItem value="host">host</MenuItem>
-                <MenuItem value="kvm64">kvm64</MenuItem>
-                <MenuItem value="qemu64">qemu64</MenuItem>
                 <MenuItem value="max">max</MenuItem>
+                <MenuItem value="kvm64">kvm64</MenuItem>
+                <MenuItem value="kvm32">kvm32</MenuItem>
+                <MenuItem value="qemu64">qemu64</MenuItem>
+                <MenuItem value="qemu32">qemu32</MenuItem>
+                <ListSubheader>x86-64 Levels</ListSubheader>
+                <MenuItem value="x86-64-v2">x86-64-v2</MenuItem>
+                <MenuItem value="x86-64-v2-AES">x86-64-v2-AES (Recommended)</MenuItem>
+                <MenuItem value="x86-64-v3">x86-64-v3</MenuItem>
+                <MenuItem value="x86-64-v4">x86-64-v4</MenuItem>
+                <ListSubheader>Intel</ListSubheader>
+                <MenuItem value="Conroe">Conroe</MenuItem>
+                <MenuItem value="Penryn">Penryn</MenuItem>
+                <MenuItem value="Nehalem">Nehalem</MenuItem>
+                <MenuItem value="Westmere">Westmere</MenuItem>
+                <MenuItem value="SandyBridge">SandyBridge</MenuItem>
+                <MenuItem value="IvyBridge">IvyBridge</MenuItem>
+                <MenuItem value="Haswell">Haswell</MenuItem>
+                <MenuItem value="Broadwell">Broadwell</MenuItem>
+                <MenuItem value="Skylake-Client">Skylake-Client</MenuItem>
+                <MenuItem value="Skylake-Server">Skylake-Server</MenuItem>
+                <MenuItem value="Cascadelake-Server">Cascadelake-Server</MenuItem>
+                <MenuItem value="Cooperlake">Cooperlake</MenuItem>
+                <MenuItem value="Icelake-Server">Icelake-Server</MenuItem>
+                <MenuItem value="SapphireRapids">SapphireRapids</MenuItem>
+                <MenuItem value="GraniteRapids">GraniteRapids</MenuItem>
+                <ListSubheader>AMD</ListSubheader>
+                <MenuItem value="Opteron_G5">Opteron G5</MenuItem>
+                <MenuItem value="EPYC">EPYC</MenuItem>
+                <MenuItem value="EPYC-Rome">EPYC-Rome</MenuItem>
+                <MenuItem value="EPYC-Milan">EPYC-Milan</MenuItem>
+                <MenuItem value="EPYC-Genoa">EPYC-Genoa</MenuItem>
               </Select>
             </FormControl>
             

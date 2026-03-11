@@ -88,7 +88,7 @@ docker compose restart          # Restart
 ## Requirements
 
 - Docker & Docker Compose
-- Proxmox VE 7.x, 8.x or 9.x
+- Proxmox VE 8.x or 9.x
 - Network access to Proxmox API (port 8006)
 
 ## Security
@@ -98,7 +98,7 @@ Automated scanning via **CodeQL**, **Trivy**, and **Dependabot**. Report vulnera
 ## License
 
 - **Community**: Free for personal and commercial use
-- **Enterprise**: Commercial license — [proxcenter.io/pricing](https://proxcenter.io/pricing)
+- **Enterprise**: Commercial license
 
 ## Support
 

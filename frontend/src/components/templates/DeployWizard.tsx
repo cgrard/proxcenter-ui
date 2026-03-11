@@ -16,6 +16,7 @@ import {
   FormControl,
   FormControlLabel,
   InputLabel,
+  ListSubheader,
   MenuItem,
   Select,
   Stack,
@@ -492,9 +493,27 @@ export default function DeployWizard({ open, onClose, image, prefillBlueprint }:
       <FormControl size="small">
         <InputLabel>{t('templates.deploy.hardware.cpuType')}</InputLabel>
         <Select value={cpu} onChange={e => setCpu(e.target.value)} label={t('templates.deploy.hardware.cpuType')}>
+          <ListSubheader>Special</ListSubheader>
           <MenuItem value="host">host</MenuItem>
-          <MenuItem value="x86-64-v2-AES">x86-64-v2-AES</MenuItem>
+          <MenuItem value="max">max</MenuItem>
           <MenuItem value="kvm64">kvm64</MenuItem>
+          <MenuItem value="qemu64">qemu64</MenuItem>
+          <ListSubheader>x86-64 Levels</ListSubheader>
+          <MenuItem value="x86-64-v2">x86-64-v2</MenuItem>
+          <MenuItem value="x86-64-v2-AES">x86-64-v2-AES (Recommended)</MenuItem>
+          <MenuItem value="x86-64-v3">x86-64-v3</MenuItem>
+          <MenuItem value="x86-64-v4">x86-64-v4</MenuItem>
+          <ListSubheader>Intel</ListSubheader>
+          <MenuItem value="Broadwell">Broadwell</MenuItem>
+          <MenuItem value="Skylake-Server">Skylake-Server</MenuItem>
+          <MenuItem value="Cascadelake-Server">Cascadelake-Server</MenuItem>
+          <MenuItem value="Icelake-Server">Icelake-Server</MenuItem>
+          <MenuItem value="SapphireRapids">SapphireRapids</MenuItem>
+          <ListSubheader>AMD</ListSubheader>
+          <MenuItem value="EPYC">EPYC</MenuItem>
+          <MenuItem value="EPYC-Rome">EPYC-Rome</MenuItem>
+          <MenuItem value="EPYC-Milan">EPYC-Milan</MenuItem>
+          <MenuItem value="EPYC-Genoa">EPYC-Genoa</MenuItem>
         </Select>
       </FormControl>
       <TextField
