@@ -357,6 +357,8 @@ type VmsTableProps = {
   onToggleFavorite?: (vm: VmRow) => void  // Callback pour ajouter/retirer des favoris
   // Migration
   migratingVmIds?: Set<string>  // IDs des VMs en cours de migration (format: "connId:vmid")
+  // Colonnes masquées par défaut (en plus de vmid)
+  defaultHiddenColumns?: string[]
 }
 
 /* -----------------------------
@@ -387,7 +389,8 @@ function VmsTable({
   highlightedId = null,
   favorites,
   onToggleFavorite,
-  migratingVmIds
+  migratingVmIds,
+  defaultHiddenColumns
 }: VmsTableProps) {
   const theme = useTheme()
   const t = useTranslations()
@@ -412,25 +415,35 @@ return migratingVmIds.has(`${connId}:${vmid}`)
   // État pour le menu de sélection des colonnes
   const [columnsMenuAnchor, setColumnsMenuAnchor] = useState<null | HTMLElement>(null)
 
-  const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({
-    vmid: false,  // ID masqué par défaut
-    favorite: true,
-    name: true,
-    type: true,
-    status: true,
-    node: true,
-    ha: true,
-    cpu: true,
-    ram: true,
-    maxmem: true,
-    disk: true,
-    tags: true,
-    ip: true,
-    snapshots: true,
-    osInfo: true,
-    uptime: true,
-    trend: true,
-    actions: true,
+  const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>(() => {
+    const defaults: Record<string, boolean> = {
+      vmid: false,
+      favorite: true,
+      name: true,
+      type: true,
+      status: true,
+      node: true,
+      ha: true,
+      cpu: true,
+      ram: true,
+      maxmem: true,
+      disk: true,
+      tags: true,
+      ip: true,
+      snapshots: true,
+      osInfo: true,
+      uptime: true,
+      trend: true,
+      actions: true,
+    }
+
+    if (defaultHiddenColumns) {
+      for (const col of defaultHiddenColumns) {
+        defaults[col] = false
+      }
+    }
+
+    return defaults
   })
   
   // État pour le menu contextuel (clic droit)
@@ -653,7 +666,8 @@ return { id: vm.id, data }
       {
         field: 'favorite',
         headerName: '',
-        width: 36,
+        width: 28,
+        maxWidth: 28,
         sortable: false,
         disableColumnMenu: true,
         renderHeader: () => (
@@ -1471,7 +1485,7 @@ return true
               ) : (
                 <>
                   <i className='ri-download-cloud-line' style={{ fontSize: 14 }} />
-                  <span>{t('common.refresh')}</span>
+                  <span>{t('common.loadDetails')}</span>
                 </>
               )}
             </Box>

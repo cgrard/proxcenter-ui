@@ -26,6 +26,7 @@ type GroupedVmsViewProps = {
     label: string
     sublabel?: string
     color?: string
+    icon?: React.ReactNode
     vms: AllVmItem[]
   }[]
   allVms: AllVmItem[]
@@ -146,12 +147,13 @@ return next
                       className={isExpanded ? 'ri-arrow-down-s-line' : 'ri-arrow-right-s-line'} 
                       style={{ fontSize: 18, opacity: 0.7 }} 
                     />
+                    {group.icon && group.icon}
                     {group.color && (
-                      <Box sx={{ 
-                        width: 12, 
-                        height: 12, 
-                        borderRadius: 0.5, 
-                        bgcolor: group.color 
+                      <Box sx={{
+                        width: 12,
+                        height: 12,
+                        borderRadius: 0.5,
+                        bgcolor: group.color
                       }} />
                     )}
                     <Typography fontWeight={700} sx={{ flex: 1 }}>

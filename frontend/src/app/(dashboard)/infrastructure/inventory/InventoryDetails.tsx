@@ -961,12 +961,13 @@ function StorageIntermediatePanel({ selection, clusterStorages, onSelect }: {
 /* Storage content group with search + sort                           */
 /* ------------------------------------------------------------------ */
 
-function StorageContentGroup({ group, formatBytes: fmt, onUpload, onDelete, onDownloadTemplate }: {
+function StorageContentGroup({ group, formatBytes: fmt, onUpload, onDelete, onDownloadTemplate, vmNames }: {
   group: { label: string; icon: string; items: any[]; contentType?: string }
   formatBytes: (n: number) => string
   onUpload?: () => void
   onDelete?: (volid: string) => Promise<void>
   onDownloadTemplate?: () => void
+  vmNames?: Record<string, string>
 }) {
   const [search, setSearch] = React.useState('')
   const [sortDir, setSortDir] = React.useState<'asc' | 'desc' | null>(null)
@@ -998,7 +999,8 @@ function StorageContentGroup({ group, formatBytes: fmt, onUpload, onDelete, onDo
       items = items.filter((item: any) => {
         const volid = String(item.volid || '').toLowerCase()
         const vmid = item.vmid ? String(item.vmid) : ''
-        return volid.includes(q) || vmid.includes(q)
+        const vmName = (item.vmid && vmNames?.[String(item.vmid)]) ? vmNames[String(item.vmid)].toLowerCase() : ''
+        return volid.includes(q) || vmid.includes(q) || vmName.includes(q)
       })
     }
     if (sortDir) {
@@ -1100,7 +1102,7 @@ function StorageContentGroup({ group, formatBytes: fmt, onUpload, onDelete, onDo
                 </Typography>
                 {item.vmid && (
                   <Typography variant="caption" sx={{ opacity: 0.4, flexShrink: 0, fontSize: 10 }}>
-                    VM {item.vmid}
+                    VM {item.vmid}{vmNames?.[String(item.vmid)] ? ` (${vmNames[String(item.vmid)]})` : ''}
                   </Typography>
                 )}
                 <Typography variant="caption" sx={{ opacity: 0.4, flexShrink: 0, fontFamily: 'JetBrains Mono, monospace', fontSize: 10 }}>
@@ -2135,6 +2137,15 @@ return next
 
   // VMs sans templates (pour affichage dans les modes vms, tree, hosts, pools, tags)
   const displayVms = useMemo(() => allVms.filter(vm => !vm.template), [allVms])
+
+  // Mapping vmid → name pour affichage dans storage content
+  const vmNamesMap = useMemo(() => {
+    const map: Record<string, string> = {}
+    for (const vm of allVms) {
+      if (vm.name) map[String(vm.vmid)] = vm.name
+    }
+    return map
+  }, [allVms])
 
   // Quand une création est en attente, poll pour voir si la VM apparaît
   useEffect(() => {
@@ -5855,7 +5866,7 @@ return vm?.isCluster ?? false
   }, [selection, allVms])
 
   return (
-    <Box sx={{ p: selection && selection.type !== 'root' && !selection.type.endsWith('-root') ? 2.5 : 0, width: '100%' }}>
+    <Box sx={{ p: selection && selection.type !== 'root' && !selection.type.endsWith('-root') ? 2.5 : 0, width: '100%', ...(viewMode === 'vms' || viewMode === 'hosts' || viewMode === 'pools' || viewMode === 'tags' || viewMode === 'favorites' ? { height: '100%', display: 'flex', flexDirection: 'column' } : {}) }}>
       {progress}
 
       {error ? (
@@ -6012,6 +6023,7 @@ return vm?.isCluster ?? false
                     favorites={favorites}
                     onToggleFavorite={toggleFavorite}
                     migratingVmIds={migratingVmIds}
+                    defaultHiddenColumns={['type', 'node', 'ha']}
                   />
                 </Box>
               </CardContent>
@@ -6025,6 +6037,7 @@ return vm?.isCluster ?? false
               key: h.key,
               label: h.node,
               sublabel: h.connName,
+              icon: <img src={theme.palette.mode === 'dark' ? '/images/proxmox-logo-dark.svg' : '/images/proxmox-logo.svg'} alt="" width={16} height={16} style={{ opacity: 0.8 }} />,
               vms: h.vms
             }))}
             allVms={displayVms}
@@ -6244,6 +6257,21 @@ return vm?.isCluster ?? false
                   <Typography variant="subtitle1" fontWeight={900} noWrap sx={{ minWidth: 0, flexShrink: 1 }}>
                     {data.title} <Typography component="span" variant="body2" sx={{ color: 'text.disabled', fontWeight: 400 }}>({vmid})</Typography>
                   </Typography>
+                  {/* Favorite star */}
+                  {(() => {
+                    const vmKey = `${connId}:${node}:${isLxc ? 'lxc' : 'qemu'}:${vmid}`
+                    const isFav = favorites.has(vmKey)
+
+                    return (
+                      <IconButton
+                        size="small"
+                        onClick={() => toggleFavorite({ id: vmKey, connId, node, type: isLxc ? 'lxc' : 'qemu', vmid, name: data.title })}
+                        sx={{ p: 0.25, flexShrink: 0, color: isFav ? '#ffc107' : 'text.disabled', '&:hover': { color: '#ffc107' } }}
+                      >
+                        <i className={isFav ? 'ri-star-fill' : 'ri-star-line'} style={{ fontSize: 16 }} />
+                      </IconButton>
+                    )
+                  })()}
                   {pendingActionVmIds?.has(`${connId}:${vmid}`) && (
                     <CircularProgress size={16} thickness={5} sx={{ flexShrink: 0 }} />
                   )}
@@ -8001,6 +8029,7 @@ return vm?.isCluster ?? false
                         key={contentType}
                         group={group}
                         formatBytes={formatBytes}
+                        vmNames={vmNamesMap}
                         onUpload={['iso', 'snippets', 'vztmpl', 'import'].includes(contentType) ? () => setStorageUploadOpen(true) : undefined}
                         onDownloadTemplate={contentType === 'vztmpl' ? () => setTemplateDialogOpen(true) : undefined}
                         onDelete={async (volid: string) => {
