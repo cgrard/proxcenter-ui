@@ -542,7 +542,7 @@ return () => setPageInfo('', '', '')
           ) : (
             <InventoryTree
               selected={selection}
-              onSelect={setSelection}
+              onSelect={(sel) => setSelection(sel)}
               onRefreshRef={handleRefreshRef}
               viewMode={viewMode}
               onViewModeChange={setViewMode}
@@ -621,7 +621,7 @@ return () => setPageInfo('', '', '')
         <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
           <InventoryDetails
             selection={selection}
-            onSelect={setSelection}
+            onSelect={(sel: any) => setSelection(sel)}
             onBack={() => setSelection(null)}
             viewMode={viewMode}
             onViewModeChange={setViewMode}

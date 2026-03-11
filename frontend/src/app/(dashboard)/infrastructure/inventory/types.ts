@@ -13,6 +13,9 @@ export type InventorySelection =
   | { type: 'extvm'; id: string }    // external hypervisor VM (connectionId:vmid)
   | { type: 'storage-root'; id: 'storage-root' }
   | { type: 'network-root'; id: 'network-root' }
+  | { type: 'net-conn'; id: string }
+  | { type: 'net-node'; id: string }
+  | { type: 'net-vlan'; id: string }
   | { type: 'backup-root'; id: 'backup-root' }
   | { type: 'migration-root'; id: 'migration-root' }
 
