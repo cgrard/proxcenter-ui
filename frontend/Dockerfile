@@ -53,6 +53,11 @@ ENV NEXT_PUBLIC_GIT_SHA=${GIT_SHA}
 ARG APP_VERSION=dev
 ENV NEXT_PUBLIC_APP_VERSION=$APP_VERSION
 
+# Demo mode (set to "true" for demo builds — inlined at build time)
+ARG DEMO_MODE=""
+ENV DEMO_MODE=${DEMO_MODE}
+ENV NEXT_PUBLIC_DEMO_MODE=${DEMO_MODE}
+
 # Create data directory for SQLite (needed during build for page data collection)
 RUN mkdir -p /app/data
 
@@ -70,6 +75,10 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV GIT_SHA=${GIT_SHA}
+
+# Demo mode (runtime — middleware checks this)
+ARG DEMO_MODE=""
+ENV DEMO_MODE=${DEMO_MODE}
 
 # Install runtime dependencies
 RUN apk add --no-cache sqlite-dev
