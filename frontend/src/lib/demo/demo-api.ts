@@ -1659,7 +1659,7 @@ function buildInventorySSE(): Response {
  * if (demo) return demo
  * ```
  */
-export function demoResponse(req: Request): NextResponse | null {
+export function demoResponse(req: Request): NextResponse | Response | null {
   // 1. Check demo mode
   if (process.env.DEMO_MODE !== 'true') return null
 
