@@ -791,7 +791,7 @@ function selectionFromItemId(itemId: string): InventorySelection | null {
     return { type: type as any, id } as InventorySelection
   }
 
-  if (type === 'net-conn' || type === 'net-node' || type === 'net-vlan') {
+  if (type === 'net-conn' || type === 'net-node' || type === 'net-vlan' || type === 'storage-cluster' || type === 'storage-node') {
     return { type: type as any, id } as InventorySelection
   }
 
