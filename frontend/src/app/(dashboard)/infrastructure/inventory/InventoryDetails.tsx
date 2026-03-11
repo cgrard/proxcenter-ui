@@ -5563,6 +5563,17 @@ return vm?.isCluster ?? false
                 </Box>
               ) : null}
 
+              {/* Refresh button for storage */}
+              {selection?.type === 'storage' && (
+                <Box sx={{ ml: 'auto' }}>
+                  <MuiTooltip title={t('common.refresh')}>
+                    <IconButton size="small" onClick={refreshData} disabled={refreshing} sx={{ bgcolor: 'action.hover', '&:hover': { bgcolor: 'action.selected' }, '@keyframes spin': { '0%': { transform: 'rotate(0deg)' }, '100%': { transform: 'rotate(360deg)' } }, ...(refreshing && { '& i': { animation: 'spin 1s linear infinite' } }) }}>
+                      <i className="ri-refresh-line" style={{ fontSize: 18 }} />
+                    </IconButton>
+                  </MuiTooltip>
+                </Box>
+              )}
+
               {/* Refresh + Boutons Create VM/LXC pour clusters et hosts */}
               {(selection?.type === 'cluster' || selection?.type === 'node') && (
                 <Stack direction="row" spacing={1} alignItems="center" sx={{ ml: data.hostInfo?.uptime ? 2 : 'auto' }}>
