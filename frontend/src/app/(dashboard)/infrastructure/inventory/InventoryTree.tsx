@@ -2617,7 +2617,7 @@ return favorites.has(vmKey)
           )}
           {(!allowedViewModes || allowedViewModes.has('favorites')) && (
             <ToggleButton value="favorites">
-              <Tooltip title={`(${favoritesList.length})`}>
+              <Tooltip title={`${t('navigation.favorites')} (${favoritesList.length})`}>
                 <i className={favoritesList.length > 0 ? "ri-star-fill" : "ri-star-line"} style={{ fontSize: 16, color: favoritesList.length > 0 ? '#ffc107' : undefined }} />
               </Tooltip>
             </ToggleButton>
