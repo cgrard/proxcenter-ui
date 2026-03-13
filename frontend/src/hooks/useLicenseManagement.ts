@@ -48,10 +48,17 @@ export function useLicenseManagement() {
     setSuccess(null)
 
     try {
+      // Clean up whitespace artifacts from PDF copy-paste
+      const cleanedKey = licenseKey
+        .split('\n')
+        .map((line) => line.trimEnd())
+        .join('\n')
+        .trim()
+
       const res = await fetch('/api/v1/license/activate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ license: licenseKey }),
+        body: JSON.stringify({ license: cleanedKey }),
       })
 
       const data = await res.json()
