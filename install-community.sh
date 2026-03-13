@@ -109,12 +109,16 @@ install_docker() {
         return
     fi
 
+    # Install required dependencies (openssl, curl may be missing on minimal installs)
+    log_info "Installing dependencies..."
+    $PKG_INSTALL openssl curl ca-certificates
+
     log_info "Installing Docker..."
 
     case $OS in
         ubuntu|debian)
             apt-get remove -y docker docker-engine docker.io containerd runc 2>/dev/null || true
-            $PKG_INSTALL ca-certificates curl gnupg lsb-release
+            $PKG_INSTALL gnupg lsb-release
             install -m 0755 -d /etc/apt/keyrings
             curl -fsSL https://download.docker.com/linux/$OS/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
             chmod a+r /etc/apt/keyrings/docker.gpg
