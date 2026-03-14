@@ -10,6 +10,7 @@ export type InventorySelection =
   | { type: 'pbs-datastore'; id: string }
   | { type: 'datastore'; id: string }
   | { type: 'ext'; id: string }      // external hypervisor host (connectionId)
+  | { type: 'ext-type'; id: string } // external hypervisor category (vmware, xcpng)
   | { type: 'extvm'; id: string }    // external hypervisor VM (connectionId:vmid)
   | { type: 'storage-root'; id: 'storage-root' }
   | { type: 'storage-cluster'; id: string }
@@ -361,6 +362,27 @@ export type DetailsPayload = {
       encrypted?: boolean | string
       verification?: { state: string; upid?: string } | null
     }>
+  }
+
+  extTypeInfo?: {
+    hypervisorType: string // 'vmware' | 'xcpng'
+    label: string
+    hosts: Array<{
+      connectionId: string
+      connectionName: string
+      baseUrl: string
+      version?: string
+      vms: Array<{
+        vmid: string
+        name: string
+        status: string
+        cpu?: number
+        memory_size_MiB?: number
+        guest_OS?: string
+        committed?: number
+      }>
+    }>
+    migrations?: any[]
   }
 
   esxiHostInfo?: {

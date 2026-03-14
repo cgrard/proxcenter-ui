@@ -5,9 +5,16 @@
  * 1. Pre-flight checks (XO reachable, PVE reachable, VM config, disk space)
  * 2. Retrieve full VM config from XO REST API
  * 3. Create empty VM shell on Proxmox via API
- * 4. For each disk: SSH to Proxmox node → download VDI from XO (raw) → import into storage
+ * 4. For each disk: SSH to Proxmox node → download VDI from XO (VHD) → convert → import
  * 5. Attach disks, configure boot order
  * 6. Optionally start the VM
+ *
+ * Live mode:
+ * 1. Create XO snapshot (VM keeps running — no downtime)
+ * 2. Download snapshot VDIs (consistent point-in-time)
+ * 3. Delete snapshot, shut down VM (downtime starts)
+ * 4. Convert + import disks (downtime continues)
+ * 5. Configure + optionally start
  *
  * Data flows XO → Proxmox directly (not through ProxCenter).
  * ProxCenter orchestrates via SSH commands + PVE API.
@@ -19,7 +26,7 @@ import { getConnectionById } from "@/lib/connections/getConnection"
 import { pveFetch } from "@/lib/proxmox/client"
 import { isFileBasedStorage } from "@/lib/proxmox/storage"
 import { executeSSH } from "@/lib/ssh/exec"
-import { getXoConnectionInfo, xoGetVmConfig, buildVdiDownloadUrl } from "@/lib/xcpng/client"
+import { getXoConnectionInfo, xoGetVmConfig, buildVdiDownloadUrl, xoCreateSnapshot, xoDeleteSnapshot } from "@/lib/xcpng/client"
 import { mapXoToPveConfig, isWindowsXoVm } from "./xcpngConfigMapper"
 import type { XoVmConfig, XoDiskInfo } from "@/lib/xcpng/client"
 
@@ -59,9 +66,9 @@ async function updateJob(id: string, status: MigrationStatus, extra: Record<stri
 }
 
 async function appendLog(id: string, msg: string, level: LogEntry["level"] = "info") {
-  const job = await prisma.migrationJob.findUnique({ where: { id }, select: { logs: true } })
+  const job = await prisma.migrationJob.findUnique({ where: { id }, select: { logs: true, progress: true } })
   const logs: LogEntry[] = job?.logs ? JSON.parse(job.logs) : []
-  logs.push({ ts: new Date().toISOString(), msg, level })
+  logs.push({ ts: new Date().toISOString(), msg, level, progress: job?.progress ?? 0 } as any)
   await prisma.migrationJob.update({ where: { id }, data: { logs: JSON.stringify(logs) } })
 }
 
@@ -239,7 +246,7 @@ export async function runXcpngMigrationPipeline(jobId: string, config: Migration
 
     if (vmConfig.powerState === "Running" || vmConfig.powerState === "running") {
       if (isLive) {
-        await appendLog(jobId, "VM is running — live migration will create a snapshot to download disks without downtime", "info")
+        await appendLog(jobId, "VM is running — live migration will snapshot + download disks while VM runs, then shut down for cutover", "info")
       } else {
         throw new Error(
           "VM is powered on. Please power off the VM before migration. " +
@@ -520,17 +527,46 @@ export async function runXcpngMigrationPipeline(jobId: string, config: Migration
     }
 
     if (isLive) {
-      // ── Near-live mode: download all disks while VM runs, then shut down, then convert/import ──
+      // ── Live mode: snapshot → download snapshot VDIs → delete snapshot → shut down → convert/import ──
+      let snapshotUuid: string | null = null
 
-      // Phase 1: Download all disks (VM still running — no downtime yet)
-      for (let i = 0; i < vmConfig.disks.length; i++) {
-        await updateJob(jobId, "transferring", { currentDisk: i })
-        await downloadDisk(i, vmConfig.disks[i])
+      try {
+        // Phase 1: Create snapshot (VM keeps running — no downtime)
+        const snapName = `proxcenter-mig-${jobId.substring(0, 8)}`
+        await appendLog(jobId, "Creating XO snapshot for consistent disk download (VM stays running)...")
+        snapshotUuid = await xoCreateSnapshot(xo, config.sourceVmId, snapName)
+        await appendLog(jobId, `Snapshot created: ${snapshotUuid}`, "success")
+
         if (isCancelled(jobId)) throw new Error("Migration cancelled")
+
+        // Phase 2: Download original VM VDIs (snapshot freezes disk state, but
+        // snapshot VDIs themselves are not downloadable via XO REST API)
+        await appendLog(jobId, `Downloading ${vmConfig.disks.length} disk(s) from VM (snapshot ensures consistency)...`)
+
+        // Phase 3: Download all VM VDIs (VM still running, snapshot freezes blocks)
+        for (let i = 0; i < vmConfig.disks.length; i++) {
+          await updateJob(jobId, "transferring", { currentDisk: i })
+          await downloadDisk(i, vmConfig.disks[i])
+          if (isCancelled(jobId)) throw new Error("Migration cancelled")
+        }
+
+        await appendLog(jobId, "All snapshot disks downloaded", "success")
+      } finally {
+        // Always clean up snapshot, even on error
+        if (snapshotUuid) {
+          try {
+            await appendLog(jobId, "Deleting migration snapshot...")
+            await xoDeleteSnapshot(xo, snapshotUuid)
+            await appendLog(jobId, "Snapshot deleted", "success")
+          } catch (snapErr: any) {
+            await appendLog(jobId, `Warning: failed to delete snapshot ${snapshotUuid}: ${snapErr?.message}. Please delete it manually in XO.`, "warn")
+          }
+        }
       }
 
-      // Phase 2: Shut down source VM via XO (downtime starts here)
-      await appendLog(jobId, "All disks downloaded — shutting down source VM for cutover...", "warn")
+      // Phase 4: Shut down source VM via XO (downtime starts here)
+      const downtimeStart = Date.now()
+      await appendLog(jobId, "Shutting down source VM for cutover (downtime starts now)...", "warn")
       try {
         const xoFetchInternal = async (path: string, opts: RequestInit = {}) => {
           const fetchOpts: any = {
@@ -544,10 +580,8 @@ export async function runXcpngMigrationPipeline(jobId: string, config: Migration
           return fetch(`${xo.baseUrl}/rest/v0${path}`, fetchOpts)
         }
 
-        // XO REST API: POST /vms/{uuid}/actions/clean_shutdown or hard_shutdown
         const shutRes = await xoFetchInternal(`/vms/${config.sourceVmId}/actions/clean_shutdown`, { method: "POST" })
         if (!shutRes.ok) {
-          // Try hard shutdown as fallback
           const hardRes = await xoFetchInternal(`/vms/${config.sourceVmId}/actions/hard_shutdown`, { method: "POST" })
           if (!hardRes.ok) {
             await appendLog(jobId, "Cannot shut down VM via XO API. Please shut down the VM manually now.", "warn")
@@ -568,15 +602,15 @@ export async function runXcpngMigrationPipeline(jobId: string, config: Migration
         }
 
         if (halted) {
-          await appendLog(jobId, "Source VM shut down — downtime started", "success")
+          await appendLog(jobId, "Source VM shut down", "success")
         } else {
-          await appendLog(jobId, "VM did not shut down within 120s — proceeding anyway (disk image may be crash-consistent)", "warn")
+          await appendLog(jobId, "VM did not shut down within 120s — proceeding anyway", "warn")
         }
       } catch (e: any) {
         await appendLog(jobId, `Shutdown attempt failed: ${e?.message || e}. Proceeding with conversion...`, "warn")
       }
 
-      // Phase 3: Convert and import all disks (downtime continues)
+      // Phase 5: Convert and import all disks (downtime continues)
       await appendLog(jobId, "Converting and importing disks to Proxmox (downtime phase)...")
       for (let i = 0; i < vmConfig.disks.length; i++) {
         const progressBase = 70 + Math.round((i / vmConfig.disks.length) * 25)
@@ -584,6 +618,11 @@ export async function runXcpngMigrationPipeline(jobId: string, config: Migration
         await convertAndImportDisk(i)
         if (isCancelled(jobId)) throw new Error("Migration cancelled")
       }
+
+      const downtimeSec = Math.round((Date.now() - downtimeStart) / 1000)
+      const downtimeMin = Math.floor(downtimeSec / 60)
+      const downtimeRemSec = downtimeSec % 60
+      await appendLog(jobId, `Downtime duration: ${downtimeMin > 0 ? `${downtimeMin}m ${downtimeRemSec}s` : `${downtimeSec}s`}`, "info")
     } else {
       // ── Cold mode: sequential download → convert → import per disk ──
       for (let i = 0; i < vmConfig.disks.length; i++) {
@@ -628,7 +667,11 @@ export async function runXcpngMigrationPipeline(jobId: string, config: Migration
     }
 
     // ── DONE ──
-    await updateJob(jobId, "completed", { progress: 100 })
+    await updateJob(jobId, "completed", {
+      progress: 100,
+      bytesTransferred: BigInt(totalDiskBytes),
+      totalBytes: BigInt(totalDiskBytes),
+    })
     await appendLog(jobId, `Migration completed successfully! VM ${targetVmid} is ready on ${config.targetNode}.`, "success")
 
     const { audit } = await import("@/lib/audit")

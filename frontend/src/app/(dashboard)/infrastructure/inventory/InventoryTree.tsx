@@ -787,7 +787,7 @@ function selectionFromItemId(itemId: string): InventorySelection | null {
 
   if (!id) return null
 
-  if (type === 'cluster' || type === 'node' || type === 'vm' || type === 'storage' || type === 'pbs' || type === 'datastore' || type === 'ext' || type === 'extvm') {
+  if (type === 'cluster' || type === 'node' || type === 'vm' || type === 'storage' || type === 'pbs' || type === 'datastore' || type === 'ext' || type === 'ext-type' || type === 'extvm') {
     return { type: type as any, id } as InventorySelection
   }
 

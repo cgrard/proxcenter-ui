@@ -1038,6 +1038,68 @@ return Number.isFinite(num) ? num.toFixed(2) : String(v)
     }
   }
 
+  // External hypervisor type category (VMware ESXi, XCP-ng)
+  if (sel.type === 'ext-type') {
+    const hypervisorType = sel.id // 'vmware' or 'xcpng'
+    const label = hypervisorType === 'vmware' ? 'VMware ESXi' : hypervisorType === 'xcpng' ? 'XCP-ng' : hypervisorType.toUpperCase()
+    const apiPrefix = hypervisorType === 'xcpng' ? 'xcpng' : 'vmware'
+
+    // Fetch all connections of this type
+    const connsR = await fetch('/api/v1/connections', { cache: 'no-store' }).catch(() => null)
+    const connsData = connsR?.ok ? await connsR.json().catch(() => ({})) : {}
+    const allConns = (connsData?.data || []).filter((c: any) => c.type === hypervisorType)
+
+    // Fetch VMs for each connection in parallel
+    const hostsWithVms = await Promise.all(
+      allConns.map(async (conn: any) => {
+        try {
+          const vmsR = await fetch(`/api/v1/${apiPrefix}/${encodeURIComponent(conn.id)}/vms`, { cache: 'no-store' })
+          const vmsData = vmsR.ok ? await vmsR.json().catch(() => ({})) : {}
+          return {
+            connectionId: conn.id,
+            connectionName: conn.name || conn.id,
+            baseUrl: conn.baseUrl || '',
+            vms: vmsData?.data?.vms || [],
+          }
+        } catch {
+          return { connectionId: conn.id, connectionName: conn.name || conn.id, baseUrl: conn.baseUrl || '', vms: [] }
+        }
+      })
+    )
+
+    const allVms = hostsWithVms.flatMap(h => h.vms)
+    const runningVms = allVms.filter((v: any) => v.status === 'running').length
+
+    // Fetch migration history for all connections of this type
+    const connIds = new Set(allConns.map((c: any) => c.id))
+    const migsR = await fetch('/api/v1/migrations', { cache: 'no-store' }).catch(() => null)
+    const migsData = migsR?.ok ? await migsR.json().catch(() => ({})) : {}
+    const migrations = ((migsData?.data || []) as any[]).filter((j: any) => connIds.has(j.sourceConnectionId))
+
+    return {
+      kindLabel: label.toUpperCase(),
+      title: label,
+      subtitle: `${allConns.length} host${allConns.length > 1 ? 's' : ''}`,
+      breadcrumb: ['Infrastructure', 'Inventaire', label],
+      status: 'ok' as Status,
+      tags: [],
+      kpis: [
+        { label: 'Hosts', value: `${allConns.length}` },
+        { label: 'VMs', value: `${allVms.length}` },
+        { label: 'Running', value: `${runningVms}` },
+        { label: 'Stopped', value: `${allVms.length - runningVms}` },
+      ],
+      properties: [],
+      lastUpdated: new Date().toISOString(),
+      extTypeInfo: {
+        hypervisorType,
+        label,
+        hosts: hostsWithVms,
+        migrations,
+      },
+    }
+  }
+
   // External hypervisor host (VMware ESXi, Hyper-V, XCP-ng)
   if (sel.type === 'ext') {
     const connId = sel.id

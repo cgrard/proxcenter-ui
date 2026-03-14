@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { useLocale, useTranslations } from 'next-intl'
 
+import { useProxCenterTasks } from '@/contexts/ProxCenterTasksContext'
 import { useFavorites } from './hooks/useFavorites'
 import { useSnapshots } from './hooks/useSnapshots'
 import { useTasks } from './hooks/useTasks'
@@ -71,7 +72,7 @@ import {
 } from '@mui/material'
 import { lighten, alpha } from '@mui/material/styles'
 // RemixIcon replacements for @mui/icons-material
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts'
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, PieChart, Pie, Cell, BarChart, Bar, CartesianGrid, Legend } from 'recharts'
 
 import NodesTable, { NodeRow, BulkAction } from '@/components/NodesTable'
 import VmsTable, { VmRow } from '@/components/VmsTable'
@@ -420,6 +421,7 @@ export default function InventoryDetails({
   const { hasFeature, loading: licenseLoading } = useLicense()
   const toast = useToast()
   const { trackTask } = useTaskTracker()
+  const { addTask: addPCTask, updateTask: updatePCTask, registerOnRestore, unregisterOnRestore } = useProxCenterTasks()
   const primaryColor = theme.palette.primary.main
   const primaryColorLight = lighten(primaryColor, 0.3)
 
@@ -477,6 +479,21 @@ export default function InventoryDetails({
   const [migJob, setMigJob] = useState<any>(null)
   const [vmMigJob, setVmMigJob] = useState<any>(null) // active migration job for current VM panel
   const migLogsRef = useRef<HTMLDivElement>(null)
+  // Bulk migration state
+  const [bulkMigSelected, setBulkMigSelected] = useState<Set<string>>(new Set())
+  const [bulkMigOpen, setBulkMigOpen] = useState(false)
+  const [bulkMigStarting, setBulkMigStarting] = useState(false)
+  const BULK_MIG_CONCURRENCY = 2
+  const [bulkMigJobs, setBulkMigJobs] = useState<{ vmid: string; name: string; jobId: string; status: string; progress: number; error?: string; logs?: { ts: string; msg: string; level: string }[]; targetNode?: string }[]>([])
+  const [bulkMigProgressExpanded, setBulkMigProgressExpanded] = useState(true)
+  const [bulkMigLogsExpanded, setBulkMigLogsExpanded] = useState(false)
+  const [bulkMigLogsFilter, setBulkMigLogsFilter] = useState<string | null>(null)
+  const bulkMigJobsRef = useRef(bulkMigJobs)
+  bulkMigJobsRef.current = bulkMigJobs
+  const bulkMigConfigRef = useRef<{ sourceConnectionId: string; targetConnectionId: string; targetStorage: string; networkBridge: string; migrationType: string; startAfterMigration: boolean; sourceType: string } | null>(null)
+  // Snapshot of host info when bulk dialog opens (avoids null data when selection changes)
+  const [bulkMigHostInfo, setBulkMigHostInfo] = useState<any>(null)
+  const [extHostMigrations, setExtHostMigrations] = useState<any[]>([])
   const [exitMaintenanceBusy, setExitMaintenanceBusy] = useState(false)
   const [exitMaintenanceError, setExitMaintenanceError] = useState<string | null>(null)
 
@@ -694,17 +711,18 @@ export default function InventoryDetails({
 
   const { favorites, toggleFavorite } = useFavorites({ propFavorites, propToggleFavorite })
 
-  // Fetch PVE connections when migration dialog opens
+  // Fetch PVE connections when migration dialog opens (single or bulk)
   useEffect(() => {
-    if (!esxiMigrateVm) return
+    if (!esxiMigrateVm && !bulkMigOpen) return
     setMigTargetConn(''); setMigTargetNode(''); setMigTargetStorage('')
-    setMigNodes([]); setMigStorages([]); setMigJobId(null); setMigJob(null)
+    setMigNodes([]); setMigStorages([])
+    if (esxiMigrateVm) { setMigJobId(null); setMigJob(null) }
     fetch('/api/v1/connections').then(r => r.json()).then(d => {
       const pveConns = (d.data || d || []).filter((c: any) => c.type === 'pve')
       setMigPveConnections(pveConns)
       if (pveConns.length === 1) setMigTargetConn(pveConns[0].id)
     }).catch(() => {})
-  }, [esxiMigrateVm])
+  }, [esxiMigrateVm, bulkMigOpen])
 
   // Fetch nodes when PVE connection is selected
   useEffect(() => {
@@ -716,10 +734,12 @@ export default function InventoryDetails({
     }).catch(() => {})
   }, [migTargetConn])
 
-  // Fetch storages when node is selected
+  // Fetch storages when node is selected (use first node for auto mode)
   useEffect(() => {
     if (!migTargetConn || !migTargetNode) { setMigStorages([]); setMigTargetStorage(''); return }
-    fetch(`/api/v1/connections/${migTargetConn}/nodes/${migTargetNode}/storages?content=images`).then(r => r.json()).then(d => {
+    const fetchNode = migTargetNode === '__auto__' ? (migNodes[0]?.node || migNodes[0]) : migTargetNode
+    if (!fetchNode) return
+    fetch(`/api/v1/connections/${migTargetConn}/nodes/${fetchNode}/storages?content=images`).then(r => r.json()).then(d => {
       const storages = (d.data || d || []).filter((s: any) => {
         const content = s.content || ''
         return content.includes('images')
@@ -731,7 +751,7 @@ export default function InventoryDetails({
       }
     }).catch(() => {})
     // Also fetch network bridges
-    fetch(`/api/v1/connections/${migTargetConn}/nodes/${migTargetNode}/network`).then(r => r.json()).then(d => {
+    fetch(`/api/v1/connections/${migTargetConn}/nodes/${fetchNode}/network`).then(r => r.json()).then(d => {
       const bridges = (d.data || d || []).filter((iface: any) => iface.type === 'bridge' || iface.type === 'OVSBridge')
       setMigBridges(bridges)
       if (bridges.length > 0) {
@@ -739,14 +759,44 @@ export default function InventoryDetails({
         setMigNetworkBridge(vmbr0 ? 'vmbr0' : bridges[0].iface)
       }
     }).catch(() => {})
-  }, [migTargetConn, migTargetNode])
+  }, [migTargetConn, migTargetNode, migNodes.length])
 
-  // Poll migration job status
+  // Cleanup TasksBar restore callback on unmount
   useEffect(() => {
     if (!migJobId) return
+    const taskId = `migration-${migJobId}`
+    return () => { unregisterOnRestore(taskId) }
+  }, [migJobId, unregisterOnRestore])
+
+  // Refs to avoid stale closures in polling interval
+  const updatePCTaskRef = useRef(updatePCTask)
+  updatePCTaskRef.current = updatePCTask
+
+  // Poll migration job status + sync to TasksBar
+  useEffect(() => {
+    if (!migJobId) return
+    const taskId = `migration-${migJobId}`
     const interval = setInterval(() => {
       fetch(`/api/v1/migrations/${migJobId}`).then(r => r.json()).then(d => {
         setMigJob(d.data)
+        if (d.data) {
+          const j = d.data
+          const speed = j.transferSpeed ? ` — ${j.transferSpeed}` : ''
+          const step = j.status === 'transferring' ? `Transferring${speed}`
+            : j.status === 'configuring' ? 'Configuring'
+            : j.status === 'creating_vm' ? 'Creating VM'
+            : j.status === 'preflight' ? 'Pre-flight checks'
+            : j.status === 'completed' ? 'Completed'
+            : j.status === 'failed' ? (j.error || 'Failed')
+            : j.status === 'cancelled' ? 'Cancelled'
+            : j.status
+          updatePCTaskRef.current(taskId, {
+            progress: j.progress || 0,
+            detail: step,
+            status: j.status === 'completed' ? 'done' : j.status === 'failed' || j.status === 'cancelled' ? 'error' : 'running',
+            ...(j.status === 'failed' ? { error: j.error } : {}),
+          })
+        }
         if (d.data?.status === 'completed' || d.data?.status === 'failed' || d.data?.status === 'cancelled') {
           clearInterval(interval)
         }
@@ -756,6 +806,105 @@ export default function InventoryDetails({
   }, [migJobId])
 
   // Fetch active migration job for the currently selected ESXi VM
+  // Poll bulk migration jobs
+  useEffect(() => {
+    if (bulkMigJobs.length === 0) return
+    const hasWork = bulkMigJobs.some(j => j.status === 'queued' || (j.jobId && !['completed', 'failed', 'cancelled'].includes(j.status)))
+    if (!hasWork) return
+    const interval = setInterval(async () => {
+      const updates = [...bulkMigJobsRef.current]
+      let changed = false
+
+      // Poll active (running) jobs
+      for (const job of updates) {
+        if (!job.jobId || ['completed', 'failed', 'cancelled', 'queued'].includes(job.status)) continue
+        try {
+          const res = await fetch(`/api/v1/migrations/${job.jobId}`)
+          const d = await res.json()
+          if (d.data) {
+            const j = d.data
+            const logsChanged = (j.logs?.length || 0) !== (job.logs?.length || 0)
+            if (j.progress !== job.progress || j.status !== job.status || logsChanged) {
+              job.progress = j.progress || 0
+              job.status = j.status
+              job.error = j.error
+              if (j.logs) job.logs = j.logs
+              changed = true
+              // Sync to PCTask
+              const speed = j.transferSpeed ? ` — ${j.transferSpeed}` : ''
+              const step = j.status === 'transferring' ? `Transferring${speed}` : j.status === 'completed' ? 'Completed' : j.status === 'failed' ? (j.error || 'Failed') : j.status
+              updatePCTaskRef.current(`migration-${job.jobId}`, {
+                progress: j.progress || 0,
+                detail: step,
+                status: j.status === 'completed' ? 'done' : j.status === 'failed' || j.status === 'cancelled' ? 'error' : 'running',
+                ...(j.status === 'failed' ? { error: j.error } : {}),
+              })
+            }
+          }
+        } catch {}
+      }
+
+      // Start queued jobs if slots are available
+      const cfg = bulkMigConfigRef.current
+      if (cfg) {
+        const runningCount = updates.filter(j => j.jobId && !['completed', 'failed', 'cancelled', 'queued'].includes(j.status)).length
+        const slotsAvailable = BULK_MIG_CONCURRENCY - runningCount
+        if (slotsAvailable > 0) {
+          const queued = updates.filter(j => j.status === 'queued')
+          for (let i = 0; i < Math.min(slotsAvailable, queued.length); i++) {
+            const job = queued[i]
+            try {
+              const res = await fetch('/api/v1/migrations', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  sourceConnectionId: cfg.sourceConnectionId,
+                  sourceVmId: job.vmid,
+                  targetConnectionId: cfg.targetConnectionId,
+                  targetNode: job.targetNode,
+                  targetStorage: cfg.targetStorage,
+                  networkBridge: cfg.networkBridge,
+                  migrationType: cfg.migrationType,
+                  startAfterMigration: cfg.startAfterMigration,
+                }),
+              })
+              const d = await res.json()
+              if (d.data?.jobId) {
+                job.jobId = d.data.jobId
+                job.status = 'pending'
+                changed = true
+                addPCTask({
+                  id: `migration-${d.data.jobId}`,
+                  type: 'generic',
+                  label: `${t('inventoryPage.esxiMigration.migrating')} ${job.name} (${cfg.sourceType} → Proxmox)`,
+                  detail: t('inventoryPage.esxiMigration.preflight'),
+                  progress: 0,
+                  status: 'running',
+                  createdAt: Date.now(),
+                })
+              } else {
+                job.status = 'failed'
+                job.error = d.error || 'Failed to start'
+                changed = true
+              }
+            } catch (e: any) {
+              job.status = 'failed'
+              job.error = e.message
+              changed = true
+            }
+          }
+        }
+      }
+
+      if (changed) setBulkMigJobs([...updates])
+      // Stop polling only when no active or queued jobs remain
+      if (updates.every(j => j.status !== 'queued' && (!j.jobId || ['completed', 'failed', 'cancelled'].includes(j.status)))) {
+        clearInterval(interval)
+      }
+    }, 3000)
+    return () => clearInterval(interval)
+  }, [bulkMigJobs.length > 0 ? bulkMigJobs.map(j => `${j.jobId}:${j.status}`).join(',') : ''])
+
   useEffect(() => {
     if (selection?.type !== 'extvm') { setVmMigJob(null); return }
     const vmid = selection.id.split(':')[1]
@@ -765,6 +914,16 @@ export default function InventoryDetails({
       const jobs = d.data || []
       const match = jobs.find((j: any) => j.sourceVmId === vmid && !['cancelled'].includes(j.status))
       setVmMigJob(match || null)
+    }).catch(() => {})
+  }, [selection])
+
+  // Fetch migration history for external host dashboard
+  useEffect(() => {
+    if (selection?.type !== 'ext') { setExtHostMigrations([]); return }
+    const connId = selection.id
+    fetch('/api/v1/migrations').then(r => r.json()).then(d => {
+      const jobs = (d.data || []).filter((j: any) => j.sourceConnectionId === connId)
+      setExtHostMigrations(jobs)
     }).catch(() => {})
   }, [selection])
 
@@ -2604,6 +2763,8 @@ return vm?.isCluster ?? false
                     <i className="ri-server-fill" style={{ fontSize: 14, marginLeft: 8 }} />
                   ) : data.kindLabel === 'VMWARE ESXI' || data.kindLabel === 'VMWARE VM' ? (
                     <img src="/images/esxi-logo.svg" alt="" style={{ width: 14, height: 14, marginLeft: 8 }} />
+                  ) : data.kindLabel === 'XCP-NG' ? (
+                    <img src="/images/xcpng-logo.svg" alt="" style={{ width: 14, height: 14, marginLeft: 8 }} />
                   ) : undefined
                 }
               />
@@ -2783,7 +2944,7 @@ return vm?.isCluster ?? false
             </>
           )}
 
-          {selection?.type !== 'ext' && selection?.type !== 'extvm' && selection?.type !== 'storage' && (<>
+          {selection?.type !== 'ext' && selection?.type !== 'ext-type' && selection?.type !== 'extvm' && selection?.type !== 'storage' && (<>
           <Divider sx={{ flexShrink: 0 }} />
 
           <Box sx={{ flexShrink: 0 }}>
@@ -3534,6 +3695,386 @@ return vm?.isCluster ?? false
             )
           })()}
 
+          {/* External Hypervisor Type — Dashboard (VMware ESXi / XCP-ng category) */}
+          {selection?.type === 'ext-type' && data.extTypeInfo && (() => {
+            const info = data.extTypeInfo
+            const allVms = info.hosts.flatMap((h: any) => h.vms)
+            const runningVms = allVms.filter((v: any) => v.status === 'running')
+            const stoppedVms = allVms.filter((v: any) => v.status !== 'running')
+            const totalCpu = allVms.reduce((s: number, v: any) => s + (v.cpu || 0), 0)
+            const totalRamGB = allVms.reduce((s: number, v: any) => s + (v.memory_size_MiB || 0), 0) / 1024
+            const totalDiskGB = allVms.reduce((s: number, v: any) => s + (v.committed || 0), 0) / 1073741824
+
+            // Migration stats
+            const migrations = info.migrations || []
+            const migCompleted = migrations.filter((j: any) => j.status === 'completed').length
+            const migFailed = migrations.filter((j: any) => j.status === 'failed').length
+            const migRunning = migrations.filter((j: any) => !['completed', 'failed', 'cancelled'].includes(j.status)).length
+            const totalMigratedGB = migrations.filter((j: any) => j.status === 'completed' && j.totalBytes).reduce((s: number, j: any) => s + Number(j.totalBytes), 0) / 1073741824
+
+            // Donut chart data — VM status
+            const vmStatusData = [
+              { name: t('inventoryPage.extDashboard.running'), value: runningVms.length, color: theme.palette.success.main },
+              { name: t('inventoryPage.extDashboard.stopped'), value: stoppedVms.length, color: theme.palette.grey[400] },
+            ].filter(d => d.value > 0)
+
+            // Donut chart data — Migration status
+            const migStatusData = [
+              { name: t('inventoryPage.extDashboard.completed'), value: migCompleted, color: theme.palette.success.main },
+              { name: t('inventoryPage.extDashboard.failed'), value: migFailed, color: theme.palette.error.main },
+              { name: t('inventoryPage.extDashboard.inProgress'), value: migRunning, color: theme.palette.primary.main },
+            ].filter(d => d.value > 0)
+
+            // Bar chart data — resources per host
+            const hostBarData = info.hosts.map((h: any) => ({
+              name: h.connectionName.length > 12 ? h.connectionName.substring(0, 12) + '…' : h.connectionName,
+              vms: h.vms.length,
+              cpu: h.vms.reduce((s: number, v: any) => s + (v.cpu || 0), 0),
+              ram: Math.round(h.vms.reduce((s: number, v: any) => s + (v.memory_size_MiB || 0), 0) / 1024),
+            }))
+
+            const statCards = [
+              { icon: 'ri-server-line', label: t('inventoryPage.extDashboard.hosts'), value: info.hosts.length, color: theme.palette.warning.main },
+              { icon: 'ri-computer-line', label: t('inventoryPage.extDashboard.totalVms'), value: allVms.length, color: theme.palette.primary.main },
+              { icon: 'ri-swap-line', label: t('inventoryPage.extDashboard.migrated'), value: migCompleted, color: theme.palette.info.main },
+              { icon: 'ri-hard-drive-3-line', label: t('inventoryPage.extDashboard.dataTransferred'), value: `${totalMigratedGB.toFixed(1)} GB`, color: theme.palette.secondary.main },
+            ]
+
+            return (
+              <>
+              {/* Stats cards */}
+              <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 1.5 }}>
+                {statCards.map((s) => (
+                  <Card key={s.label} variant="outlined" sx={{ borderRadius: 2 }}>
+                    <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 }, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                      <Box sx={{ width: 36, height: 36, borderRadius: 1.5, bgcolor: alpha(s.color, 0.1), display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <i className={s.icon} style={{ fontSize: 18, color: s.color }} />
+                      </Box>
+                      <Box>
+                        <Typography variant="h6" fontWeight={700} fontSize={18} lineHeight={1}>{s.value}</Typography>
+                        <Typography variant="caption" sx={{ opacity: 0.6, fontSize: 10 }}>{s.label}</Typography>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                ))}
+              </Box>
+
+              {/* Donut charts row — VM Status + Migration Status */}
+              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
+                {/* VM Status donut */}
+                <Card variant="outlined" sx={{ borderRadius: 2 }}>
+                  <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                    <Typography variant="body2" fontWeight={700} fontSize={12} sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <i className="ri-computer-line" style={{ fontSize: 16, opacity: 0.5 }} />
+                      {t('inventoryPage.extDashboard.vmStatus')}
+                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <Box sx={{ width: 100, height: 100, flexShrink: 0 }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie data={vmStatusData} dataKey="value" cx="50%" cy="50%" innerRadius={28} outerRadius={45} paddingAngle={2} strokeWidth={0}>
+                              {vmStatusData.map((d, i) => <Cell key={i} fill={d.color} />)}
+                            </Pie>
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </Box>
+                      <Stack spacing={0.75} sx={{ flex: 1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: 'success.main' }} />
+                          <Typography variant="body2" fontSize={12} sx={{ flex: 1 }}>{t('inventoryPage.extDashboard.running')}</Typography>
+                          <Typography variant="body2" fontSize={12} fontWeight={700}>{runningVms.length}</Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: 'grey.400' }} />
+                          <Typography variant="body2" fontSize={12} sx={{ flex: 1 }}>{t('inventoryPage.extDashboard.stopped')}</Typography>
+                          <Typography variant="body2" fontSize={12} fontWeight={700}>{stoppedVms.length}</Typography>
+                        </Box>
+                        <Divider sx={{ my: 0.5 }} />
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Typography variant="body2" fontSize={12} fontWeight={700} sx={{ flex: 1 }}>Total</Typography>
+                          <Typography variant="body2" fontSize={12} fontWeight={700}>{allVms.length}</Typography>
+                        </Box>
+                      </Stack>
+                    </Box>
+                  </CardContent>
+                </Card>
+
+                {/* Migration Status donut */}
+                <Card variant="outlined" sx={{ borderRadius: 2 }}>
+                  <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                    <Typography variant="body2" fontWeight={700} fontSize={12} sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <i className="ri-swap-line" style={{ fontSize: 16, opacity: 0.5 }} />
+                      {t('inventoryPage.extDashboard.migrationStats')}
+                    </Typography>
+                    {migrations.length === 0 ? (
+                      <Box sx={{ height: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Typography variant="body2" fontSize={12} sx={{ opacity: 0.4 }}>{t('inventoryPage.extDashboard.noMigrations')}</Typography>
+                      </Box>
+                    ) : (
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <Box sx={{ width: 100, height: 100, flexShrink: 0 }}>
+                          <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                              <Pie data={migStatusData} dataKey="value" cx="50%" cy="50%" innerRadius={28} outerRadius={45} paddingAngle={2} strokeWidth={0}>
+                                {migStatusData.map((d, i) => <Cell key={i} fill={d.color} />)}
+                              </Pie>
+                            </PieChart>
+                          </ResponsiveContainer>
+                        </Box>
+                        <Stack spacing={0.75} sx={{ flex: 1 }}>
+                          {migCompleted > 0 && (
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: 'success.main' }} />
+                              <Typography variant="body2" fontSize={12} sx={{ flex: 1 }}>{t('inventoryPage.extDashboard.completed')}</Typography>
+                              <Typography variant="body2" fontSize={12} fontWeight={700}>{migCompleted}</Typography>
+                            </Box>
+                          )}
+                          {migFailed > 0 && (
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: 'error.main' }} />
+                              <Typography variant="body2" fontSize={12} sx={{ flex: 1 }}>{t('inventoryPage.extDashboard.failed')}</Typography>
+                              <Typography variant="body2" fontSize={12} fontWeight={700}>{migFailed}</Typography>
+                            </Box>
+                          )}
+                          {migRunning > 0 && (
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: 'primary.main' }} />
+                              <Typography variant="body2" fontSize={12} sx={{ flex: 1 }}>{t('inventoryPage.extDashboard.inProgress')}</Typography>
+                              <Typography variant="body2" fontSize={12} fontWeight={700}>{migRunning}</Typography>
+                            </Box>
+                          )}
+                          <Divider sx={{ my: 0.5 }} />
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Typography variant="body2" fontSize={12} fontWeight={700} sx={{ flex: 1 }}>{t('inventoryPage.extDashboard.dataTransferred')}</Typography>
+                            <Typography variant="body2" fontSize={12} fontWeight={700}>{totalMigratedGB.toFixed(1)} GB</Typography>
+                          </Box>
+                        </Stack>
+                      </Box>
+                    )}
+                  </CardContent>
+                </Card>
+              </Box>
+
+              {/* Resources per host — bar chart */}
+              {info.hosts.length > 1 && (
+                <Card variant="outlined" sx={{ borderRadius: 2 }}>
+                  <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                    <Typography variant="body2" fontWeight={700} fontSize={12} sx={{ mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <i className="ri-bar-chart-2-line" style={{ fontSize: 16, opacity: 0.5 }} />
+                      {t('inventoryPage.extDashboard.resourcesPerHost')}
+                    </Typography>
+                    <Box sx={{ height: 180 }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={hostBarData} margin={{ top: 5, right: 5, bottom: 5, left: -15 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke={alpha(theme.palette.divider, 0.5)} />
+                          <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                          <YAxis tick={{ fontSize: 10 }} />
+                          <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: `1px solid ${theme.palette.divider}`, background: theme.palette.background.paper }} />
+                          <Bar dataKey="vms" name="VMs" fill={theme.palette.primary.main} radius={[3, 3, 0, 0]} />
+                          <Bar dataKey="cpu" name="vCPU" fill={theme.palette.warning.main} radius={[3, 3, 0, 0]} />
+                          <Bar dataKey="ram" name="RAM (GB)" fill={theme.palette.info.main} radius={[3, 3, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </Box>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Global resources summary */}
+              <Card variant="outlined" sx={{ borderRadius: 2 }}>
+                <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                  <Typography variant="body2" fontWeight={700} fontSize={12} sx={{ mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <i className="ri-cpu-line" style={{ fontSize: 16, opacity: 0.5 }} />
+                    {t('inventoryPage.extDashboard.resources')}
+                  </Typography>
+                  <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 2 }}>
+                    <Box sx={{ textAlign: 'center' }}>
+                      <Typography variant="h5" fontWeight={700}>{totalCpu}</Typography>
+                      <Typography variant="caption" sx={{ opacity: 0.6 }}>vCPU</Typography>
+                    </Box>
+                    <Box sx={{ textAlign: 'center' }}>
+                      <Typography variant="h5" fontWeight={700}>{totalRamGB.toFixed(1)}</Typography>
+                      <Typography variant="caption" sx={{ opacity: 0.6 }}>GB RAM</Typography>
+                    </Box>
+                    <Box sx={{ textAlign: 'center' }}>
+                      <Typography variant="h5" fontWeight={700}>{totalDiskGB.toFixed(1)}</Typography>
+                      <Typography variant="caption" sx={{ opacity: 0.6 }}>GB {t('inventoryPage.extDashboard.diskUsage')}</Typography>
+                    </Box>
+                  </Box>
+                </CardContent>
+              </Card>
+
+              {/* Hosts list with VM counts */}
+              <Card variant="outlined" sx={{ borderRadius: 2 }}>
+                <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                  <Typography variant="body2" fontWeight={700} fontSize={12} sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <i className="ri-server-line" style={{ fontSize: 16, opacity: 0.5 }} />
+                    {t('inventoryPage.extDashboard.hosts')}
+                  </Typography>
+                  <Stack spacing={0}>
+                    {info.hosts.map((host: any) => {
+                      const hostRunning = host.vms.filter((v: any) => v.status === 'running').length
+                      const hostCpu = host.vms.reduce((s: number, v: any) => s + (v.cpu || 0), 0)
+                      const hostRamGB = host.vms.reduce((s: number, v: any) => s + (v.memory_size_MiB || 0), 0) / 1024
+                      return (
+                        <Box
+                          key={host.connectionId}
+                          onClick={() => onSelect?.({ type: 'ext', id: host.connectionId })}
+                          sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 0.75, borderBottom: '1px solid', borderColor: 'divider', '&:last-child': { borderBottom: 'none' }, cursor: 'pointer', '&:hover': { bgcolor: 'action.hover' }, borderRadius: 1, px: 0.5 }}
+                        >
+                          <img src={info.hypervisorType === 'xcpng' ? '/images/xcpng-logo.svg' : '/images/esxi-logo.svg'} alt="" width={16} height={16} style={{ opacity: 0.7 }} />
+                          <Typography variant="body2" fontSize={12} fontWeight={600} sx={{ flex: 1 }} noWrap>{host.connectionName}</Typography>
+                          <Typography variant="caption" fontSize={10} sx={{ opacity: 0.5, whiteSpace: 'nowrap' }}>
+                            {host.vms.length} VMs · {hostRunning} up · {hostCpu} vCPU · {hostRamGB.toFixed(1)} GB
+                          </Typography>
+                        </Box>
+                      )
+                    })}
+                  </Stack>
+                </CardContent>
+              </Card>
+
+              {/* Recent migrations */}
+              {migrations.length > 0 && (
+                <Card variant="outlined" sx={{ borderRadius: 2 }}>
+                  <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                    <Typography variant="body2" fontWeight={700} fontSize={12} sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <i className="ri-history-line" style={{ fontSize: 16, opacity: 0.5 }} />
+                      {t('inventoryPage.extDashboard.recentMigrations')}
+                    </Typography>
+                    <Stack spacing={0}>
+                      {migrations.slice(0, 10).map((mig: any) => (
+                        <Box key={mig.id} sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 0.75, borderBottom: '1px solid', borderColor: 'divider', '&:last-child': { borderBottom: 'none' } }}>
+                          <Box sx={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, bgcolor: mig.status === 'completed' ? 'success.main' : mig.status === 'failed' ? 'error.main' : 'primary.main' }} />
+                          <Typography variant="body2" fontSize={12} fontWeight={600} noWrap sx={{ minWidth: 0, flex: 1 }}>{mig.sourceVmName || mig.sourceVmId}</Typography>
+                          <Typography variant="caption" fontSize={10} sx={{ opacity: 0.5, whiteSpace: 'nowrap', flexShrink: 0 }}>→ {mig.targetNode}</Typography>
+                          <Typography variant="caption" fontSize={10} sx={{ opacity: 0.5, whiteSpace: 'nowrap', flexShrink: 0 }}>{mig.totalBytes ? `${(Number(mig.totalBytes) / 1073741824).toFixed(1)} GB` : '--'}</Typography>
+                          {mig.completedAt && <Typography variant="caption" fontSize={10} sx={{ opacity: 0.4, whiteSpace: 'nowrap', flexShrink: 0 }}>{new Date(mig.completedAt).toLocaleDateString()}</Typography>}
+                          <Chip size="small" label={mig.status === 'completed' ? t('inventoryPage.esxiMigration.completed') : mig.status === 'failed' ? t('inventoryPage.esxiMigration.failed') : `${mig.progress || 0}%`} sx={{ height: 20, fontSize: 10, fontWeight: 700, flexShrink: 0, bgcolor: mig.status === 'completed' ? 'success.main' : mig.status === 'failed' ? 'error.main' : 'primary.main', color: '#fff' }} />
+                        </Box>
+                      ))}
+                    </Stack>
+                  </CardContent>
+                </Card>
+              )}
+              </>
+            )
+          })()}
+
+          {/* External Host — Dashboard */}
+          {selection?.type === 'ext' && data.esxiHostInfo && (() => {
+            const isXcpng = data.esxiHostInfo.hostType === 'xcpng'
+            const hostLabel = isXcpng ? 'XCP-ng' : 'VMware ESXi'
+            const vms = data.esxiHostInfo.vms
+            const runningVms = vms.filter((v: any) => v.status === 'running')
+            const stoppedVms = vms.filter((v: any) => v.status !== 'running')
+            const totalCpu = vms.reduce((s: number, v: any) => s + (v.cpu || 0), 0)
+            const totalRamGB = vms.reduce((s: number, v: any) => s + (v.memory_size_MiB || 0), 0) / 1024
+            const totalDiskGB = vms.reduce((s: number, v: any) => s + (v.committed || 0), 0) / 1073741824
+
+            const migCompleted = extHostMigrations.filter((j: any) => j.status === 'completed').length
+            const migFailed = extHostMigrations.filter((j: any) => j.status === 'failed').length
+            const migRunning = extHostMigrations.filter((j: any) => !['completed', 'failed', 'cancelled'].includes(j.status)).length
+            const migTotal = extHostMigrations.length
+            const totalMigratedGB = extHostMigrations
+              .filter((j: any) => j.status === 'completed' && j.totalBytes)
+              .reduce((s: number, j: any) => s + Number(j.totalBytes), 0) / 1073741824
+
+            const statCards = [
+              { icon: 'ri-computer-line', label: t('inventoryPage.extDashboard.totalVms'), value: vms.length, color: theme.palette.primary.main },
+              { icon: 'ri-play-circle-line', label: t('inventoryPage.extDashboard.running'), value: runningVms.length, color: theme.palette.success.main },
+              { icon: 'ri-stop-circle-line', label: t('inventoryPage.extDashboard.stopped'), value: stoppedVms.length, color: theme.palette.text.disabled },
+              { icon: 'ri-swap-line', label: t('inventoryPage.extDashboard.migrated'), value: migCompleted, color: theme.palette.info.main },
+            ]
+
+            return (
+              <>
+              {/* Stats cards */}
+              <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 1.5 }}>
+                {statCards.map((s) => (
+                  <Card key={s.label} variant="outlined" sx={{ borderRadius: 2 }}>
+                    <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 }, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                      <Box sx={{ width: 36, height: 36, borderRadius: 1.5, bgcolor: alpha(s.color, 0.1), display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <i className={s.icon} style={{ fontSize: 18, color: s.color }} />
+                      </Box>
+                      <Box>
+                        <Typography variant="h6" fontWeight={700} fontSize={18} lineHeight={1}>{s.value}</Typography>
+                        <Typography variant="caption" sx={{ opacity: 0.6, fontSize: 10 }}>{s.label}</Typography>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                ))}
+              </Box>
+
+              {/* Resources & Migration overview */}
+              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
+                {/* Resources summary */}
+                <Card variant="outlined" sx={{ borderRadius: 2 }}>
+                  <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                    <Typography variant="body2" fontWeight={700} fontSize={12} sx={{ mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <i className="ri-cpu-line" style={{ fontSize: 16, opacity: 0.5 }} />
+                      {t('inventoryPage.extDashboard.resources')}
+                    </Typography>
+                    <Stack spacing={1.5}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Typography variant="body2" fontSize={12} sx={{ opacity: 0.7 }}>vCPU</Typography>
+                        <Typography variant="body2" fontSize={12} fontWeight={700}>{totalCpu}</Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Typography variant="body2" fontSize={12} sx={{ opacity: 0.7 }}>RAM</Typography>
+                        <Typography variant="body2" fontSize={12} fontWeight={700}>{totalRamGB.toFixed(1)} GB</Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Typography variant="body2" fontSize={12} sx={{ opacity: 0.7 }}>{t('inventoryPage.extDashboard.diskUsage')}</Typography>
+                        <Typography variant="body2" fontSize={12} fontWeight={700}>{totalDiskGB.toFixed(1)} GB</Typography>
+                      </Box>
+                    </Stack>
+                  </CardContent>
+                </Card>
+
+                {/* Migration stats */}
+                <Card variant="outlined" sx={{ borderRadius: 2 }}>
+                  <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                    <Typography variant="body2" fontWeight={700} fontSize={12} sx={{ mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <i className="ri-swap-line" style={{ fontSize: 16, opacity: 0.5 }} />
+                      {t('inventoryPage.extDashboard.migrationStats')}
+                    </Typography>
+                    {migTotal === 0 ? (
+                      <Typography variant="body2" fontSize={12} sx={{ opacity: 0.4 }}>
+                        {t('inventoryPage.extDashboard.noMigrations')}
+                      </Typography>
+                    ) : (
+                      <Stack spacing={1.5}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Typography variant="body2" fontSize={12} sx={{ opacity: 0.7 }}>{t('inventoryPage.extDashboard.completed')}</Typography>
+                          <Chip size="small" label={migCompleted} sx={{ height: 20, fontSize: 11, fontWeight: 700, bgcolor: 'success.main', color: '#fff', minWidth: 30 }} />
+                        </Box>
+                        {migFailed > 0 && (
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Typography variant="body2" fontSize={12} sx={{ opacity: 0.7 }}>{t('inventoryPage.extDashboard.failed')}</Typography>
+                            <Chip size="small" label={migFailed} sx={{ height: 20, fontSize: 11, fontWeight: 700, bgcolor: 'error.main', color: '#fff', minWidth: 30 }} />
+                          </Box>
+                        )}
+                        {migRunning > 0 && (
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Typography variant="body2" fontSize={12} sx={{ opacity: 0.7 }}>{t('inventoryPage.extDashboard.inProgress')}</Typography>
+                            <Chip size="small" label={migRunning} sx={{ height: 20, fontSize: 11, fontWeight: 700, bgcolor: 'primary.main', color: '#fff', minWidth: 30 }} />
+                          </Box>
+                        )}
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Typography variant="body2" fontSize={12} sx={{ opacity: 0.7 }}>{t('inventoryPage.extDashboard.dataTransferred')}</Typography>
+                          <Typography variant="body2" fontSize={12} fontWeight={700}>{totalMigratedGB.toFixed(1)} GB</Typography>
+                        </Box>
+                      </Stack>
+                    )}
+                  </CardContent>
+                </Card>
+              </Box>
+
+              </>
+            )
+          })()}
+
           {/* External Host — VM List with Migrate buttons */}
           {selection?.type === 'ext' && data.esxiHostInfo && (() => {
             const isXcpng = data.esxiHostInfo.hostType === 'xcpng'
@@ -3547,10 +4088,55 @@ return vm?.isCluster ?? false
                     <Typography variant="body2" sx={{ opacity: 0.5, mt: 1 }}>No virtual machines found on this host</Typography>
                   </Box>
                 ) : (
+                  <>
+                  {/* Bulk migration toolbar */}
+                  {bulkMigSelected.size > 0 && (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, px: 2, py: 1, bgcolor: theme.palette.mode === 'dark' ? 'rgba(var(--mui-palette-primary-mainChannel) / 0.08)' : 'rgba(var(--mui-palette-primary-mainChannel) / 0.06)', borderBottom: '1px solid', borderColor: 'divider' }}>
+                      <Typography variant="body2" fontWeight={600} sx={{ fontSize: 12 }}>
+                        {bulkMigSelected.size} VM{bulkMigSelected.size > 1 ? 's' : ''} {t('inventoryPage.esxiMigration.selected')}
+                      </Typography>
+                      <Box sx={{ flex: 1 }} />
+                      <Button
+                        size="small"
+                        variant="text"
+                        sx={{ textTransform: 'none', fontSize: 11 }}
+                        onClick={() => setBulkMigSelected(new Set())}
+                      >
+                        {t('inventoryPage.esxiMigration.deselectAll')}
+                      </Button>
+                      <Button
+                        size="small"
+                        variant="contained"
+                        sx={{ textTransform: 'none', fontSize: 11, height: 28 }}
+                        startIcon={<img src={theme.palette.mode === 'dark' ? '/images/proxmox-logo-dark.svg' : '/images/proxmox-logo.svg'} alt="" width={14} height={14} />}
+                        onClick={() => {
+                          if (!vmwareMigrationAvailable) { setUpgradeDialogOpen(true); return }
+                          setBulkMigHostInfo(data.esxiHostInfo)
+                          setBulkMigOpen(true)
+                        }}
+                      >
+                        {t('inventoryPage.esxiMigration.migrateSelected')} ({bulkMigSelected.size})
+                      </Button>
+                    </Box>
+                  )}
                   <TableContainer sx={{ maxHeight: 'calc(100vh - 320px)' }}>
                     <Table size="small" stickyHeader>
                       <TableHead>
                         <TableRow>
+                          <TableCell padding="checkbox" sx={{ width: 42 }}>
+                            <Checkbox
+                              size="small"
+                              indeterminate={bulkMigSelected.size > 0 && bulkMigSelected.size < data.esxiHostInfo.vms.length}
+                              checked={data.esxiHostInfo.vms.length > 0 && bulkMigSelected.size === data.esxiHostInfo.vms.length}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setBulkMigSelected(new Set(data.esxiHostInfo!.vms.map((vm: any) => vm.vmid)))
+                                } else {
+                                  setBulkMigSelected(new Set())
+                                }
+                              }}
+                            />
+                          </TableCell>
                           <TableCell sx={{ fontWeight: 700, fontSize: 12 }}>{t('common.name')}</TableCell>
                           <TableCell sx={{ fontWeight: 700, fontSize: 12 }}>{t('common.status')}</TableCell>
                           <TableCell sx={{ fontWeight: 700, fontSize: 12 }}>{t('inventoryPage.esxiMigration.guestOs')}</TableCell>
@@ -3565,9 +4151,24 @@ return vm?.isCluster ?? false
                           <TableRow
                             key={vm.vmid}
                             hover
+                            selected={bulkMigSelected.has(vm.vmid)}
                             sx={{ cursor: 'pointer', '&:last-child td': { borderBottom: 'none' } }}
                             onClick={() => onSelect?.({ type: 'extvm', id: `${data.esxiHostInfo!.connectionId}:${vm.vmid}` })}
                           >
+                            <TableCell padding="checkbox" onClick={e => e.stopPropagation()}>
+                              <Checkbox
+                                size="small"
+                                checked={bulkMigSelected.has(vm.vmid)}
+                                onChange={(e) => {
+                                  setBulkMigSelected(prev => {
+                                    const next = new Set(prev)
+                                    if (e.target.checked) next.add(vm.vmid)
+                                    else next.delete(vm.vmid)
+                                    return next
+                                  })
+                                }}
+                              />
+                            </TableCell>
                             <TableCell>
                               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                 <img src={extVmIcon} alt="" width={16} height={16} style={{ opacity: 0.7 }} />
@@ -3622,11 +4223,55 @@ return vm?.isCluster ?? false
                       </TableBody>
                     </Table>
                   </TableContainer>
+                  </>
                 )}
               </CardContent>
             </Card>
             )
           })()}
+
+          {/* External Host — Recent Migrations */}
+          {selection?.type === 'ext' && extHostMigrations.length > 0 && (
+            <Card variant="outlined" sx={{ borderRadius: 2 }}>
+              <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                <Typography variant="body2" fontWeight={700} fontSize={12} sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <i className="ri-history-line" style={{ fontSize: 16, opacity: 0.5 }} />
+                  {t('inventoryPage.extDashboard.recentMigrations')}
+                </Typography>
+                <Stack spacing={0}>
+                  {extHostMigrations.slice(0, 8).map((mig: any) => (
+                    <Box key={mig.id} sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 0.75, borderBottom: '1px solid', borderColor: 'divider', '&:last-child': { borderBottom: 'none' } }}>
+                      <Box sx={{
+                        width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+                        bgcolor: mig.status === 'completed' ? 'success.main' : mig.status === 'failed' ? 'error.main' : 'primary.main',
+                      }} />
+                      <Typography variant="body2" fontSize={12} fontWeight={600} noWrap sx={{ minWidth: 0, flex: 1 }}>{mig.sourceVmName || mig.sourceVmId}</Typography>
+                      <Typography variant="caption" fontSize={10} sx={{ opacity: 0.5, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                        → {mig.targetNode}
+                      </Typography>
+                      <Typography variant="caption" fontSize={10} sx={{ opacity: 0.5, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                        {mig.totalBytes ? `${(Number(mig.totalBytes) / 1073741824).toFixed(1)} GB` : '--'}
+                      </Typography>
+                      {mig.completedAt && (
+                        <Typography variant="caption" fontSize={10} sx={{ opacity: 0.4, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                          {new Date(mig.completedAt).toLocaleDateString()}
+                        </Typography>
+                      )}
+                      <Chip
+                        size="small"
+                        label={mig.status === 'completed' ? t('inventoryPage.esxiMigration.completed') : mig.status === 'failed' ? t('inventoryPage.esxiMigration.failed') : `${mig.progress || 0}%`}
+                        sx={{
+                          height: 20, fontSize: 10, fontWeight: 700, flexShrink: 0,
+                          bgcolor: mig.status === 'completed' ? 'success.main' : mig.status === 'failed' ? 'error.main' : 'primary.main',
+                          color: '#fff',
+                        }}
+                      />
+                    </Box>
+                  ))}
+                </Stack>
+              </CardContent>
+            </Card>
+          )}
 
           {/* External VM — Migration Control Panel */}
           {selection?.type === 'extvm' && data.esxiVmInfo && (() => {
@@ -3666,7 +4311,7 @@ return vm?.isCluster ?? false
                         variant="outlined"
                         color="primary"
                         sx={{ textTransform: 'none', fontSize: 11, height: 28, minWidth: 0, px: 1.5, whiteSpace: 'nowrap', flexShrink: 0 }}
-                        startIcon={<i className="ri-play-circle-line" style={{ fontSize: 14 }} />}
+                        startIcon={<img src={theme.palette.mode === 'dark' ? '/images/proxmox-logo-dark.svg' : '/images/proxmox-logo.svg'} alt="" width={14} height={14} />}
                         onClick={() => {
                           if (!vmwareMigrationAvailable) { setUpgradeDialogOpen(true); return }
                           setEsxiMigrateVm({
@@ -3786,7 +4431,7 @@ return vm?.isCluster ?? false
                               const elapsed = (new Date(l.ts).getTime() - startTime) / 1000
                               return {
                                 elapsed,
-                                pct: Math.round((idx / (logs.length - 1)) * 100),
+                                pct: typeof l.progress === 'number' ? l.progress : Math.round((idx / (logs.length - 1)) * 100),
                                 time: new Date(l.ts).toLocaleTimeString(),
                                 msg: l.msg,
                               }
@@ -4678,7 +5323,7 @@ return
       </Dialog>
 
       {/* ESXi / XCP-ng Migration Dialog */}
-      <Dialog open={!!esxiMigrateVm} onClose={() => { if (!migStarting && !migJobId) setEsxiMigrateVm(null) }} maxWidth="sm" fullWidth>
+      <Dialog open={!!esxiMigrateVm} onClose={() => { if (!migStarting) setEsxiMigrateVm(null) }} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
           <img src={esxiMigrateVm?.hostType === 'xcpng' ? '/images/xcpng-logo.svg' : '/images/esxi-logo.svg'} alt="" width={22} height={22} />
           {t('inventoryPage.esxiMigration.migrateToProxmox')}
@@ -4988,7 +5633,7 @@ return
                 variant="contained"
                 disabled={!migTargetConn || !migTargetNode || !migTargetStorage || migStarting || (migTargetConn && !migPveConnections.find((c: any) => c.id === migTargetConn)?.sshEnabled)}
                 sx={{ textTransform: 'none' }}
-                startIcon={migStarting ? <CircularProgress size={16} color="inherit" /> : <i className="ri-play-circle-line" />}
+                startIcon={migStarting ? <CircularProgress size={16} color="inherit" /> : <img src={theme.palette.mode === 'dark' ? '/images/proxmox-logo-dark.svg' : '/images/proxmox-logo.svg'} alt="" width={16} height={16} />}
                 onClick={async () => {
                   if (!esxiMigrateVm) return
                   setMigStarting(true)
@@ -5009,7 +5654,27 @@ return
                     })
                     const d = await res.json()
                     if (d.data?.jobId) {
-                      setMigJobId(d.data.jobId)
+                      const jobId = d.data.jobId
+                      setMigJobId(jobId)
+                      // Add task to ProxCenter TasksBar
+                      const taskId = `migration-${jobId}`
+                      const vmLabel = esxiMigrateVm.name || esxiMigrateVm.vmid
+                      const sourceType = esxiMigrateVm.hostType === 'xcpng' ? 'XCP-ng' : 'ESXi'
+                      addPCTask({
+                        id: taskId,
+                        type: 'generic',
+                        label: `${t('inventoryPage.esxiMigration.migrating')} ${vmLabel} (${sourceType} → Proxmox)`,
+                        detail: t('inventoryPage.esxiMigration.preflight'),
+                        progress: 0,
+                        status: 'running',
+                        createdAt: Date.now(),
+                      })
+                      // Register restore callback to reopen dialog
+                      const savedVm = { ...esxiMigrateVm }
+                      registerOnRestore(taskId, () => {
+                        setEsxiMigrateVm(savedVm)
+                        setMigJobId(jobId)
+                      })
                     } else {
                       throw new Error(d.error || 'Failed to start migration')
                     }
@@ -5026,14 +5691,23 @@ return
           ) : (
             <>
               {migJob && !['completed', 'failed', 'cancelled'].includes(migJob.status) && (
-                <Button
-                  color="error"
-                  onClick={async () => {
-                    await fetch(`/api/v1/migrations/${migJobId}/cancel`, { method: 'POST' })
-                  }}
-                >
-                  {t('inventoryPage.esxiMigration.cancelMigration')}
-                </Button>
+                <>
+                  <Button
+                    color="error"
+                    onClick={async () => {
+                      await fetch(`/api/v1/migrations/${migJobId}/cancel`, { method: 'POST' })
+                    }}
+                  >
+                    {t('inventoryPage.esxiMigration.cancelMigration')}
+                  </Button>
+                  <Button
+                    startIcon={<i className="ri-subtract-line" />}
+                    onClick={() => setEsxiMigrateVm(null)}
+                    sx={{ textTransform: 'none' }}
+                  >
+                    {t('inventoryPage.esxiMigration.minimize')}
+                  </Button>
+                </>
               )}
               {migJob && migJob.status === 'failed' && (
                 <Button
@@ -5046,9 +5720,355 @@ return
                   {t('inventoryPage.esxiMigration.retry')}
                 </Button>
               )}
-              <Button onClick={() => { setEsxiMigrateVm(null); setMigJobId(null); setMigJob(null); setMigType('cold') }}>
-                {t('common.close')}
+              {migJob && ['completed', 'failed', 'cancelled'].includes(migJob.status) && (
+                <Button onClick={() => { setEsxiMigrateVm(null); setMigJobId(null); setMigJob(null); setMigType('cold') }}>
+                  {t('common.close')}
+                </Button>
+              )}
+            </>
+          )}
+        </DialogActions>
+      </Dialog>
+
+      {/* Bulk Migration Dialog */}
+      <Dialog open={bulkMigOpen} onClose={() => { if (!bulkMigStarting && bulkMigJobs.length === 0) setBulkMigOpen(false) }} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <img src={bulkMigHostInfo?.hostType === 'xcpng' ? '/images/xcpng-logo.svg' : '/images/esxi-logo.svg'} alt="" width={22} height={22} />
+          {t('inventoryPage.esxiMigration.bulkMigration')} ({bulkMigSelected.size} VMs)
+        </DialogTitle>
+        <DialogContent>
+          <Stack spacing={2.5} sx={{ mt: 1 }}>
+            {/* Selected VMs summary */}
+            <Box sx={{ p: 2, borderRadius: 1.5, bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)', border: '1px solid', borderColor: 'divider', maxHeight: 150, overflow: 'auto' }}>
+              <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>{t('inventoryPage.esxiMigration.selectedVms')}</Typography>
+              {(bulkMigHostInfo?.vms || []).filter((vm: any) => bulkMigSelected.has(vm.vmid)).map((vm: any) => (
+                <Box key={vm.vmid} sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 0.3 }}>
+                  <Chip size="small" label={vm.status === 'running' ? 'ON' : 'OFF'} sx={{ height: 18, fontSize: 9, fontWeight: 700, bgcolor: vm.status === 'running' ? 'success.main' : 'action.disabledBackground', color: vm.status === 'running' ? '#fff' : 'text.secondary' }} />
+                  <Typography variant="body2" fontSize={12} fontWeight={600}>{vm.name || vm.vmid}</Typography>
+                  <Typography variant="caption" color="text.secondary">{vm.cpu} vCPU · {vm.memory_size_MiB ? `${(vm.memory_size_MiB / 1024).toFixed(1)} GB` : '?'}</Typography>
+                </Box>
+              ))}
+            </Box>
+
+            {bulkMigJobs.length === 0 && (
+              <>
+                <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+                  <i className="ri-arrow-down-line" style={{ fontSize: 24, color: theme.palette.primary.main }} />
+                </Box>
+
+                {/* Target config — reuse same selectors as single migration */}
+                <Box sx={{ p: 2, borderRadius: 1.5, bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)', border: '1px solid', borderColor: 'divider' }}>
+                  <Typography variant="subtitle2" sx={{ mb: 1.5, color: 'text.secondary', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>{t('inventoryPage.esxiMigration.targetProxmox')}</Typography>
+                  <Stack spacing={2}>
+                    <Autocomplete size="small" options={migPveConnections} getOptionLabel={(o: any) => o.name || o.id}
+                      value={migPveConnections.find((c: any) => c.id === migTargetConn) || null}
+                      onChange={(_, v: any) => { setMigTargetConn(v?.id || ''); setMigTargetNode(''); setMigTargetStorage(''); setMigNetworkBridge('') }}
+                      renderInput={(p) => <TextField {...p} label={t('inventoryPage.esxiMigration.targetCluster')} placeholder={t('inventoryPage.esxiMigration.selectCluster')} />}
+                    />
+                    {migTargetConn && (
+                      <Autocomplete size="small"
+                        options={[{ node: '__auto__', label: t('inventoryPage.esxiMigration.autoDistribute') }, ...migNodes.map((n: any) => ({ node: n.node || n, label: n.node || n }))]}
+                        getOptionLabel={(o: any) => o.label || o.node || o}
+                        value={migTargetNode === '__auto__' ? { node: '__auto__', label: t('inventoryPage.esxiMigration.autoDistribute') } : migNodes.find((n: any) => (n.node || n) === migTargetNode) ? { node: migTargetNode, label: migTargetNode } : null}
+                        onChange={(_, v: any) => { setMigTargetNode(v?.node || ''); setMigTargetStorage(''); setMigNetworkBridge('') }}
+                        renderInput={(p) => <TextField {...p} label={t('inventoryPage.esxiMigration.targetNode')} placeholder={t('inventoryPage.esxiMigration.selectNode')} />}
+                        renderOption={(props, option: any) => (
+                          <li {...props} key={option.node}>
+                            {option.node === '__auto__' ? (
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <i className="ri-equalizer-line" style={{ fontSize: 16, color: theme.palette.primary.main }} />
+                                <Box>
+                                  <Typography variant="body2" fontWeight={600} fontSize={13}>{option.label}</Typography>
+                                  <Typography variant="caption" color="text.secondary" fontSize={10}>{t('inventoryPage.esxiMigration.autoDistributeDesc')}</Typography>
+                                </Box>
+                              </Box>
+                            ) : (
+                              <Typography variant="body2" fontSize={13}>{option.label}</Typography>
+                            )}
+                          </li>
+                        )}
+                      />
+                    )}
+                    {migTargetNode && (
+                      <>
+                        <Autocomplete size="small" options={migStorages} getOptionLabel={(o: any) => `${o.storage} (${o.type}, ${formatBytes(o.avail || 0)} ${t('inventoryPage.esxiMigration.free')})`}
+                          value={migStorages.find((s: any) => s.storage === migTargetStorage) || null}
+                          onChange={(_, v: any) => setMigTargetStorage(v?.storage || '')}
+                          renderInput={(p) => <TextField {...p} label={t('inventoryPage.esxiMigration.targetStorage')} placeholder={t('inventoryPage.esxiMigration.selectStorage')}
+                            helperText={migTargetNode === '__auto__' ? t('inventoryPage.esxiMigration.sharedStorageHint') : undefined} />}
+                        />
+                        <Autocomplete size="small" options={migBridges} getOptionLabel={(o: any) => o.iface || o}
+                          value={migBridges.find((b: any) => (b.iface || b) === migNetworkBridge) || null}
+                          onChange={(_, v: any) => setMigNetworkBridge(v?.iface || v || '')}
+                          renderInput={(p) => <TextField {...p} label={t('inventoryPage.esxiMigration.networkBridge')} placeholder={t('inventoryPage.esxiMigration.selectBridge')} />}
+                        />
+                      </>
+                    )}
+                  </Stack>
+                </Box>
+
+                {/* Migration type */}
+                <Box sx={{ display: 'flex', gap: 1.5 }}>
+                  {(['cold', 'live'] as const).map(type => (
+                    <Box key={type} onClick={() => setMigType(type)} sx={{
+                      flex: 1, p: 1.5, borderRadius: 1.5, cursor: 'pointer', border: '2px solid',
+                      borderColor: migType === type ? 'primary.main' : 'divider',
+                      bgcolor: migType === type ? (theme.palette.mode === 'dark' ? 'rgba(var(--mui-palette-primary-mainChannel) / 0.08)' : 'rgba(var(--mui-palette-primary-mainChannel) / 0.04)') : 'transparent',
+                    }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <i className={type === 'cold' ? 'ri-shut-down-line' : 'ri-flashlight-line'} style={{ fontSize: 16, color: type === 'cold' ? theme.palette.info.main : theme.palette.success.main }} />
+                        <Typography variant="body2" fontWeight={700} fontSize={12}>
+                          {type === 'cold' ? t('inventoryPage.esxiMigration.migrationTypeCold') : t('inventoryPage.esxiMigration.migrationTypeLive')}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  ))}
+                </Box>
+
+                {migTargetConn && !migPveConnections.find((c: any) => c.id === migTargetConn)?.sshEnabled && (
+                  <Alert severity="error" sx={{ fontSize: 12 }}>{t('inventoryPage.esxiMigration.sshRequired')}</Alert>
+                )}
+
+                {migType === 'cold' && bulkMigHostInfo?.vms && (() => {
+                  const runningVms = bulkMigHostInfo.vms.filter((vm: any) => bulkMigSelected.has(vm.vmid) && vm.status === 'running')
+                  return runningVms.length > 0 ? (
+                    <Alert severity="warning" sx={{ fontSize: 12 }}>
+                      {t('inventoryPage.esxiMigration.coldMigrationRunningVms')}
+                      <Box component="ul" sx={{ m: 0, mt: 0.5, pl: 2 }}>
+                        {runningVms.map((vm: any) => (
+                          <li key={vm.vmid}><strong>{vm.name || vm.vmid}</strong></li>
+                        ))}
+                      </Box>
+                    </Alert>
+                  ) : null
+                })()}
+              </>
+            )}
+
+            {/* Bulk migration progress */}
+            {bulkMigJobs.length > 0 && (() => {
+              const completedCount = bulkMigJobs.filter(j => j.status === 'completed').length
+              const failedCount = bulkMigJobs.filter(j => j.status === 'failed').length
+              const globalProgress = bulkMigJobs.length > 0 ? Math.round(bulkMigJobs.reduce((sum, j) => sum + j.progress, 0) / bulkMigJobs.length) : 0
+              const allDone = bulkMigJobs.every(j => ['completed', 'failed', 'cancelled'].includes(j.status))
+              const allLogs = (bulkMigLogsFilter
+                ? bulkMigJobs.filter(j => j.jobId === bulkMigLogsFilter)
+                : bulkMigJobs
+              ).flatMap(j => (j.logs || []).map(l => ({ ...l, vmName: j.name }))).sort((a, b) => new Date(a.ts).getTime() - new Date(b.ts).getTime())
+              return (
+                <Stack spacing={1}>
+                  {/* Global progress header — collapsible */}
+                  <Box
+                    onClick={() => setBulkMigProgressExpanded(v => !v)}
+                    sx={{ display: 'flex', alignItems: 'center', gap: 1, cursor: 'pointer', userSelect: 'none', py: 0.5 }}
+                  >
+                    <i className={bulkMigProgressExpanded ? 'ri-arrow-down-s-line' : 'ri-arrow-right-s-line'} style={{ fontSize: 18, opacity: 0.5 }} />
+                    <Typography variant="body2" fontWeight={700} fontSize={12} sx={{ flex: 1 }}>
+                      {t('inventoryPage.esxiMigration.bulkMigration')} — {completedCount}/{bulkMigJobs.length} {t('inventoryPage.esxiMigration.completed').toLowerCase()}
+                      {failedCount > 0 && <Typography component="span" color="error.main" fontWeight={700} fontSize={12}> ({failedCount} {t('inventoryPage.esxiMigration.failed').toLowerCase()})</Typography>}
+                    </Typography>
+                    <Typography variant="caption" fontWeight={700} sx={{ opacity: 0.6 }}>{globalProgress}%</Typography>
+                  </Box>
+                  <LinearProgress
+                    variant="determinate"
+                    value={globalProgress}
+                    color={allDone ? (failedCount > 0 ? 'error' : 'success') : 'primary'}
+                    sx={{ height: 6, borderRadius: 3 }}
+                  />
+
+                  {/* Individual jobs — shown when expanded */}
+                  {bulkMigProgressExpanded && (
+                    <Box sx={{ pl: 1 }}>
+                      {bulkMigJobs.map((job) => (
+                        <Box key={job.vmid} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: 0.75, borderBottom: '1px solid', borderColor: 'divider', '&:last-child': { borderBottom: 'none' } }}>
+                          <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <Typography variant="body2" fontWeight={600} fontSize={12} noWrap>{job.name}</Typography>
+                            <LinearProgress
+                              variant={job.status === 'pending' ? 'indeterminate' : 'determinate'}
+                              value={job.status === 'queued' ? 0 : job.progress}
+                              color={job.status === 'completed' ? 'success' : job.status === 'failed' || job.status === 'cancelled' ? 'error' : 'primary'}
+                              sx={{ height: 4, borderRadius: 2, mt: 0.5, ...(job.status === 'queued' ? { opacity: 0.3 } : {}) }}
+                            />
+                          </Box>
+                          <Chip
+                            size="small"
+                            label={job.status === 'completed' ? t('inventoryPage.esxiMigration.completed') : job.status === 'failed' ? t('inventoryPage.esxiMigration.failed') : job.status === 'queued' ? t('inventoryPage.esxiMigration.queued') : `${job.progress}%`}
+                            sx={{
+                              height: 20, fontSize: 10, fontWeight: 700, minWidth: 50,
+                              bgcolor: job.status === 'completed' ? 'success.main' : job.status === 'failed' ? 'error.main' : job.status === 'queued' ? 'action.disabled' : 'primary.main',
+                              color: '#fff',
+                            }}
+                          />
+                        </Box>
+                      ))}
+                    </Box>
+                  )}
+
+                  {/* Logs section — collapsible */}
+                  <Box
+                    onClick={() => setBulkMigLogsExpanded(v => !v)}
+                    sx={{ display: 'flex', alignItems: 'center', gap: 1, cursor: 'pointer', userSelect: 'none', py: 0.5, mt: 1 }}
+                  >
+                    <i className={bulkMigLogsExpanded ? 'ri-arrow-down-s-line' : 'ri-arrow-right-s-line'} style={{ fontSize: 18, opacity: 0.5 }} />
+                    <Typography variant="body2" fontWeight={700} fontSize={12}>
+                      {t('inventoryPage.esxiMigration.migrationLogs')}
+                    </Typography>
+                    <Typography component="span" variant="caption" sx={{ opacity: 0.4 }}>({allLogs.length})</Typography>
+                  </Box>
+
+                  {bulkMigLogsExpanded && (
+                    <Box>
+                      {/* VM filter tabs */}
+                      {bulkMigJobs.length > 1 && (
+                        <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mb: 1 }}>
+                          <Chip
+                            size="small"
+                            label={t('inventoryPage.esxiMigration.allVms')}
+                            onClick={() => setBulkMigLogsFilter(null)}
+                            sx={{ height: 22, fontSize: 10, fontWeight: 600, bgcolor: !bulkMigLogsFilter ? 'primary.main' : 'action.hover', color: !bulkMigLogsFilter ? '#fff' : 'text.secondary' }}
+                          />
+                          {bulkMigJobs.filter(j => j.jobId).map(j => (
+                            <Chip
+                              key={j.jobId}
+                              size="small"
+                              label={j.name}
+                              onClick={() => setBulkMigLogsFilter(bulkMigLogsFilter === j.jobId ? null : j.jobId)}
+                              sx={{ height: 22, fontSize: 10, fontWeight: 600, bgcolor: bulkMigLogsFilter === j.jobId ? 'primary.main' : 'action.hover', color: bulkMigLogsFilter === j.jobId ? '#fff' : 'text.secondary' }}
+                            />
+                          ))}
+                        </Box>
+                      )}
+
+                      {/* Log entries */}
+                      <Box sx={{ maxHeight: 250, overflowY: 'auto', bgcolor: theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.03)', borderRadius: 1, p: 1 }}>
+                        {allLogs.length > 0 ? allLogs.map((log, i) => (
+                          <Box key={i} sx={{ display: 'flex', gap: 0.75, py: 0.25, fontFamily: 'JetBrains Mono, monospace', fontSize: 11, lineHeight: 1.5 }}>
+                            <Typography component="span" sx={{ fontSize: 10, opacity: 0.4, whiteSpace: 'nowrap', fontFamily: 'inherit' }}>
+                              {new Date(log.ts).toLocaleTimeString()}
+                            </Typography>
+                            <Typography component="span" sx={{ fontSize: 11, fontFamily: 'inherit', color: log.level === 'error' ? 'error.main' : log.level === 'warn' ? 'warning.main' : log.level === 'success' ? 'success.main' : 'text.secondary' }}>
+                              {log.level === 'success' ? '✓' : log.level === 'error' ? '✗' : log.level === 'warn' ? '⚠' : '·'}
+                            </Typography>
+                            {!bulkMigLogsFilter && bulkMigJobs.length > 1 && (
+                              <Typography component="span" sx={{ fontSize: 10, fontFamily: 'inherit', fontWeight: 700, opacity: 0.5, whiteSpace: 'nowrap' }}>
+                                [{log.vmName}]
+                              </Typography>
+                            )}
+                            <Typography component="span" sx={{ fontSize: 11, fontFamily: 'inherit', color: log.level === 'error' ? 'error.main' : 'text.primary' }}>
+                              {log.msg}
+                            </Typography>
+                          </Box>
+                        )) : (
+                          <Typography variant="caption" sx={{ opacity: 0.4 }}>
+                            {t('inventoryPage.esxiMigration.logsWillAppear')}
+                          </Typography>
+                        )}
+                      </Box>
+                    </Box>
+                  )}
+                </Stack>
+              )
+            })()}
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          {bulkMigJobs.length === 0 ? (
+            <>
+              <Button onClick={() => setBulkMigOpen(false)} disabled={bulkMigStarting}>{t('common.cancel')}</Button>
+              <Button
+                variant="contained"
+                disabled={!migTargetConn || !migTargetNode || !migTargetStorage || bulkMigStarting || (migTargetConn && !migPveConnections.find((c: any) => c.id === migTargetConn)?.sshEnabled) || (migType === 'cold' && bulkMigHostInfo?.vms?.some((vm: any) => bulkMigSelected.has(vm.vmid) && vm.status === 'running'))}
+                sx={{ textTransform: 'none' }}
+                startIcon={bulkMigStarting ? <CircularProgress size={16} color="inherit" /> : <img src={theme.palette.mode === 'dark' ? '/images/proxmox-logo-dark.svg' : '/images/proxmox-logo.svg'} alt="" width={16} height={16} />}
+                onClick={async () => {
+                  if (!bulkMigHostInfo) return
+                  setBulkMigStarting(true)
+                  const vmsToMigrate = bulkMigHostInfo.vms.filter((vm: any) => bulkMigSelected.has(vm.vmid))
+                  // Build node list for round-robin distribution
+                  const nodeList = migTargetNode === '__auto__' ? migNodes.map((n: any) => n.node || n) : [migTargetNode]
+
+                  // Create all jobs — first N as 'pending' (will be started), rest as 'queued'
+                  const jobs: typeof bulkMigJobs = vmsToMigrate.map((vm: any, idx: number) => ({
+                    vmid: vm.vmid,
+                    name: vm.name || vm.vmid,
+                    jobId: '',
+                    status: idx < BULK_MIG_CONCURRENCY ? 'pending' : 'queued',
+                    progress: 0,
+                    targetNode: nodeList[idx % nodeList.length],
+                  }))
+
+                  // Start the first batch
+                  const sourceType = bulkMigHostInfo.hostType === 'xcpng' ? 'XCP-ng' : 'ESXi'
+                  for (let idx = 0; idx < Math.min(BULK_MIG_CONCURRENCY, jobs.length); idx++) {
+                    const job = jobs[idx]
+                    try {
+                      const res = await fetch('/api/v1/migrations', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          sourceConnectionId: bulkMigHostInfo.connectionId,
+                          sourceVmId: job.vmid,
+                          targetConnectionId: migTargetConn,
+                          targetNode: job.targetNode,
+                          targetStorage: migTargetStorage,
+                          networkBridge: migNetworkBridge,
+                          migrationType: migType,
+                          startAfterMigration: migStartAfter,
+                        }),
+                      })
+                      const d = await res.json()
+                      if (d.data?.jobId) {
+                        job.jobId = d.data.jobId
+                        job.status = 'pending'
+                        addPCTask({
+                          id: `migration-${d.data.jobId}`,
+                          type: 'generic',
+                          label: `${t('inventoryPage.esxiMigration.migrating')} ${job.name} (${sourceType} → Proxmox)`,
+                          detail: t('inventoryPage.esxiMigration.preflight'),
+                          progress: 0,
+                          status: 'running',
+                          createdAt: Date.now(),
+                        })
+                      } else {
+                        job.status = 'failed'
+                        job.error = d.error || 'Failed to start'
+                      }
+                    } catch (e: any) {
+                      job.status = 'failed'
+                      job.error = e.message
+                    }
+                  }
+
+                  bulkMigConfigRef.current = {
+                    sourceConnectionId: bulkMigHostInfo.connectionId,
+                    targetConnectionId: migTargetConn,
+                    targetStorage: migTargetStorage,
+                    networkBridge: migNetworkBridge,
+                    migrationType: migType,
+                    startAfterMigration: migStartAfter,
+                    sourceType,
+                  }
+                  setBulkMigJobs(jobs)
+                  setBulkMigStarting(false)
+                }}
+              >
+                {t('inventoryPage.esxiMigration.startMigration')} ({bulkMigSelected.size} VMs)
               </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                startIcon={<i className="ri-subtract-line" />}
+                onClick={() => setBulkMigOpen(false)}
+                sx={{ textTransform: 'none' }}
+              >
+                {t('inventoryPage.esxiMigration.minimize')}
+              </Button>
+              {bulkMigJobs.every(j => ['completed', 'failed', 'cancelled'].includes(j.status)) && (
+                <Button onClick={() => { setBulkMigOpen(false); setBulkMigJobs([]); setBulkMigSelected(new Set()) }}>
+                  {t('common.close')}
+                </Button>
+              )}
             </>
           )}
         </DialogActions>

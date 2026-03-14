@@ -59,9 +59,9 @@ async function updateJob(id: string, status: MigrationStatus, extra: Record<stri
 }
 
 async function appendLog(id: string, msg: string, level: LogEntry["level"] = "info") {
-  const job = await prisma.migrationJob.findUnique({ where: { id }, select: { logs: true } })
+  const job = await prisma.migrationJob.findUnique({ where: { id }, select: { logs: true, progress: true } })
   const logs: LogEntry[] = job?.logs ? JSON.parse(job.logs) : []
-  logs.push({ ts: new Date().toISOString(), msg, level })
+  logs.push({ ts: new Date().toISOString(), msg, level, progress: job?.progress ?? 0 } as any)
   await prisma.migrationJob.update({ where: { id }, data: { logs: JSON.stringify(logs) } })
 }
 
@@ -236,6 +236,16 @@ export async function runMigrationPipeline(jobId: string, config: MigrationConfi
       throw new Error(`SSH to Proxmox node failed: ${sshTest.error}`)
     }
     await appendLog(jobId, "SSH connectivity OK", "success")
+
+    // Check sshpass on PVE node (needed when ESXi auth is password-based, for nested SSH)
+    const esxiUsesPassword = esxiConn.sshAuthMethod !== "key" && esxiConn.sshPassEnc && !esxiConn.sshKeyEnc
+    if (esxiSshAvailable && esxiUsesPassword) {
+      const sshpassCheck = await executeSSH(config.targetConnectionId, nodeIp, "which sshpass")
+      if (!sshpassCheck.success || !sshpassCheck.output?.trim()) {
+        throw new Error("sshpass is not installed on the Proxmox node. Install it with: apt install sshpass")
+      }
+      await appendLog(jobId, "sshpass available on PVE node", "success")
+    }
 
     // Check target storage
     const storageStatus = await pveFetch<any>(
@@ -918,7 +928,12 @@ export async function runMigrationPipeline(jobId: string, config: MigrationConfi
     }
 
     // ── DONE ──
-    await updateJob(jobId, "completed", { progress: 100 })
+    const totalCapacity = vmConfig.disks.reduce((sum, d) => sum + d.capacityBytes, 0)
+    await updateJob(jobId, "completed", {
+      progress: 100,
+      bytesTransferred: BigInt(totalCapacity),
+      totalBytes: BigInt(totalCapacity),
+    })
     await appendLog(jobId, `Migration completed successfully! VM ${targetVmid} is ready on ${config.targetNode}.`, "success")
 
     // Audit
