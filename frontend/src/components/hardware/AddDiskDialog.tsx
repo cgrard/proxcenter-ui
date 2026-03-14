@@ -456,7 +456,7 @@ return match ? parseInt(match[1]) : -1
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', gap: 2 }}>
                       <span>{s.storage}</span>
                       <Typography variant="caption" sx={{ opacity: 0.7 }}>
-                        {s.type} • {formatBytes(s.avail)} libre / {formatBytes(s.total)}
+                        {s.type} • {formatBytes(s.avail)} free / {formatBytes(s.total)}
                       </Typography>
                     </Box>
                   </MenuItem>
