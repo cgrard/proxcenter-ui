@@ -532,7 +532,7 @@ export default function DashboardTab({ health, loading, jobs, connections }: Das
   }
 
   return (
-    <Stack spacing={2.5}>
+    <Stack spacing={2.5} sx={{ flex: 1 }}>
       {/* KPI Row */}
       <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)', lg: 'repeat(5, 1fr)' } }}>
         <KPICard
@@ -581,8 +581,8 @@ export default function DashboardTab({ health, loading, jobs, connections }: Das
       <BandwidthChart jobs={jobs} connections={connections} t={t} />
 
       {/* Recent Activity Timeline */}
-      <Card variant='outlined' sx={{ borderRadius: 2 }}>
-        <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+      <Card variant='outlined' sx={{ borderRadius: 2, flex: 1, display: 'flex', flexDirection: 'column', minHeight: 200 }}>
+        <CardContent sx={{ p: 2, '&:last-child': { pb: 2 }, flex: 1, display: 'flex', flexDirection: 'column' }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
             <Typography variant='subtitle2' sx={{ fontWeight: 600 }}>
               {t('siteRecovery.dashboard.recentActivity')}
@@ -597,14 +597,14 @@ export default function DashboardTab({ health, loading, jobs, connections }: Das
             )}
           </Box>
           {(!health.recent_activity || health.recent_activity.length === 0) ? (
-            <Box sx={{ textAlign: 'center', py: 3, opacity: 0.5 }}>
+            <Box sx={{ textAlign: 'center', py: 3, opacity: 0.5, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
               <i className='ri-time-line' style={{ fontSize: '1.5rem' }} />
               <Typography variant='body2' sx={{ mt: 0.5 }}>
                 {t('siteRecovery.dashboard.noRecentActivity')}
               </Typography>
             </Box>
           ) : (
-            <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
+            <Box sx={{ flex: 1, overflow: 'auto' }}>
               <Stack divider={<Box sx={{ borderBottom: '1px solid', borderColor: 'divider' }} />}>
                 {health.recent_activity.map((activity, i) => (
                   <ActivityItem key={i} activity={activity} />
