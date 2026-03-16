@@ -513,10 +513,10 @@ const NavbarContent = () => {
             onClick={() => { changeLocale(loc); setLangAnchor(null) }}
             selected={locale === loc}
           >
-            <ListItemIcon>
+            <ListItemIcon sx={{ minWidth: 'auto', mr: 2 }}>
               <span style={{ fontSize: '1.2rem' }}>{localeFlags[loc]}</span>
             </ListItemIcon>
-            {localeNames[loc]}
+            {t(`languages.${loc}`)}
           </MenuItem>
         ))}
       </Menu>

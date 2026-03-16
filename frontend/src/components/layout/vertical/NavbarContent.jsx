@@ -57,6 +57,29 @@ import { useActiveAlerts, useDRSRecommendations, useVersionCheck, useOrchestrato
 // Version config
 import { GIT_SHA } from '@/config/version'
 
+// GitHub Stars badge
+function GitHubStars() {
+  const [stars, setStars] = useState(null)
+
+  useEffect(() => {
+    fetch('https://api.github.com/repos/adminsyspro/proxcenter-ui', { next: { revalidate: 3600 } })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data?.stargazers_count != null) setStars(data.stargazers_count) })
+      .catch(() => {})
+  }, [])
+
+  if (stars === null) return <span style={{ fontSize: '0.75rem' }}>--</span>
+
+  const formatted = stars >= 1000 ? `${(stars / 1000).toFixed(1)}k` : String(stars)
+
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2, fontSize: '0.75rem' }}>
+      {formatted}
+      <i className='ri-star-fill' style={{ fontSize: 12, color: '#f59e0b' }} />
+    </span>
+  )
+}
+
 // Fonction pour obtenir les initiales
 const getInitials = (name, email) => {
   if (name) {
@@ -134,7 +157,6 @@ const NavbarContent = () => {
   const { title, subtitle, icon } = usePageTitle()
   const { hasFeature, loading: licenseLoading, status: licenseStatus, isEnterprise } = useLicense()
   const { roles: rbacRoles, hasPermission } = useRBAC()
-
   // Check if AI feature is available AND enabled in settings
   const [aiEnabled, setAiEnabled] = useState(false)
   const aiAvailable = !licenseLoading && hasFeature(Features.AI_INSIGHTS) && aiEnabled
@@ -457,26 +479,26 @@ return () => window.removeEventListener('keydown', onKeyDown)
     <>
       <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', gap: 2, px: 2, position: 'relative' }}>
         {/* Page Title - Left side */}
-        <Box sx={{ flex: 1, display: { xs: 'none', md: 'flex' }, alignItems: 'baseline', minWidth: 0 }}>
+        <Box sx={{ flex: 1, display: { xs: 'none', md: 'flex' }, alignItems: 'center', gap: 2, minWidth: 0 }}>
           {title && (
             <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, minWidth: 0 }}>
               {icon && (
-                <i 
-                  className={icon} 
-                  style={{ 
-                    fontSize: 18, 
+                <i
+                  className={icon}
+                  style={{
+                    fontSize: 18,
                     color: 'var(--mui-palette-primary-main)',
                     opacity: 0.9,
                     flexShrink: 0,
                     position: 'relative',
                     top: 2
-                  }} 
+                  }}
                 />
               )}
-              <Typography 
-                variant='h6' 
-                sx={{ 
-                  fontWeight: 800, 
+              <Typography
+                variant='h6'
+                sx={{
+                  fontWeight: 800,
                   lineHeight: 1,
                   whiteSpace: 'nowrap',
                   fontSize: '1.1rem'
@@ -486,9 +508,9 @@ return () => window.removeEventListener('keydown', onKeyDown)
               </Typography>
               {subtitle && (
                 <>
-                  <Typography 
+                  <Typography
                     component='span'
-                    sx={{ 
+                    sx={{
                       opacity: 0.3,
                       mx: 0.5,
                       fontSize: '0.9rem',
@@ -497,9 +519,9 @@ return () => window.removeEventListener('keydown', onKeyDown)
                   >
                     •
                   </Typography>
-                  <Typography 
-                    variant='body2' 
-                    sx={{ 
+                  <Typography
+                    variant='body2'
+                    sx={{
                       opacity: 0.5,
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
@@ -547,70 +569,39 @@ return () => window.removeEventListener('keydown', onKeyDown)
 
         {/* RIGHT ICONS */}
         <Box sx={{ flex: 1, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 1 }}>
-          {/* Orchestrator Status Badge - Only show for Enterprise */}
-          {isEnterprise && (
-            <Tooltip title={pxcoreInfo.label}>
-              <Box
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 0.5,
-                  px: 1,
-                  py: 0.25,
-                  borderRadius: 1,
-                  bgcolor: `${pxcoreInfo.color}15`,
-                  transition: 'all 0.2s'
-                }}
-              >
-                <Box
-                  sx={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: '50%',
-                    bgcolor: pxcoreInfo.color,
-                    boxShadow: `0 0 6px ${pxcoreInfo.color}`,
-                    animation: pxcoreStatus.syncing
-                      ? 'pxcore-sync 0.8s ease-in-out infinite'
-                      : pxcoreStatus.status === 'healthy'
-                        ? 'pxcore-glow 2s ease-in-out infinite'
-                        : 'none',
-                    '@keyframes pxcore-glow': {
-                      '0%, 100%': {
-                        opacity: 1,
-                        boxShadow: `0 0 6px ${pxcoreInfo.color}`
-                      },
-                      '50%': {
-                        opacity: 0.6,
-                        boxShadow: `0 0 2px ${pxcoreInfo.color}`
-                      }
-                    },
-                    '@keyframes pxcore-sync': {
-                      '0%, 100%': {
-                        transform: 'scale(1)',
-                        opacity: 1
-                      },
-                      '50%': {
-                        transform: 'scale(1.3)',
-                        opacity: 0.5
-                      }
-                    }
-                  }}
-                />
-                <Typography
-                  variant='caption'
-                  sx={{
-                    fontWeight: 600,
-                    color: pxcoreInfo.color,
-                    fontSize: '0.7rem',
-                    textTransform: 'uppercase',
-                    letterSpacing: 0.5
-                  }}
-                >
-                  PXCore
-                </Typography>
-              </Box>
-            </Tooltip>
-          )}
+          {/* GitHub Stars */}
+          <Tooltip title='Star us on GitHub'>
+            <Box
+              component='a'
+              href='https://github.com/adminsyspro/proxcenter-ui'
+              target='_blank'
+              rel='noopener noreferrer'
+              sx={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 0.5,
+                textDecoration: 'none',
+                color: 'text.secondary',
+                px: 1,
+                py: 0.25,
+                borderRadius: 1,
+                border: '1px solid',
+                borderColor: 'divider',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                transition: 'all 0.2s',
+                '&:hover': {
+                  borderColor: 'primary.main',
+                  color: 'primary.main',
+                  bgcolor: 'action.hover',
+                }
+              }}
+            >
+              <i className='ri-github-fill' style={{ fontSize: 16 }} />
+              <GitHubStars />
+            </Box>
+          </Tooltip>
+
 
           {/* Lang */}
           <Tooltip title={t('navbar.language')}>
@@ -688,10 +679,10 @@ return () => window.removeEventListener('keydown', onKeyDown)
             }}
             selected={locale === loc}
           >
-            <ListItemIcon>
+            <ListItemIcon sx={{ minWidth: 'auto', mr: 2 }}>
               <span style={{ fontSize: '1.2rem' }}>{localeFlags[loc]}</span>
             </ListItemIcon>
-            {localeNames[loc]}
+            {t(`languages.${loc}`)}
           </MenuItem>
         ))}
       </Menu>
@@ -1186,6 +1177,50 @@ return () => window.removeEventListener('keydown', onKeyDown)
             />
           )}
         </Box>
+
+        {isEnterprise && (
+          <>
+            <Divider />
+            <Box sx={{ px: 2, py: 1 }}>
+              <Typography variant='caption' sx={{ opacity: 0.6, fontWeight: 600, textTransform: 'uppercase', fontSize: '0.65rem' }}>
+                Backend Status
+              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                <Box
+                  sx={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    bgcolor: pxcoreInfo.color,
+                    boxShadow: `0 0 6px ${pxcoreInfo.color}`,
+                    flexShrink: 0,
+                    animation: pxcoreStatus.syncing
+                      ? 'pxcore-sync 0.8s ease-in-out infinite'
+                      : pxcoreStatus.status === 'healthy'
+                        ? 'pxcore-glow 2s ease-in-out infinite'
+                        : 'none',
+                    '@keyframes pxcore-glow': {
+                      '0%, 100%': { opacity: 1, boxShadow: `0 0 6px ${pxcoreInfo.color}` },
+                      '50%': { opacity: 0.6, boxShadow: `0 0 2px ${pxcoreInfo.color}` }
+                    },
+                    '@keyframes pxcore-sync': {
+                      '0%, 100%': { transform: 'scale(1)', opacity: 1 },
+                      '50%': { transform: 'scale(1.3)', opacity: 0.5 }
+                    },
+                  }}
+                />
+                <Typography variant='body2' sx={{ fontSize: '0.8rem' }}>
+                  {pxcoreStatus.status === 'healthy' ? t('pxcore.operational') :
+                   pxcoreStatus.status === 'degraded' ? t('pxcore.degraded') :
+                   pxcoreStatus.status === 'error' ? t('pxcore.error') :
+                   pxcoreStatus.status === 'offline' ? t('pxcore.offline') :
+                   t('pxcore.unknown')}
+                </Typography>
+              </Box>
+            </Box>
+          </>
+        )}
+
         <Divider />
 
         <MenuItem
@@ -1263,6 +1298,7 @@ return () => window.removeEventListener('keydown', onKeyDown)
 
       {/* About Dialog */}
       <AboutDialog open={aboutOpen} onClose={() => setAboutOpen(false)} />
+
     </>
   )
 }

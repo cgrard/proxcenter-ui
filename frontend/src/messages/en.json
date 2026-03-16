@@ -86,7 +86,11 @@
     "node": "Node",
     "done": "Done",
     "tags": "Tags",
-    "created": "Created"
+    "created": "Created",
+    "close": "Close"
+  },
+  "whatsNew": {
+    "title": "What's New"
   },
   "license": {
     "enterpriseRequired": "Enterprise license required",
@@ -194,11 +198,11 @@
     "verticalLayout": "Vertical layout"
   },
   "pxcore": {
-    "operational": "PXCore operational",
-    "degraded": "PXCore degraded",
-    "error": "PXCore error",
-    "offline": "PXCore offline",
-    "unknown": "PXCore...",
+    "operational": "Operational",
+    "degraded": "Degraded",
+    "error": "Error",
+    "offline": "Offline",
+    "unknown": "Unknown",
     "databaseOk": "Database OK",
     "databaseError": "Database error",
     "drsActive": "DRS active",
@@ -1525,6 +1529,7 @@
     "security": "Security",
     "ai": "Artificial Intelligence",
     "license": "License",
+    "tenant": "Tenant",
     "deleteConnectionConfirm": "Delete this {type} connection?",
     "addPbsServer": "Add a PBS server",
     "addPveServer": "Add a PVE server",
@@ -5044,5 +5049,36 @@
     "retentionDays": "Retention",
     "retentionInfo": "Retention: {days} days",
     "days": "days"
+  },
+  "tenants": {
+    "title": "Tenants",
+    "subtitle": "Manage isolated environments for different organizations or teams.",
+    "newTenant": "New Tenant",
+    "editTenant": "Edit Tenant",
+    "deleteTenant": "Delete Tenant",
+    "slug": "Slug",
+    "slugHelp": "Lowercase letters, numbers, and hyphens only",
+    "active": "Active",
+    "users": "Users",
+    "addUser": "Add user",
+    "searchUser": "Search by name or email...",
+    "noUsers": "No users assigned to this tenant.",
+    "removeFromTenant": "Remove from tenant",
+    "tenantUpdated": "Tenant updated",
+    "tenantCreated": "Tenant created",
+    "tenantDeleted": "Tenant deleted",
+    "deleteConfirm": "Are you sure you want to delete tenant {name}? This will remove all associated data.",
+    "failedLoad": "Failed to load tenants",
+    "failedLoadUsers": "Failed to load users",
+    "failedSave": "Failed to save tenant",
+    "failedDelete": "Failed to delete tenant",
+    "failedAddUser": "Failed to add user",
+    "failedRemoveUser": "Failed to remove user",
+    "saving": "Saving..."
+  },
+  "languages": {
+    "fr": "French",
+    "en": "English",
+    "zh-CN": "Chinese (Simplified)"
   }
 }

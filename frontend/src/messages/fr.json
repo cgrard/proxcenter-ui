@@ -86,7 +86,11 @@
     "node": "Nœud",
     "done": "Terminé",
     "tags": "Tags",
-    "created": "Créé"
+    "created": "Créé",
+    "close": "Fermer"
+  },
+  "whatsNew": {
+    "title": "Nouveautés"
   },
   "license": {
     "enterpriseRequired": "Licence Enterprise requise",
@@ -194,11 +198,11 @@
     "verticalLayout": "Disposition verticale"
   },
   "pxcore": {
-    "operational": "PXCore opérationnel",
-    "degraded": "PXCore dégradé",
-    "error": "PXCore en erreur",
-    "offline": "PXCore hors ligne",
-    "unknown": "PXCore...",
+    "operational": "Opérationnel",
+    "degraded": "Dégradé",
+    "error": "En erreur",
+    "offline": "Hors ligne",
+    "unknown": "Inconnu",
     "databaseOk": "Base de données OK",
     "databaseError": "Base de données en erreur",
     "drsActive": "DRS actif",
@@ -1530,6 +1534,7 @@
     "security": "Sécurité",
     "ai": "Intelligence Artificielle",
     "license": "Licence",
+    "tenant": "Tenant",
     "deleteConnectionConfirm": "Supprimer cette connexion {type} ?",
     "addPbsServer": "Ajouter un serveur PBS",
     "addPveServer": "Ajouter un serveur PVE",
@@ -5050,5 +5055,36 @@
     "retentionDays": "Rétention",
     "retentionInfo": "Rétention : {days} jours",
     "days": "jours"
+  },
+  "tenants": {
+    "title": "Tenants",
+    "subtitle": "Gérer des environnements isolés pour différentes organisations ou équipes.",
+    "newTenant": "Nouveau tenant",
+    "editTenant": "Modifier le tenant",
+    "deleteTenant": "Supprimer le tenant",
+    "slug": "Slug",
+    "slugHelp": "Lettres minuscules, chiffres et tirets uniquement",
+    "active": "Actif",
+    "users": "Utilisateurs",
+    "addUser": "Ajouter un utilisateur",
+    "searchUser": "Rechercher par nom ou email...",
+    "noUsers": "Aucun utilisateur assigné à ce tenant.",
+    "removeFromTenant": "Retirer du tenant",
+    "tenantUpdated": "Tenant mis à jour",
+    "tenantCreated": "Tenant créé",
+    "tenantDeleted": "Tenant supprimé",
+    "deleteConfirm": "Êtes-vous sûr de vouloir supprimer le tenant {name} ? Toutes les données associées seront supprimées.",
+    "failedLoad": "Échec du chargement des tenants",
+    "failedLoadUsers": "Échec du chargement des utilisateurs",
+    "failedSave": "Échec de la sauvegarde du tenant",
+    "failedDelete": "Échec de la suppression du tenant",
+    "failedAddUser": "Échec de l'ajout de l'utilisateur",
+    "failedRemoveUser": "Échec de la suppression de l'utilisateur",
+    "saving": "Enregistrement..."
+  },
+  "languages": {
+    "fr": "Français",
+    "en": "Anglais",
+    "zh-CN": "Chinois (simplifié)"
   }
 }

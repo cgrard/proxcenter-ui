@@ -1,0 +1,33 @@
+{
+  "updates": {
+    "rollingUpdate": "滚动更新",
+    "rollingUpdateDescription": "滚动更新允许您按顺序更新 Proxmox 节点，在每次更新前自动迁移 VM 以避免服务中断。",
+    "refresh": "刷新",
+    "nodesStatus": "节点状态",
+    "node": "节点",
+    "version": "版本",
+    "vms": "虚拟机",
+    "availableUpdates": "可用更新",
+    "estimatedTime": "预计时间",
+    "status": "状态",
+    "online": "在线",
+    "offline": "离线",
+    "rebootRequired": "需要重启",
+    "rebootsRequired": "需要 {count} 次重启",
+    "rebootRequiredKernel": "内核更新需要重启",
+    "summaryUpdates": "{nodes} 个节点上有 {count} 个可用更新",
+    "totalEstimatedTime": "预计总时间",
+    "updatesOn": "{node} 上的更新",
+    "packagesToUpdate": "待更新软件包",
+    "package": "软件包",
+    "currentVersion": "当前版本",
+    "newVersion": "新版本",
+    "upToDate": "所有节点均为最新",
+    "close": "关闭",
+    "localVmsOn": "{node} 上使用本地存储的 VM",
+    "localVmsBlocking": "{count} 个使用本地存储的 VM 阻止迁移",
+    "localVmsWithReplication": "{count} 个具有副本的 VM 可以迁移",
+    "localVmsBlockingMigration": "这些 VM 因使用本地存储而无法自动更新",
+    "startRollingUpdate": "开始滚动更新"
+  }
+}

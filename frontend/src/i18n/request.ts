@@ -19,9 +19,26 @@ export default getRequestConfig(async () => {
       // Parse Accept-Language header and find first matching locale
       const browserLocales = acceptLanguage
         .split(',')
-        .map(l => l.split(';')[0].trim().substring(0, 2).toLowerCase())
+        .map(l => l.split(';')[0].trim())
 
-      locale = browserLocales.find(l => locales.includes(l as Locale)) as Locale
+      for (const bl of browserLocales) {
+        // Try exact match first (e.g. zh-CN)
+        const exact = locales.find(loc => loc.toLowerCase() === bl.toLowerCase())
+
+        if (exact) {
+          locale = exact
+          break
+        }
+
+        // Fallback to 2-letter prefix match (e.g. fr-FR -> fr)
+        const prefix = bl.substring(0, 2).toLowerCase()
+        const prefixMatch = locales.find(loc => loc.toLowerCase() === prefix)
+
+        if (prefixMatch) {
+          locale = prefixMatch
+          break
+        }
+      }
     }
   }
 

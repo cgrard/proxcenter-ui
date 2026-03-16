@@ -7,7 +7,7 @@ import { getToken } from "next-auth/jwt"
 const AUTH_SECRET = process.env.NEXTAUTH_SECRET || "your-secret-key-change-in-production"
 
 // i18n configuration
-const locales = ['fr', 'en']
+const locales = ['fr', 'en', 'zh-CN']
 const defaultLocale = 'en'
 
 // Routes publiques (pas besoin d'être connecté)
@@ -28,6 +28,9 @@ const publicApiRoutes = [
   "/api/v1/auth/providers",
   "/api/v1/app/status",
   "/api/v1/settings/branding/public", // Branding pour login page
+  "/api/v1/settings/branding/uploads", // Logos/favicons pour login page
+  "/api/v1/settings/login-background", // Background custom login page
+  "/api/v1/settings/login-background/serve", // Serving des images background
   "/api/internal", // API internes (proxy WS, etc.)
 ]
 
@@ -37,14 +40,25 @@ function getLocaleFromHeader(request: NextRequest): string {
 
   if (!acceptLanguage) return defaultLocale
 
-  // Parse Accept-Language and find first matching locale
+  // Parse Accept-Language header
   const browserLocales = acceptLanguage
     .split(',')
-    .map(l => l.split(';')[0].trim().substring(0, 2).toLowerCase())
+    .map(l => l.split(';')[0].trim())
 
-  const matchedLocale = browserLocales.find(l => locales.includes(l))
+  for (const bl of browserLocales) {
+    // Try exact match first (e.g. zh-CN)
+    const exact = locales.find(loc => loc.toLowerCase() === bl.toLowerCase())
 
-  return matchedLocale || defaultLocale
+    if (exact) return exact
+
+    // Fallback to 2-letter prefix match (e.g. fr-FR -> fr)
+    const prefix = bl.substring(0, 2).toLowerCase()
+    const prefixMatch = locales.find(loc => loc.toLowerCase() === prefix)
+
+    if (prefixMatch) return prefixMatch
+  }
+
+  return defaultLocale
 }
 
 // Get locale from cookie or header
