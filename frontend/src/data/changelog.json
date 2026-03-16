@@ -1,0 +1,23 @@
+[
+  {
+    "version": "2026-03-16",
+    "title": "Multi-Tenancy",
+    "items": [
+      { "type": "new", "text": "Multi-tenant support — isolate and manage multiple environments from a single ProxCenter instance" },
+      { "type": "new", "text": "Tenant management panel in Settings (super admin only)" },
+      { "type": "new", "text": "Per-tenant data isolation — connections, VMs, and configurations scoped to each tenant" },
+      { "type": "new", "text": "Seamless tenant switching from the dashboard" }
+    ]
+  },
+  {
+    "version": "2026-03-14",
+    "title": "VMware ESXi & XCP-ng Migration",
+    "items": [
+      { "type": "new", "text": "Bulk migration — migrate multiple VMs at once from ESXi or XCP-ng to Proxmox" },
+      { "type": "new", "text": "Live migration support — migrate running VMs with minimal downtime" },
+      { "type": "new", "text": "ESXi migration pipeline with disk download, conversion (qemu-img) and import" },
+      { "type": "new", "text": "XCP-ng migration pipeline with XVA export and automated conversion" },
+      { "type": "improved", "text": "Real-time progress tracking per VM during bulk migrations" }
+    ]
+  }
+]

@@ -43,6 +43,7 @@ src/assets/iconify-icons/generated-icons.css
 # Database & data
 /db/
 /data/
+!/src/data/
 *.db
 *.db-journal
 *.db-shm
