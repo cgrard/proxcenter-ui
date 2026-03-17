@@ -2601,7 +2601,7 @@ return favorites.has(vmKey)
           )}
           {(!allowedViewModes || allowedViewModes.has('vms')) && (
             <ToggleButton value="vms">
-              <Tooltip title={`${t('inventory.vms')} (${displayVms.length})`}>
+              <Tooltip title={`${t('inventory.guests')} (${displayVms.length})`}>
                 <i className="ri-computer-line" style={{ fontSize: 16 }} />
               </Tooltip>
             </ToggleButton>

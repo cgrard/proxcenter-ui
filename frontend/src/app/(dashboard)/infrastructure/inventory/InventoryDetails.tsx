@@ -2338,7 +2338,7 @@ return vm?.isCluster ?? false
                 }}>
                   <Typography fontWeight={900} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <i className="ri-computer-line" style={{ fontSize: 20, opacity: 0.7 }} />
-                    {t('inventory.vms')} ({displayVms.length})
+                    {t('inventory.guests')} ({displayVms.length})
                   </Typography>
                   <Stack direction="row" spacing={1}>
                     <Button

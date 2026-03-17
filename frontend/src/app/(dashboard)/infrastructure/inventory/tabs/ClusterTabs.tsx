@@ -333,7 +333,7 @@ export default function ClusterTabs(props: any) {
                   label={
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
                       <i className="ri-computer-line" style={{ fontSize: 16 }} />
-                      {t('inventory.vms')}
+                      {t('inventory.guests')}
                       {data.vmsCount !== undefined && (
                         <Chip size="small" label={data.vmsCount} sx={{ height: 18, fontSize: 11 }} />
                       )}
