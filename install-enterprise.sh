@@ -415,11 +415,13 @@ start_and_wait() {
     spinner $wait_pid "Starting frontend..."
     wait $wait_pid || log_error "Frontend failed to start within 2 minutes. Check: docker compose logs frontend"
 
-    # Wait for orchestrator
+    # Wait for orchestrator via Docker health status (port not exposed to host)
     (
         local attempt=1
         while [ $attempt -le 60 ]; do
-            if curl -s -f http://localhost:8080/api/v1/health > /dev/null 2>&1; then
+            local health
+            health=$(docker inspect --format='{{.State.Health.Status}}' proxcenter-orchestrator 2>/dev/null || echo "missing")
+            if [ "$health" = "healthy" ]; then
                 exit 0
             fi
             sleep 2
