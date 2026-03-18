@@ -189,6 +189,19 @@ return
         const configJson = await configRes.json()
         const config = configJson.data || {}
 
+        // Load source node storages to determine which are local (not shared)
+        const sharedStorages = new Set<string>()
+        try {
+          const storagesRes = await fetch(`/api/v1/connections/${encodeURIComponent(connId)}/nodes/${encodeURIComponent(currentNode)}/storages`)
+          if (storagesRes.ok) {
+            const storagesJson = await storagesRes.json()
+            for (const s of (storagesJson.data || [])) {
+              if (s.shared) sharedStorages.add(s.storage)
+            }
+          }
+        } catch {}
+
+
         // Chercher TOUS les disques de la VM
         const foundDisks: LocalDiskInfo[] = []
 
@@ -220,8 +233,8 @@ return
               // Extraire le format
               const formatMatch = diskStr.match(/\.(qcow2|raw|vmdk)/)
 
-              // Vérifier si c'est un stockage local
-              const isLocal = storageName.startsWith('local')
+              // A storage is local if it's not in the shared set
+              const isLocal = !sharedStorages.has(storageName)
 
               foundDisks.push({
                 id: key,
