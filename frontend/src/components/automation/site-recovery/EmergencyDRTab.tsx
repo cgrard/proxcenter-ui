@@ -12,6 +12,7 @@ import {
   CardHeader,
   Chip,
   CircularProgress,
+  IconButton,
   Skeleton,
   Snackbar,
   Table,
@@ -60,10 +61,11 @@ interface EmergencyDRTabProps {
   onStartVM: (vmId: number, targetCluster: string, jobId: string) => Promise<void>
   onExecuteFailover: (planId: string) => void
   onExecuteFailback: (planId: string) => void
+  onDeletePlan?: (planId: string) => void
 }
 
 export default function EmergencyDRTab({
-  jobs, plans, loading, connections, vmNameMap, onStartVM, onExecuteFailover, onExecuteFailback
+  jobs, plans, loading, connections, vmNameMap, onStartVM, onExecuteFailover, onExecuteFailback, onDeletePlan
 }: EmergencyDRTabProps) {
   const t = useTranslations('siteRecovery')
   const [loadingVMs, setLoadingVMs] = useState<Record<string, 'starting'>>({})
@@ -252,30 +254,26 @@ export default function EmergencyDRTab({
                   <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
                     <Tooltip title={t('emergencyDR.startVM')}>
                       <span>
-                        <Button
+                        <IconButton
                           size="small"
-                          variant="outlined"
-                          color="warning"
                           disabled={!!vmLoading}
                           onClick={() => handleStartVM(vm)}
-                          sx={{ minWidth: 36, px: 1 }}
+                          sx={{ color: 'success.main', '&:hover': { bgcolor: 'success.main', color: 'white' } }}
                         >
-                          {vmLoading === 'starting' ? <CircularProgress size={16} /> : <i className="ri-play-line" />}
-                        </Button>
+                          {vmLoading === 'starting' ? <CircularProgress size={16} /> : <i className="ri-play-circle-line" style={{ fontSize: 18 }} />}
+                        </IconButton>
                       </span>
                     </Tooltip>
                     <Tooltip title={vm.planId ? t('emergencyDR.failback') : t('emergencyDR.failbackNoPlan')}>
                       <span>
-                        <Button
+                        <IconButton
                           size="small"
-                          variant="outlined"
-                          color="info"
                           disabled={!vm.planId}
                           onClick={() => vm.planId && onExecuteFailback(vm.planId)}
-                          sx={{ minWidth: 36, px: 1 }}
+                          sx={{ color: 'primary.main', '&:hover': { bgcolor: 'primary.main', color: 'white' } }}
                         >
-                          <i className="ri-arrow-go-back-line" />
-                        </Button>
+                          <i className="ri-arrow-turn-back-line" style={{ fontSize: 18 }} />
+                        </IconButton>
                       </span>
                     </Tooltip>
                   </Box>
@@ -330,16 +328,27 @@ export default function EmergencyDRTab({
               </Box>
             }
             action={
-              <Button
-                variant="contained"
-                color="error"
-                size="small"
-                startIcon={<i className="ri-alarm-warning-line" />}
-                onClick={() => onExecuteFailover(planId)}
-                disabled={plan.status === 'executing' || plan.status === 'failed_over'}
-              >
-                {t('emergencyDR.emergencyFailover')}
-              </Button>
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <Button
+                  variant="contained"
+                  color="error"
+                  size="small"
+                  startIcon={<i className="ri-alarm-warning-line" />}
+                  onClick={() => onExecuteFailover(planId)}
+                  disabled={plan.status === 'executing' || plan.status === 'failed_over'}
+                >
+                  {t('emergencyDR.emergencyFailover')}
+                </Button>
+                {onDeletePlan && (
+                  <IconButton
+                    size="small"
+                    onClick={() => { if (confirm(t('plans.confirmDelete'))) onDeletePlan(planId) }}
+                    sx={{ color: 'text.secondary', '&:hover': { color: 'error.main' } }}
+                  >
+                    <i className="ri-delete-bin-line" style={{ fontSize: 18 }} />
+                  </IconButton>
+                )}
+              </Box>
             }
             sx={{ pb: 0 }}
           />

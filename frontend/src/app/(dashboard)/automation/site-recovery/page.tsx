@@ -407,6 +407,7 @@ export default function SiteRecoveryPage() {
             onStartVM={handleStartDRVM}
             onExecuteFailover={(planId) => openFailoverDialog(planId, 'failover')}
             onExecuteFailback={(planId) => openFailoverDialog(planId, 'failback')}
+            onDeletePlan={handleDeletePlan}
           />
         )}
 
