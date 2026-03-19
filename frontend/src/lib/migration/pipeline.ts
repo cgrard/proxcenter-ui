@@ -244,10 +244,10 @@ export async function runMigrationPipeline(jobId: string, config: MigrationConfi
     if (vsanDisks.length > 0) {
       const dsNames = [...new Set(vsanDisks.map(d => d.datastoreName))].join(', ')
       throw new Error(
-        `Les datastores vSAN ne sont pas encore supportés pour la migration (trouvé : ${dsNames}). ` +
-        `vSAN utilise un modèle de stockage objet qui empêche l'accès direct aux disques via vmkfstools ou SSH. ` +
-        `Solution : déplacez la VM vers un datastore VMFS ou NFS sur l'hôte ESXi avant la migration, ` +
-        `ou exportez la VM en OVA depuis vCenter et importez-la manuellement avec "qm importovf" sur Proxmox.`
+        `vSAN datastores are not yet supported for migration (found: ${dsNames}). ` +
+        `vSAN uses an object-based storage model that prevents direct disk access via vmkfstools or SSH. ` +
+        `Workaround: move the VM to a VMFS or NFS datastore before migrating, ` +
+        `or export as OVA from vCenter and import with "qm importovf" on Proxmox.`
       )
     }
 
@@ -924,7 +924,7 @@ export async function runMigrationPipeline(jobId: string, config: MigrationConfi
         const isVsanDs = vmConfig.disks[i].datastoreName.toLowerCase().includes('vsan')
         if (isVsanDs && esxiSshAvailable) {
           // vSAN: blocked in pre-flight, but guard here too
-          throw new Error(`Les datastores vSAN ne sont pas encore supportés. Déplacez la VM vers un datastore VMFS ou NFS avant la migration.`)
+          throw new Error(`vSAN datastores are not yet supported. Move the VM to a VMFS or NFS datastore before migrating.`)
         } else {
           await downloadDisk(i, vmConfig.disks[i])
         }
