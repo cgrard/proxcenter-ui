@@ -87,6 +87,7 @@ export default function ClusterTabs(props: any) {
   const [cephOsdFlags, setCephOsdFlags] = useState<string[]>([])
   const [cephOsdFlagsLoading, setCephOsdFlagsLoading] = useState(false)
   const [cephFlagToggling, setCephFlagToggling] = useState<string | null>(null)
+  const [refreshingUpdates, setRefreshingUpdates] = useState(false)
   const theme = useTheme()
   const toast = useToast()
 
@@ -2461,13 +2462,32 @@ export default function ClusterTabs(props: any) {
                         <Button
                           variant="outlined"
                           size="small"
-                          startIcon={<i className="ri-refresh-line" />}
-                          onClick={() => {
-                            setNodeUpdates({})
-                            setNodeLocalVms({})
+                          disabled={refreshingUpdates}
+                          startIcon={refreshingUpdates ? <CircularProgress size={16} /> : <i className="ri-refresh-line" />}
+                          onClick={async () => {
+                            const cId = selection?.type === 'cluster' ? selection.id : ''
+                            if (!cId || !data.nodesData?.length) return
+                            setRefreshingUpdates(true)
+                            try {
+                              // Trigger apt update on all online nodes (POST = apt update)
+                              await Promise.all(
+                                data.nodesData
+                                  .filter((n: any) => n.status === 'online')
+                                  .map((n: any) =>
+                                    fetch(`/api/v1/connections/${encodeURIComponent(cId)}/nodes/${encodeURIComponent(n.node)}/apt`, { method: 'POST' }).catch(() => null)
+                                  )
+                              )
+                              // Wait for apt update tasks to complete on PVE nodes
+                              await new Promise(r => setTimeout(r, 5000))
+                              // Reload update lists
+                              setNodeUpdates({})
+                              setNodeLocalVms({})
+                            } finally {
+                              setRefreshingUpdates(false)
+                            }
                           }}
                         >
-                          {t('updates.refresh')}
+                          {refreshingUpdates ? t('updates.checking') : t('updates.refresh')}
                         </Button>
                       </Box>
 
