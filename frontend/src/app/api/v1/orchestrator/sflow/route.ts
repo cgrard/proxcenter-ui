@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const endpoint = searchParams.get("endpoint") || "status"
 
-    const allowed = ["status", "top-talkers", "top-pairs", "top-ports", "top-sources", "top-destinations", "agents"]
+    const allowed = ["status", "top-talkers", "top-pairs", "top-ports", "top-sources", "top-destinations", "ip-pairs", "agents"]
     if (!allowed.includes(endpoint)) {
       return NextResponse.json({ error: "Invalid endpoint" }, { status: 400 })
     }

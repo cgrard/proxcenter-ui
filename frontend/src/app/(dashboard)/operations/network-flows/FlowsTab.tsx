@@ -34,6 +34,9 @@ import {
 } from '@mui/material'
 
 import { formatBytes } from '@/utils/format'
+import dynamic from 'next/dynamic'
+
+const DependencyGraph = dynamic(() => import('./DependencyGraph'), { ssr: false })
 
 interface FlowsTabProps {
   connectionId: string
@@ -666,12 +669,7 @@ export default function FlowsTab({ connectionId, connectionName }: FlowsTabProps
 
       {/* Dependency Graph sub-tab */}
       {subTab === 1 && (
-        <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 400 }}>
-          <Box sx={{ textAlign: 'center', opacity: 0.5 }}>
-            <i className="ri-git-branch-line" style={{ fontSize: 48 }} />
-            <Typography variant="body2" sx={{ mt: 1 }}>{t('networkFlows.graphComingSoon')}</Typography>
-          </Box>
-        </Box>
+        <DependencyGraph connectionId={connectionId} />
       )}
 
       {/* Time Series sub-tab */}
