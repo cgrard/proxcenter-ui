@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 
 import {
   Alert,
@@ -522,40 +523,30 @@ export default function FlowsTab({ connectionId, connectionName }: FlowsTabProps
                   <Typography variant="body2">{t('networkFlows.waitingForData')}</Typography>
                 </Box>
               ) : (
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                  {topPorts.map((port) => (
-                    <Box key={`${port.protocol}-${port.port}`} sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                      <Typography variant="body2" sx={{ minWidth: 140, fontSize: '0.8rem' }}>
-                        {port.port}/{port.protocol}
-                        {port.service && (
-                          <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>
-                            ({port.service})
-                          </Typography>
-                        )}
-                      </Typography>
-                      <Box sx={{ flex: 1 }}>
-                        <LinearProgress
-                          variant="determinate"
-                          value={port.percent}
-                          sx={{
-                            height: 8,
-                            borderRadius: 1,
-                            bgcolor: 'action.hover',
-                            '& .MuiLinearProgress-bar': {
-                              borderRadius: 1,
-                              bgcolor: primaryColor,
-                            }
-                          }}
-                        />
-                      </Box>
-                      <Typography variant="caption" sx={{ minWidth: 40, textAlign: 'right', fontFamily: 'monospace' }}>
-                        {port.percent.toFixed(0)}%
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary" sx={{ minWidth: 70, textAlign: 'right', fontFamily: 'monospace' }}>
-                        {formatBytes(port.bytes)}
-                      </Typography>
-                    </Box>
-                  ))}
+                <Box sx={{ height: Math.max(200, topPorts.length * 32 + 40) }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={topPorts.map(p => ({
+                        name: `${p.port}/${p.protocol}${p.service ? ` (${p.service})` : ''}`,
+                        bytes: p.bytes,
+                        percent: p.percent,
+                      }))}
+                      layout="vertical"
+                      margin={{ top: 5, right: 80, left: 120, bottom: 5 }}
+                    >
+                      <XAxis type="number" tickFormatter={(v) => formatBytes(v)} tick={{ fontSize: 11 }} />
+                      <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={110} />
+                      <Tooltip
+                        formatter={(value: number) => [formatBytes(value), 'Traffic']}
+                        contentStyle={{ fontSize: 12, borderRadius: 8 }}
+                      />
+                      <Bar dataKey="bytes" radius={[0, 4, 4, 0]} maxBarSize={20}>
+                        {topPorts.map((_, idx) => (
+                          <Cell key={idx} fill={idx === 0 ? primaryColor : `${primaryColor}${Math.max(30, 90 - idx * 8).toString(16)}`} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
                 </Box>
               )}
             </CardContent>
