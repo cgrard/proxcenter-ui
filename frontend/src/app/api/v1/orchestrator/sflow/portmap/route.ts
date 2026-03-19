@@ -3,17 +3,20 @@ import { NextResponse } from "next/server"
 import { orchestratorFetch } from "@/lib/orchestrator"
 import { getSessionPrisma } from "@/lib/tenant"
 import { decryptSecret } from "@/lib/crypto/secret"
+import { executeSSHDirect } from "@/lib/ssh/exec"
+import { checkPermission, PERMISSIONS } from "@/lib/rbac"
 
 export const runtime = "nodejs"
 
 // POST /api/v1/orchestrator/sflow/portmap
 // Refreshes the sFlow port map by executing `ovs-ofctl show` on PVE nodes via SSH
-// and sending the output to the Go backend.
 export async function POST() {
   try {
+    const denied = await checkPermission(PERMISSIONS.CONNECTION_VIEW)
+    if (denied) return denied
+
     const prisma = await getSessionPrisma()
 
-    // Get all PVE connections with SSH enabled
     const connections = await prisma.connection.findMany({
       where: { type: "pve", sshEnabled: true },
       include: { hosts: true },
@@ -30,57 +33,52 @@ export async function POST() {
       for (const host of conn.hosts) {
         if (!host.enabled || !host.ip) continue
 
+        const sshOpts = {
+          host: host.ip,
+          port: conn.sshPort || 22,
+          user: conn.sshUser || "root",
+          ...(conn.sshAuthMethod === "key" && sshKey ? { key: sshKey } : {}),
+          ...(conn.sshAuthMethod === "password" && sshPass ? { password: sshPass } : {}),
+          ...(conn.sshAuthMethod === "key" && sshPass ? { passphrase: sshPass } : {}),
+        }
+
         try {
-          // Execute ovs-vsctl list-br to get bridges
-          const bridgesRes = await fetch(`${process.env.NEXTAUTH_URL || "http://localhost:3000"}/api/v1/ssh/exec`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              host: host.ip,
-              port: conn.sshPort || 22,
-              user: conn.sshUser || "root",
-              ...(conn.sshAuthMethod === "key" ? { key: sshKey } : { password: sshPass }),
-              command: "ovs-vsctl list-br 2>/dev/null",
-            }),
+          // List OVS bridges
+          const bridgesResult = await executeSSHDirect({
+            ...sshOpts,
+            command: "ovs-vsctl list-br 2>/dev/null",
           })
 
-          if (!bridgesRes.ok) continue
-          const bridgesJson = await bridgesRes.json()
-          if (!bridgesJson.success || !bridgesJson.output) continue
+          if (!bridgesResult.success || !bridgesResult.output) continue
 
-          const bridges = bridgesJson.output.trim().split("\n").filter(Boolean)
+          const bridges = bridgesResult.output.trim().split("\n").filter(Boolean)
 
           for (const bridge of bridges) {
-            // Execute ovs-ofctl show for each bridge
-            const ovsRes = await fetch(`${process.env.NEXTAUTH_URL || "http://localhost:3000"}/api/v1/ssh/exec`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                host: host.ip,
-                port: conn.sshPort || 22,
-                user: conn.sshUser || "root",
-                ...(conn.sshAuthMethod === "key" ? { key: sshKey } : { password: sshPass }),
-                command: `ovs-ofctl show ${bridge.trim()} 2>/dev/null`,
-              }),
+            // Get port mapping for each bridge
+            const ovsResult = await executeSSHDirect({
+              ...sshOpts,
+              command: `ovs-ofctl show ${bridge.trim()} 2>/dev/null`,
             })
 
-            if (!ovsRes.ok) continue
-            const ovsJson = await ovsRes.json()
-            if (!ovsJson.success || !ovsJson.output) continue
+            if (!ovsResult.success || !ovsResult.output) continue
 
             // Send to Go backend
-            const result = await orchestratorFetch("/sflow/portmap", {
-              method: "POST",
-              body: {
-                agent_ip: host.ip,
-                ovs_output: ovsJson.output,
-              },
-            }) as any
+            try {
+              const result = await orchestratorFetch("/sflow/portmap", {
+                method: "POST",
+                body: {
+                  agent_ip: host.ip,
+                  ovs_output: ovsResult.output,
+                },
+              }) as any
 
-            totalMapped += result?.vm_ports_mapped || 0
+              totalMapped += result?.vm_ports_mapped || 0
+            } catch {
+              // Non-critical
+            }
           }
-        } catch (e) {
-          // Skip this host on error
+        } catch {
+          // Skip host on SSH error
           continue
         }
       }
