@@ -14,6 +14,13 @@ import {
   CardContent,
   Chip,
   CircularProgress,
+  LinearProgress,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
   TextField,
   ToggleButton,
   ToggleButtonGroup,
@@ -381,6 +388,122 @@ export default function TimeSeriesChart() {
         </Card>
       )}
 
+      {/* Statistics + Data Table — below the chart */}
+      {selectedVMs.length > 0 && hasData && (() => {
+        const data = selectedVMs.length === 1 ? singleData : mergedMultiData
+        if (data.length < 2) return null
+
+        const totalIn = selectedVMs.length === 1
+          ? singleData.reduce((s, p) => s + (p.bytes_in || 0), 0)
+          : multiData.reduce((s, vm) => s + vm.points.reduce((ss, p) => ss + (p.bytes_in || 0), 0), 0)
+        const totalOut = selectedVMs.length === 1
+          ? singleData.reduce((s, p) => s + (p.bytes_out || 0), 0)
+          : multiData.reduce((s, vm) => s + vm.points.reduce((ss, p) => ss + (p.bytes_out || 0), 0), 0)
+
+        // Per-point stats for single VM
+        const pointsIn = singleData.map(p => p.bytes_in || 0)
+        const pointsOut = singleData.map(p => p.bytes_out || 0)
+        const peakIn = Math.max(...pointsIn, 0)
+        const peakOut = Math.max(...pointsOut, 0)
+        const avgIn = totalIn / (data.length || 1)
+        const avgOut = totalOut / (data.length || 1)
+        const peak = Math.max(peakIn, peakOut)
+
+        return (
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
+            {/* Bandwidth Statistics */}
+            <Card variant="outlined" sx={{ borderRadius: 2 }}>
+              <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1.5 }}>
+                  <i className="ri-bar-chart-box-line" style={{ fontSize: 16, marginRight: 6 }} />
+                  Statistics
+                </Typography>
+                <TableContainer>
+                  <Table size="small">
+                    <TableBody>
+                      <TableRow>
+                        <TableCell sx={{ py: 0.75, fontSize: '0.8rem', fontWeight: 600, border: 0 }}>Peak Inbound</TableCell>
+                        <TableCell align="right" sx={{ py: 0.75, fontSize: '0.8rem', fontFamily: 'JetBrains Mono, monospace', color: 'success.main', border: 0 }}>{formatBytes(peakIn)}</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell sx={{ py: 0.75, fontSize: '0.8rem', fontWeight: 600, border: 0 }}>Peak Outbound</TableCell>
+                        <TableCell align="right" sx={{ py: 0.75, fontSize: '0.8rem', fontFamily: 'JetBrains Mono, monospace', color: 'warning.main', border: 0 }}>{formatBytes(peakOut)}</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell sx={{ py: 0.75, fontSize: '0.8rem', fontWeight: 600, border: 0 }}>Avg Inbound</TableCell>
+                        <TableCell align="right" sx={{ py: 0.75, fontSize: '0.8rem', fontFamily: 'JetBrains Mono, monospace', border: 0 }}>{formatBytes(avgIn)}/pt</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell sx={{ py: 0.75, fontSize: '0.8rem', fontWeight: 600, border: 0 }}>Avg Outbound</TableCell>
+                        <TableCell align="right" sx={{ py: 0.75, fontSize: '0.8rem', fontFamily: 'JetBrains Mono, monospace', border: 0 }}>{formatBytes(avgOut)}/pt</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell sx={{ py: 0.75, fontSize: '0.8rem', fontWeight: 600, border: 0 }}>In/Out Ratio</TableCell>
+                        <TableCell align="right" sx={{ py: 0.75, fontSize: '0.8rem', fontFamily: 'JetBrains Mono, monospace', border: 0 }}>
+                          {totalOut > 0 ? (totalIn / totalOut).toFixed(2) : '—'}
+                        </TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+
+                {/* Visual peak bar */}
+                {peak > 0 && (
+                  <Box sx={{ mt: 2 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                      <Typography variant="caption" color="text.secondary">Peak utilization</Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                      <Typography variant="caption" color="success.main" sx={{ width: 20 }}>↓</Typography>
+                      <LinearProgress variant="determinate" value={peak > 0 ? (peakIn / peak) * 100 : 0} sx={{ flex: 1, height: 6, borderRadius: 3, bgcolor: 'action.hover', '& .MuiLinearProgress-bar': { borderRadius: 3, bgcolor: 'success.main' } }} />
+                    </Box>
+                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mt: 0.5 }}>
+                      <Typography variant="caption" color="warning.main" sx={{ width: 20 }}>↑</Typography>
+                      <LinearProgress variant="determinate" value={peak > 0 ? (peakOut / peak) * 100 : 0} sx={{ flex: 1, height: 6, borderRadius: 3, bgcolor: 'action.hover', '& .MuiLinearProgress-bar': { borderRadius: 3, bgcolor: 'warning.main' } }} />
+                    </Box>
+                  </Box>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Recent Data Points table */}
+            <Card variant="outlined" sx={{ borderRadius: 2 }}>
+              <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1.5 }}>
+                  <i className="ri-table-line" style={{ fontSize: 16, marginRight: 6 }} />
+                  Recent Data Points
+                </Typography>
+                <TableContainer sx={{ maxHeight: 220 }}>
+                  <Table size="small" stickyHeader>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell sx={{ fontWeight: 600, fontSize: '0.7rem', py: 0.5 }}>Time</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 600, fontSize: '0.7rem', py: 0.5, color: 'success.main' }}>↓ In</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 600, fontSize: '0.7rem', py: 0.5, color: 'warning.main' }}>↑ Out</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {singleData.slice(-15).reverse().map((p, i) => (
+                        <TableRow key={i}>
+                          <TableCell sx={{ py: 0.5, fontSize: '0.75rem', fontFamily: 'JetBrains Mono, monospace' }}>
+                            {new Date(p.time * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </TableCell>
+                          <TableCell align="right" sx={{ py: 0.5, fontSize: '0.75rem', fontFamily: 'JetBrains Mono, monospace' }}>
+                            {formatBytes(p.bytes_in || 0)}
+                          </TableCell>
+                          <TableCell align="right" sx={{ py: 0.5, fontSize: '0.75rem', fontFamily: 'JetBrains Mono, monospace' }}>
+                            {formatBytes(p.bytes_out || 0)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </CardContent>
+            </Card>
+          </Box>
+        )
+      })()}
 
       {/* Empty state */}
       {selectedVMs.length > 0 && !loading && !hasData && !error && (
