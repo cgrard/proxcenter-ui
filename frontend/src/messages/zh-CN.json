@@ -5157,6 +5157,12 @@
     "noTimeSeriesData": "尚无时间序列数据。InfluxDB 每分钟收集数据。",
     "influxNotConfigured": "InfluxDB 未配置。时间序列需要 InfluxDB — 请在编排器配置中添加 influxdb 设置。",
     "selectVms": "选择 VM",
-    "multiVmBandwidth": "多 VM 带宽对比"
+    "multiVmBandwidth": "多 VM 带宽对比",
+    "totalIn": "总入站",
+    "totalOut": "总出站",
+    "totalTraffic": "总流量",
+    "dataPoints": "数据点",
+    "inOutRatio": "入站 / 出站",
+    "trafficByVm": "按 VM 流量"
   }
 }

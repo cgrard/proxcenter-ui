@@ -5157,6 +5157,12 @@
     "noTimeSeriesData": "No time series data available yet. InfluxDB collects data every minute.",
     "influxNotConfigured": "InfluxDB is not configured. Time series requires InfluxDB — add influxdb settings to your orchestrator config.",
     "selectVms": "Select VMs",
-    "multiVmBandwidth": "Multi-VM Bandwidth Comparison"
+    "multiVmBandwidth": "Multi-VM Bandwidth Comparison",
+    "totalIn": "Total Inbound",
+    "totalOut": "Total Outbound",
+    "totalTraffic": "Total Traffic",
+    "dataPoints": "Data Points",
+    "inOutRatio": "Inbound / Outbound",
+    "trafficByVm": "Traffic by VM"
   }
 }

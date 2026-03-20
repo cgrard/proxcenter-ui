@@ -5158,6 +5158,12 @@
     "noTimeSeriesData": "Pas encore de données de séries temporelles. InfluxDB collecte les données chaque minute.",
     "influxNotConfigured": "InfluxDB n'est pas configuré. Les séries temporelles nécessitent InfluxDB — ajoutez les paramètres influxdb à la config de l'orchestrateur.",
     "selectVms": "Sélectionner les VMs",
-    "multiVmBandwidth": "Comparaison de bande passante multi-VM"
+    "multiVmBandwidth": "Comparaison de bande passante multi-VM",
+    "totalIn": "Total entrant",
+    "totalOut": "Total sortant",
+    "totalTraffic": "Trafic total",
+    "dataPoints": "Points de données",
+    "inOutRatio": "Entrant / Sortant",
+    "trafficByVm": "Trafic par VM"
   }
 }

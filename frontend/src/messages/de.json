@@ -5153,6 +5153,12 @@
     "noTimeSeriesData": "Noch keine Zeitreihendaten verfügbar. InfluxDB sammelt Daten jede Minute.",
     "influxNotConfigured": "InfluxDB ist nicht konfiguriert. Zeitreihen erfordern InfluxDB — fügen Sie die influxdb-Einstellungen zur Orchestrator-Konfiguration hinzu.",
     "selectVms": "VMs auswählen",
-    "multiVmBandwidth": "Multi-VM Bandbreitenvergleich"
+    "multiVmBandwidth": "Multi-VM Bandbreitenvergleich",
+    "totalIn": "Gesamt eingehend",
+    "totalOut": "Gesamt ausgehend",
+    "totalTraffic": "Gesamtverkehr",
+    "dataPoints": "Datenpunkte",
+    "inOutRatio": "Eingehend / Ausgehend",
+    "trafficByVm": "Verkehr pro VM"
   }
 }
