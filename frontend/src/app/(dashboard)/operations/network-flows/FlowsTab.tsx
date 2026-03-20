@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts'
 
@@ -40,10 +40,6 @@ import dynamic from 'next/dynamic'
 const SankeyChart = dynamic(() => import('./SankeyChart'), { ssr: false })
 const TimeSeriesChart = dynamic(() => import('./TimeSeriesChart'), { ssr: false })
 
-interface FlowsTabProps {
-  connectionId: string
-  connectionName?: string
-}
 
 interface SFlowStatus {
   enabled: boolean
@@ -99,7 +95,7 @@ async function fetchSFlow(endpoint: string, params?: Record<string, string>) {
   return res.json()
 }
 
-export default function FlowsTab({ connectionId, connectionName }: FlowsTabProps) {
+export default function FlowsTab() {
   const t = useTranslations()
   const theme = useTheme()
   const [subTab, setSubTab] = useState(0)
@@ -140,48 +136,6 @@ export default function FlowsTab({ connectionId, connectionName }: FlowsTabProps
 
   const primaryColor = theme.palette.primary.main
 
-  // Fetch connection's hosts to get node names for filtering
-  const [connectionNodeNames, setConnectionNodeNames] = useState<Set<string>>(new Set())
-  useEffect(() => {
-    if (!connectionId) return
-    fetch(`/api/v1/hosts?connId=${connectionId}`)
-      .then(r => r.ok ? r.json() : { data: { hosts: [] } })
-      .then(json => {
-        const hosts = json.data?.hosts || json.data || []
-        const names = new Set<string>(hosts.map((h: any) => h.node).filter(Boolean))
-        setConnectionNodeNames(names)
-      })
-      .catch(() => {})
-  }, [connectionId])
-
-  // Also derive from agents as fallback
-  const connectionNodes = useMemo(() => {
-    const agents = nodeAgents.filter(n => n.connectionId === connectionId)
-    const names = new Set(agents.map(a => a.node))
-    // Merge with hosts data
-    for (const n of connectionNodeNames) names.add(n)
-    return {
-      names,
-      ips: new Set(agents.map(a => a.ip)),
-    }
-  }, [nodeAgents, connectionId, connectionNodeNames])
-
-  // Filter Top Talkers & Pairs by connection nodes (only these have node/vmid info)
-  const canFilterByNode = useMemo(() => {
-    if (connectionNodes.names.size === 0) return false
-    return topTalkers.some(t => !!t.node)
-  }, [topTalkers, connectionNodes])
-
-  const filteredTalkers = useMemo(() => {
-    if (!canFilterByNode) return topTalkers
-    return topTalkers.filter(t => connectionNodes.names.has(t.node))
-  }, [topTalkers, connectionNodes, canFilterByNode])
-
-  const filteredPairs = useMemo(() => {
-    if (!canFilterByNode) return topPairs
-    const vmids = new Set(filteredTalkers.map(t => t.vmid))
-    return topPairs.filter(p => vmids.has(p.src_vmid) || vmids.has(p.dst_vmid))
-  }, [topPairs, filteredTalkers, canFilterByNode])
 
   // Handle port bar click
   const handlePortClick = useCallback(async (port: TopPort) => {
@@ -241,7 +195,7 @@ export default function FlowsTab({ connectionId, connectionName }: FlowsTabProps
     // If configuring a single node, use that; otherwise configure all unconfigured
     const nodesToConfigure = configSingleNode
       ? [configSingleNode]
-      : nodeAgents.filter(n => n.connectionId === connectionId && n.hasOvs && !n.sflowConfigured)
+      : nodeAgents.filter(n => n.hasOvs && !n.sflowConfigured)
 
     if (nodesToConfigure.length === 0) return
 
@@ -388,7 +342,7 @@ export default function FlowsTab({ connectionId, connectionName }: FlowsTabProps
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
 
           {/* sFlow Agents Status */}
-          {!agentsLoading && nodeAgents.filter(n => n.connectionId === connectionId).length > 0 && (
+          {!agentsLoading && nodeAgents.length > 0 && (
             <Card variant="outlined" sx={{ borderRadius: 2 }}>
               <CardContent sx={{ p: 0, '&:last-child': { pb: 0 } }}>
                 <Box
@@ -401,13 +355,13 @@ export default function FlowsTab({ connectionId, connectionName }: FlowsTabProps
                       {t('networkFlows.sflowAgents')}
                     </Typography>
                     <Chip
-                      label={nodeAgents.filter(n => n.connectionId === connectionId).length}
+                      label={nodeAgents.length}
                       size="small"
                       sx={{ height: 20, fontSize: '0.65rem', fontWeight: 700 }}
                     />
                     <i className={agentsExpanded ? 'ri-arrow-up-s-line' : 'ri-arrow-down-s-line'} style={{ fontSize: 18, opacity: 0.5 }} />
                   </Box>
-                  {nodeAgents.filter(n => n.connectionId === connectionId).some(n => n.hasOvs && !n.sflowConfigured) && (
+                  {nodeAgents.some(n => n.hasOvs && !n.sflowConfigured) && (
                     <Button
                       size="small"
                       variant="contained"
@@ -420,80 +374,97 @@ export default function FlowsTab({ connectionId, connectionName }: FlowsTabProps
                   )}
                 </Box>
                 <Collapse in={agentsExpanded}>
-                  <TableContainer sx={{ px: 1, pb: 1.5 }}>
-                    <Table size="small">
-                      <TableHead>
-                        <TableRow>
-                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', py: 0.5 }}>Node</TableCell>
-                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', py: 0.5 }}>IP</TableCell>
-                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', py: 0.5 }}>OVS</TableCell>
-                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', py: 0.5 }}>sFlow</TableCell>
-                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', py: 0.5 }}>Target</TableCell>
-                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', py: 0.5 }}></TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {nodeAgents.filter(n => n.connectionId === connectionId).map((agent) => (
-                          <TableRow key={agent.ip}>
-                            <TableCell sx={{ py: 0.75, fontSize: '0.8rem' }}>
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                                <i className="ri-server-line" style={{ fontSize: 14, opacity: 0.5 }} />
-                                {agent.node}
-                              </Box>
-                            </TableCell>
-                            <TableCell sx={{ py: 0.75, fontSize: '0.8rem', fontFamily: 'monospace' }}>
-                              {agent.ip}
-                            </TableCell>
-                            <TableCell sx={{ py: 0.75 }}>
-                              {agent.hasOvs ? (
-                                <MuiTooltip title={agent.ovsVersion ? `Open vSwitch ${agent.ovsVersion}` : 'Open vSwitch'}>
-                                  <Chip
-                                    label={agent.ovsVersion ? `OVS ${agent.ovsVersion}` : 'OVS'}
-                                    size="small"
-                                    color="success"
-                                    variant="outlined"
-                                    sx={{ height: 20, fontSize: '0.65rem' }}
-                                  />
-                                </MuiTooltip>
-                              ) : (
-                                <Chip label="No OVS" size="small" color="default" variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />
-                              )}
-                            </TableCell>
-                            <TableCell sx={{ py: 0.75 }}>
-                              {agent.sflowConfigured ? (
-                                <Chip label={t('networkFlows.active')} size="small" color="success" sx={{ height: 20, fontSize: '0.65rem' }} />
-                              ) : agent.hasOvs ? (
-                                <Chip label={t('networkFlows.notConfigured')} size="small" color="warning" variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />
-                              ) : (
-                                <Chip label="—" size="small" color="default" variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />
-                              )}
-                            </TableCell>
-                            <TableCell sx={{ py: 0.75, fontSize: '0.75rem', fontFamily: 'monospace', color: 'text.secondary' }}>
-                              {agent.sflowTarget || '—'}
-                            </TableCell>
-                            <TableCell sx={{ py: 0.75 }}>
-                              {agent.hasOvs && (
-                                <MuiTooltip title={agent.sflowConfigured ? t('networkFlows.reconfigure') : t('networkFlows.configure')}>
-                                  <IconButton
-                                    size="small"
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      setConfigSingleNode(agent)
-                                      if (!collectorTarget) setCollectorTarget(`${window.location.hostname}:6343`)
-                                      setConfigDialogOpen(true)
-                                    }}
-                                    sx={{ color: agent.sflowConfigured ? 'text.secondary' : 'warning.main' }}
-                                  >
-                                    <i className={agent.sflowConfigured ? 'ri-refresh-line' : 'ri-play-circle-line'} style={{ fontSize: 16 }} />
-                                  </IconButton>
-                                </MuiTooltip>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
+                  <Box sx={{ px: 1, pb: 1.5 }}>
+                    {/* Group agents by connectionName */}
+                    {Array.from(new Set(nodeAgents.map(a => a.connectionName))).map((connName) => {
+                      const connAgents = nodeAgents.filter(a => a.connectionName === connName)
+                      return (
+                        <Box key={connName} sx={{ mb: 1.5, '&:last-child': { mb: 0 } }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1, py: 0.5 }}>
+                            <i className="ri-database-2-line" style={{ fontSize: 14, opacity: 0.6 }} />
+                            <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                              {connName}
+                            </Typography>
+                            <Chip label={`${connAgents.length} nodes`} size="small" variant="outlined" sx={{ height: 18, fontSize: '0.6rem' }} />
+                          </Box>
+                          <TableContainer>
+                            <Table size="small">
+                              <TableHead>
+                                <TableRow>
+                                  <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', py: 0.5 }}>Node</TableCell>
+                                  <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', py: 0.5 }}>IP</TableCell>
+                                  <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', py: 0.5 }}>OVS</TableCell>
+                                  <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', py: 0.5 }}>sFlow</TableCell>
+                                  <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', py: 0.5 }}>Target</TableCell>
+                                  <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', py: 0.5 }}></TableCell>
+                                </TableRow>
+                              </TableHead>
+                              <TableBody>
+                                {connAgents.map((agent) => (
+                                  <TableRow key={agent.ip}>
+                                    <TableCell sx={{ py: 0.75, fontSize: '0.8rem' }}>
+                                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                                        <i className="ri-server-line" style={{ fontSize: 14, opacity: 0.5 }} />
+                                        {agent.node}
+                                      </Box>
+                                    </TableCell>
+                                    <TableCell sx={{ py: 0.75, fontSize: '0.8rem', fontFamily: 'monospace' }}>
+                                      {agent.ip}
+                                    </TableCell>
+                                    <TableCell sx={{ py: 0.75 }}>
+                                      {agent.hasOvs ? (
+                                        <MuiTooltip title={agent.ovsVersion ? `Open vSwitch ${agent.ovsVersion}` : 'Open vSwitch'}>
+                                          <Chip
+                                            label={agent.ovsVersion ? `OVS ${agent.ovsVersion}` : 'OVS'}
+                                            size="small"
+                                            color="success"
+                                            variant="outlined"
+                                            sx={{ height: 20, fontSize: '0.65rem' }}
+                                          />
+                                        </MuiTooltip>
+                                      ) : (
+                                        <Chip label="No OVS" size="small" color="default" variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />
+                                      )}
+                                    </TableCell>
+                                    <TableCell sx={{ py: 0.75 }}>
+                                      {agent.sflowConfigured ? (
+                                        <Chip label={t('networkFlows.active')} size="small" color="success" sx={{ height: 20, fontSize: '0.65rem' }} />
+                                      ) : agent.hasOvs ? (
+                                        <Chip label={t('networkFlows.notConfigured')} size="small" color="warning" variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />
+                                      ) : (
+                                        <Chip label="—" size="small" color="default" variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />
+                                      )}
+                                    </TableCell>
+                                    <TableCell sx={{ py: 0.75, fontSize: '0.75rem', fontFamily: 'monospace', color: 'text.secondary' }}>
+                                      {agent.sflowTarget || '—'}
+                                    </TableCell>
+                                    <TableCell sx={{ py: 0.75 }}>
+                                      {agent.hasOvs && (
+                                        <MuiTooltip title={agent.sflowConfigured ? t('networkFlows.reconfigure') : t('networkFlows.configure')}>
+                                          <IconButton
+                                            size="small"
+                                            onClick={(e) => {
+                                              e.stopPropagation()
+                                              setConfigSingleNode(agent)
+                                              if (!collectorTarget) setCollectorTarget(`${window.location.hostname}:6343`)
+                                              setConfigDialogOpen(true)
+                                            }}
+                                            sx={{ color: agent.sflowConfigured ? 'text.secondary' : 'warning.main' }}
+                                          >
+                                            <i className={agent.sflowConfigured ? 'ri-refresh-line' : 'ri-play-circle-line'} style={{ fontSize: 16 }} />
+                                          </IconButton>
+                                        </MuiTooltip>
+                                      )}
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </TableContainer>
+                        </Box>
+                      )
+                    })}
+                  </Box>
                 </Collapse>
               </CardContent>
             </Card>
@@ -514,7 +485,7 @@ export default function FlowsTab({ connectionId, connectionName }: FlowsTabProps
               <CardContent sx={{ p: 2, '&:last-child': { pb: 2 }, textAlign: 'center' }}>
                 <Typography variant="caption" color="text.secondary" fontWeight={600}>{t('networkFlows.activeVms')}</Typography>
                 <Typography variant="h5" fontWeight={800} color="primary">
-                  {filteredTalkers.length || status?.active_vms || 0}
+                  {topTalkers.length || status?.active_vms || 0}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">{t('networkFlows.withTraffic')}</Typography>
               </CardContent>
@@ -523,7 +494,7 @@ export default function FlowsTab({ connectionId, connectionName }: FlowsTabProps
               <CardContent sx={{ p: 2, '&:last-child': { pb: 2 }, textAlign: 'center' }}>
                 <Typography variant="caption" color="text.secondary" fontWeight={600}>{t('networkFlows.totalBandwidth')}</Typography>
                 <Typography variant="h5" fontWeight={800} color="primary">
-                  {filteredTalkers.length > 0 ? formatBytes(filteredTalkers.reduce((sum, t) => sum + t.bytes_in + t.bytes_out, 0)) : '0 B'}
+                  {topTalkers.length > 0 ? formatBytes(topTalkers.reduce((sum, t) => sum + t.bytes_in + t.bytes_out, 0)) : '0 B'}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">{t('networkFlows.currentWindow')}</Typography>
               </CardContent>
@@ -564,7 +535,7 @@ export default function FlowsTab({ connectionId, connectionName }: FlowsTabProps
                     sx: { fontSize: '0.8rem', height: 32 }
                   }}
                 />
-                {filteredTalkers.length === 0 ? (
+                {topTalkers.length === 0 ? (
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5, py: 4, opacity: 0.5 }}>
                     <CircularProgress size={16} />
                     <Typography variant="body2">{t('networkFlows.waitingForData')}</Typography>
@@ -580,7 +551,7 @@ export default function FlowsTab({ connectionId, connectionName }: FlowsTabProps
                         </TableRow>
                       </TableHead>
                       <TableBody>
-                        {filteredTalkers.filter(t => !talkerSearch || (t.vm_name || `VM ${t.vmid}`).toLowerCase().includes(talkerSearch.toLowerCase()) || String(t.vmid).includes(talkerSearch)).map((talker) => (
+                        {topTalkers.filter(t => !talkerSearch || (t.vm_name || `VM ${t.vmid}`).toLowerCase().includes(talkerSearch.toLowerCase()) || String(t.vmid).includes(talkerSearch)).map((talker) => (
                           <TableRow key={talker.vmid} hover sx={{ cursor: 'pointer' }} onClick={() => setSelectedVM(talker)}>
                             <TableCell sx={{ py: 0.75, fontSize: '0.8rem' }}>
                               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
@@ -763,12 +734,12 @@ export default function FlowsTab({ connectionId, connectionName }: FlowsTabProps
 
       {/* Sankey Flow Diagram sub-tab */}
       {subTab === 1 && (
-        <SankeyChart connectionId={connectionId} />
+        <SankeyChart />
       )}
 
       {/* Time Series sub-tab */}
       {subTab === 2 && (
-        <TimeSeriesChart connectionId={connectionId} />
+        <TimeSeriesChart />
       )}
 
       {/* Security sub-tab */}
@@ -831,7 +802,7 @@ export default function FlowsTab({ connectionId, connectionName }: FlowsTabProps
               </Box>
 
               {/* Related pairs */}
-              {filteredPairs.filter(p => p.src_vmid === selectedVM.vmid || p.dst_vmid === selectedVM.vmid).length > 0 && (
+              {topPairs.filter(p => p.src_vmid === selectedVM.vmid || p.dst_vmid === selectedVM.vmid).length > 0 && (
                 <Box>
                   <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
                     <i className="ri-arrow-left-right-line" style={{ fontSize: 14, marginRight: 6 }} />
@@ -1046,7 +1017,7 @@ export default function FlowsTab({ connectionId, connectionName }: FlowsTabProps
                 sx={{ height: 24, fontSize: '0.75rem' }}
               />
             ) : (
-              nodeAgents.filter(n => n.connectionId === connectionId && n.hasOvs && !n.sflowConfigured).map(n => (
+              nodeAgents.filter(n => n.hasOvs && !n.sflowConfigured).map(n => (
                 <Chip
                   key={n.ip}
                   label={`${n.node} (${n.ip})`}

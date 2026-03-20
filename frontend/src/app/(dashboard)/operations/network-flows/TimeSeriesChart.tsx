@@ -69,7 +69,7 @@ const VM_COLORS = [
   '#06b6d4', '#ec4899', '#14b8a6', '#f97316', '#6366f1',
 ]
 
-export default function TimeSeriesChart({ connectionId }: { connectionId?: string }) {
+export default function TimeSeriesChart() {
   const t = useTranslations()
   const theme = useTheme()
   const isDark = theme.palette.mode === 'dark'
@@ -89,20 +89,17 @@ export default function TimeSeriesChart({ connectionId }: { connectionId?: strin
 
   const isMultiVM = selectedVMs.length > 1
 
-  // Load available VMs and pre-select the top one — reload when connection changes
+  // Load available VMs and pre-select the top one
   useEffect(() => {
-    setSelectedVMs([])
-    setSingleData([])
-    setMultiData([])
     fetchSFlow('top-talkers', { n: '50' }).then(d => {
       if (Array.isArray(d) && d.length > 0) {
         setVMs(d)
-        setSelectedVMs([d[0]])
-      } else {
-        setVMs([])
+        if (selectedVMs.length === 0) {
+          setSelectedVMs([d[0]])
+        }
       }
     }).catch(() => {})
-  }, [connectionId]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load time series data
   const loadTimeSeries = useCallback(async () => {

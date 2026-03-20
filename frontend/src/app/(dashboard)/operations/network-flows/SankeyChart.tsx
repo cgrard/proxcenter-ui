@@ -105,7 +105,7 @@ interface LinkDetail {
 
 type DetailData = NodeDetail | LinkDetail
 
-export default function SankeyChart({ connectionId }: { connectionId?: string }) {
+export default function SankeyChart() {
   const t = useTranslations()
   const theme = useTheme()
   const containerRef = useRef<HTMLDivElement>(null)

@@ -1,14 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect } from 'react'
 import { useTranslations } from 'next-intl'
 
 import {
   Box,
-  FormControl,
-  InputLabel,
-  MenuItem,
-  Select,
   Typography,
 } from '@mui/material'
 
@@ -21,22 +17,13 @@ export default function NetworkFlowsPage() {
   const { setPageInfo } = usePageTitle()
   const t = useTranslations()
 
-  const [selectedConnection, setSelectedConnection] = useState<string>('')
-
   const { data: connectionsData } = usePVEConnections()
-  // Only show PVE connections with SSH enabled (required for OVS/sFlow)
   const connections = (connectionsData?.data || []).filter((c: any) => c.sshConfigured)
 
   useEffect(() => {
     setPageInfo(t('networkFlows.title'), t('networkFlows.subtitle'), 'ri-flow-chart')
     return () => setPageInfo('', '', '')
   }, [setPageInfo, t])
-
-  useEffect(() => {
-    if (connections.length > 0 && !selectedConnection) {
-      setSelectedConnection(connections[0].id)
-    }
-  }, [connections, selectedConnection])
 
   if (connectionsData && connections.length === 0) {
     return (
@@ -52,29 +39,7 @@ export default function NetworkFlowsPage() {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, height: '100%' }}>
-
-      {/* Connection selector */}
-      {connections.length > 1 && (
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-          <FormControl size="small" sx={{ minWidth: 250 }}>
-            <InputLabel>{t('common.connection')}</InputLabel>
-            <Select
-              value={selectedConnection}
-              onChange={(e) => setSelectedConnection(e.target.value)}
-              label={t('common.connection')}
-            >
-              {connections.map((conn: any) => (
-                <MenuItem key={conn.id} value={conn.id}>{conn.name}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </Box>
-      )}
-
-      <FlowsTab
-        connectionId={selectedConnection}
-        connectionName={connections.find((c: any) => c.id === selectedConnection)?.name}
-      />
+      <FlowsTab />
     </Box>
   )
 }
