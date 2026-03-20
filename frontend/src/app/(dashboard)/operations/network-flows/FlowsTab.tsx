@@ -382,97 +382,93 @@ export default function FlowsTab() {
                   )}
                 </Box>
                 <Collapse in={agentsExpanded}>
-                  <Box sx={{ px: 1, pb: 1.5 }}>
-                    {/* Group agents by connectionName */}
-                    {Array.from(new Set(nodeAgents.map(a => a.connectionName))).map((connName) => {
-                      const connAgents = nodeAgents.filter(a => a.connectionName === connName)
-                      return (
-                        <Box key={connName} sx={{ mb: 1.5, '&:last-child': { mb: 0 } }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1, py: 0.5 }}>
-                            <i className="ri-database-2-line" style={{ fontSize: 14, opacity: 0.6 }} />
-                            <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                              {connName}
-                            </Typography>
-                            <Chip label={`${connAgents.length} nodes`} size="small" variant="outlined" sx={{ height: 18, fontSize: '0.6rem' }} />
-                          </Box>
-                          <TableContainer>
-                            <Table size="small">
-                              <TableHead>
-                                <TableRow>
-                                  <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', py: 0.5 }}>Node</TableCell>
-                                  <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', py: 0.5 }}>IP</TableCell>
-                                  <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', py: 0.5 }}>OVS</TableCell>
-                                  <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', py: 0.5 }}>sFlow</TableCell>
-                                  <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', py: 0.5 }}>Target</TableCell>
-                                  <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', py: 0.5 }}></TableCell>
-                                </TableRow>
-                              </TableHead>
-                              <TableBody>
-                                {connAgents.map((agent) => (
-                                  <TableRow key={agent.ip}>
-                                    <TableCell sx={{ py: 0.75, fontSize: '0.8rem' }}>
-                                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                                        <i className="ri-server-line" style={{ fontSize: 14, opacity: 0.5 }} />
-                                        {agent.node}
-                                      </Box>
-                                    </TableCell>
-                                    <TableCell sx={{ py: 0.75, fontSize: '0.8rem', fontFamily: 'monospace' }}>
-                                      {agent.ip}
-                                    </TableCell>
-                                    <TableCell sx={{ py: 0.75 }}>
-                                      {agent.hasOvs ? (
-                                        <MuiTooltip title={agent.ovsVersion ? `Open vSwitch ${agent.ovsVersion}` : 'Open vSwitch'}>
-                                          <Chip
-                                            label={agent.ovsVersion ? `OVS ${agent.ovsVersion}` : 'OVS'}
-                                            size="small"
-                                            color="success"
-                                            variant="outlined"
-                                            sx={{ height: 20, fontSize: '0.65rem' }}
-                                          />
-                                        </MuiTooltip>
-                                      ) : (
-                                        <Chip label="No OVS" size="small" color="default" variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />
-                                      )}
-                                    </TableCell>
-                                    <TableCell sx={{ py: 0.75 }}>
-                                      {agent.sflowConfigured ? (
-                                        <Chip label={t('networkFlows.active')} size="small" color="success" sx={{ height: 20, fontSize: '0.65rem' }} />
-                                      ) : agent.hasOvs ? (
-                                        <Chip label={t('networkFlows.notConfigured')} size="small" color="warning" variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />
-                                      ) : (
-                                        <Chip label="—" size="small" color="default" variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />
-                                      )}
-                                    </TableCell>
-                                    <TableCell sx={{ py: 0.75, fontSize: '0.75rem', fontFamily: 'monospace', color: 'text.secondary' }}>
-                                      {agent.sflowTarget || '—'}
-                                    </TableCell>
-                                    <TableCell sx={{ py: 0.75 }}>
-                                      {agent.hasOvs && (
-                                        <MuiTooltip title={agent.sflowConfigured ? t('networkFlows.reconfigure') : t('networkFlows.configure')}>
-                                          <IconButton
-                                            size="small"
-                                            onClick={(e) => {
-                                              e.stopPropagation()
-                                              setConfigSingleNode(agent)
-                                              if (!collectorTarget) setCollectorTarget(`${window.location.hostname}:6343`)
-                                              setConfigDialogOpen(true)
-                                            }}
-                                            sx={{ color: agent.sflowConfigured ? 'text.secondary' : 'warning.main' }}
-                                          >
-                                            <i className={agent.sflowConfigured ? 'ri-refresh-line' : 'ri-play-circle-line'} style={{ fontSize: 16 }} />
-                                          </IconButton>
-                                        </MuiTooltip>
-                                      )}
-                                    </TableCell>
-                                  </TableRow>
-                                ))}
-                              </TableBody>
-                            </Table>
-                          </TableContainer>
-                        </Box>
-                      )
-                    })}
-                  </Box>
+                  <TableContainer sx={{ px: 1, pb: 1.5 }}>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', py: 0.5 }}>Node</TableCell>
+                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', py: 0.5 }}>IP</TableCell>
+                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', py: 0.5 }}>OVS</TableCell>
+                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', py: 0.5 }}>sFlow</TableCell>
+                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', py: 0.5 }}>Target</TableCell>
+                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', py: 0.5 }}></TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {Array.from(new Set(nodeAgents.map(a => a.connectionName))).map((connName) => {
+                          const connAgents = nodeAgents.filter(a => a.connectionName === connName)
+                          const multipleConnections = new Set(nodeAgents.map(a => a.connectionName)).size > 1
+                          return [
+                            multipleConnections && (
+                              <TableRow key={`header-${connName}`}>
+                                <TableCell colSpan={6} sx={{ py: 0.5, border: 0, bgcolor: 'action.hover' }}>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <i className="ri-database-2-line" style={{ fontSize: 13, opacity: 0.6 }} />
+                                    <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                      {connName}
+                                    </Typography>
+                                    <Chip label={`${connAgents.length} nodes`} size="small" variant="outlined" sx={{ height: 18, fontSize: '0.6rem' }} />
+                                  </Box>
+                                </TableCell>
+                              </TableRow>
+                            ),
+                            ...connAgents.map((agent) => (
+                              <TableRow key={agent.ip}>
+                                <TableCell sx={{ py: 0.75, fontSize: '0.8rem' }}>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                                    <i className="ri-server-line" style={{ fontSize: 14, opacity: 0.5 }} />
+                                    {agent.node}
+                                  </Box>
+                                </TableCell>
+                                <TableCell sx={{ py: 0.75, fontSize: '0.8rem', fontFamily: 'monospace' }}>
+                                  {agent.ip}
+                                </TableCell>
+                                <TableCell sx={{ py: 0.75 }}>
+                                  {agent.hasOvs ? (
+                                    <MuiTooltip title={agent.ovsVersion ? `Open vSwitch ${agent.ovsVersion}` : 'Open vSwitch'}>
+                                      <Chip label={agent.ovsVersion ? `OVS ${agent.ovsVersion}` : 'OVS'} size="small" color="success" variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />
+                                    </MuiTooltip>
+                                  ) : (
+                                    <Chip label="No OVS" size="small" color="default" variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />
+                                  )}
+                                </TableCell>
+                                <TableCell sx={{ py: 0.75 }}>
+                                  {agent.sflowConfigured ? (
+                                    <Chip label={t('networkFlows.active')} size="small" color="success" sx={{ height: 20, fontSize: '0.65rem' }} />
+                                  ) : agent.hasOvs ? (
+                                    <Chip label={t('networkFlows.notConfigured')} size="small" color="warning" variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />
+                                  ) : (
+                                    <Chip label="—" size="small" color="default" variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />
+                                  )}
+                                </TableCell>
+                                <TableCell sx={{ py: 0.75, fontSize: '0.75rem', fontFamily: 'monospace', color: 'text.secondary' }}>
+                                  {agent.sflowTarget || '—'}
+                                </TableCell>
+                                <TableCell sx={{ py: 0.75 }}>
+                                  {agent.hasOvs && (
+                                    <MuiTooltip title={agent.sflowConfigured ? t('networkFlows.reconfigure') : t('networkFlows.configure')}>
+                                      <IconButton
+                                        size="small"
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          setConfigSingleNode(agent)
+                                          if (!collectorTarget) setCollectorTarget(`${window.location.hostname}:6343`)
+                                          setConfigDialogOpen(true)
+                                        }}
+                                        sx={{ color: agent.sflowConfigured ? 'text.secondary' : 'warning.main' }}
+                                      >
+                                        <i className={agent.sflowConfigured ? 'ri-refresh-line' : 'ri-play-circle-line'} style={{ fontSize: 16 }} />
+                                      </IconButton>
+                                    </MuiTooltip>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            )),
+                          ]
+                        })}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
                 </Collapse>
               </CardContent>
             </Card>
