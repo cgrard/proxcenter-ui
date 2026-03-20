@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
-import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts'
+import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts'
 
 import {
   Alert,
@@ -103,8 +103,6 @@ export default function FlowsTab() {
   const [status, setStatus] = useState<SFlowStatus | null>(null)
   const [topTalkers, setTopTalkers] = useState<TopTalker[]>([])
   const [topPairs, setTopPairs] = useState<TopPair[]>([])
-  const [topSources, setTopSources] = useState<TopEndpoint[]>([])
-  const [topDestinations, setTopDestinations] = useState<TopEndpoint[]>([])
   const [topPorts, setTopPorts] = useState<TopPort[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -131,11 +129,25 @@ export default function FlowsTab() {
 
   // Search filters
   const [talkerSearch, setTalkerSearch] = useState('')
-  const [srcSearch, setSrcSearch] = useState('')
-  const [dstSearch, setDstSearch] = useState('')
+  const [pairSearch, setPairSearch] = useState('')
+
+  // Mini time-series for VM detail dialog
+  const [vmTimeSeries, setVmTimeSeries] = useState<Array<{ time: number; bytes_in: number; bytes_out: number }>>([])
+  const [vmTsLoading, setVmTsLoading] = useState(false)
 
   const primaryColor = theme.palette.primary.main
 
+  // Fetch VM time-series when VM dialog opens
+  useEffect(() => {
+    if (!selectedVM) { setVmTimeSeries([]); return }
+    setVmTsLoading(true)
+    const now = new Date()
+    const from = new Date(now.getTime() - 60 * 60 * 1000) // last 1h
+    fetchSFlow('timeseries/vm', { vmid: String(selectedVM.vmid), from: from.toISOString(), to: now.toISOString() })
+      .then(d => setVmTimeSeries(Array.isArray(d) ? d : []))
+      .catch(() => setVmTimeSeries([]))
+      .finally(() => setVmTsLoading(false))
+  }, [selectedVM])
 
   // Handle port bar click
   const handlePortClick = useCallback(async (port: TopPort) => {
@@ -223,20 +235,16 @@ export default function FlowsTab() {
   const loadData = useCallback(async () => {
     try {
       setError(null)
-      const [statusData, talkersData, pairsData, portsData, srcData, dstData] = await Promise.all([
+      const [statusData, talkersData, pairsData, portsData] = await Promise.all([
         fetchSFlow('status'),
         fetchSFlow('top-talkers', { n: '10' }),
         fetchSFlow('top-pairs', { n: '20' }),
         fetchSFlow('top-ports', { n: '10' }),
-        fetchSFlow('top-sources', { n: '10' }),
-        fetchSFlow('top-destinations', { n: '10' }),
       ])
       setStatus(statusData)
       setTopTalkers(Array.isArray(talkersData) ? talkersData : [])
       setTopPairs(Array.isArray(pairsData) ? pairsData : [])
       setTopPorts(Array.isArray(portsData) ? portsData : [])
-      setTopSources(Array.isArray(srcData) ? srcData : [])
-      setTopDestinations(Array.isArray(dstData) ? dstData : [])
     } catch (e: any) {
       setError(e.message)
     } finally {
@@ -579,106 +587,76 @@ export default function FlowsTab() {
               </CardContent>
             </Card>
 
-            {/* Top Sources + Top Destinations stacked */}
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              {/* Top Sources */}
-              <Card variant="outlined" sx={{ borderRadius: 2 }}>
-                <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-                  <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
-                    <i className="ri-upload-2-line" style={{ fontSize: 16, marginRight: 6, color: theme.palette.warning.main }} />
-                    {t('networkFlows.topSources')}
-                  </Typography>
-                  <TextField
-                    size="small"
-                    placeholder={t('common.search')}
-                    value={srcSearch}
-                    onChange={(e) => setSrcSearch(e.target.value)}
-                    sx={{ mb: 1 }}
-                    fullWidth
-                    InputProps={{
-                      startAdornment: <InputAdornment position="start"><i className="ri-search-line" style={{ fontSize: 14, opacity: 0.5 }} /></InputAdornment>,
-                      sx: { fontSize: '0.8rem', height: 32 }
-                    }}
-                  />
-                  {topSources.length === 0 ? (
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5, py: 3, opacity: 0.5 }}>
-                      <CircularProgress size={16} />
-                      <Typography variant="body2">{t('networkFlows.waitingForData')}</Typography>
-                    </Box>
-                  ) : (
-                    <TableContainer>
-                      <Table size="small">
-                        <TableHead>
-                          <TableRow>
-                            <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', py: 0.5 }}>IP</TableCell>
-                            <TableCell align="right" sx={{ fontWeight: 600, fontSize: '0.75rem', py: 0.5 }}>Bytes</TableCell>
-                            <TableCell align="right" sx={{ fontWeight: 600, fontSize: '0.75rem', py: 0.5 }}>Flows</TableCell>
+            {/* Top Pairs */}
+            <Card variant="outlined" sx={{ borderRadius: 2 }}>
+              <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
+                  <i className="ri-arrow-left-right-line" style={{ fontSize: 16, marginRight: 6 }} />
+                  {t('networkFlows.topPairs')}
+                </Typography>
+                <TextField
+                  size="small"
+                  placeholder={t('common.search')}
+                  value={pairSearch}
+                  onChange={(e) => setPairSearch(e.target.value)}
+                  sx={{ mb: 1 }}
+                  fullWidth
+                  InputProps={{
+                    startAdornment: <InputAdornment position="start"><i className="ri-search-line" style={{ fontSize: 14, opacity: 0.5 }} /></InputAdornment>,
+                    sx: { fontSize: '0.8rem', height: 32 }
+                  }}
+                />
+                {topPairs.length === 0 ? (
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5, py: 3, opacity: 0.5 }}>
+                    <CircularProgress size={16} />
+                    <Typography variant="body2">{t('networkFlows.waitingForData')}</Typography>
+                  </Box>
+                ) : (
+                  <TableContainer>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', py: 0.5 }}>Source</TableCell>
+                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', py: 0.5 }}></TableCell>
+                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', py: 0.5 }}>Destination</TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 600, fontSize: '0.75rem', py: 0.5 }}>Bytes</TableCell>
+                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', py: 0.5 }}>Proto</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {topPairs
+                          .filter(p => !pairSearch || (p.src_name || `VM ${p.src_vmid}`).toLowerCase().includes(pairSearch.toLowerCase()) || (p.dst_name || `VM ${p.dst_vmid}`).toLowerCase().includes(pairSearch.toLowerCase()) || String(p.src_vmid).includes(pairSearch) || String(p.dst_vmid).includes(pairSearch))
+                          .map((pair, idx) => (
+                          <TableRow key={idx} hover>
+                            <TableCell sx={{ py: 0.75, fontSize: '0.8rem' }}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                <i className="ri-computer-line" style={{ fontSize: 12, opacity: 0.5 }} />
+                                <Typography variant="body2" fontSize="0.8rem">{pair.src_name || `VM ${pair.src_vmid}`}</Typography>
+                              </Box>
+                            </TableCell>
+                            <TableCell sx={{ py: 0.75, textAlign: 'center' }}>
+                              <i className="ri-arrow-right-line" style={{ fontSize: 14, opacity: 0.4 }} />
+                            </TableCell>
+                            <TableCell sx={{ py: 0.75, fontSize: '0.8rem' }}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                <i className="ri-computer-line" style={{ fontSize: 12, opacity: 0.5 }} />
+                                <Typography variant="body2" fontSize="0.8rem">{pair.dst_name || `VM ${pair.dst_vmid}`}</Typography>
+                              </Box>
+                            </TableCell>
+                            <TableCell align="right" sx={{ py: 0.75, fontSize: '0.8rem', fontFamily: 'monospace' }}>
+                              {formatBytes(pair.bytes)}
+                            </TableCell>
+                            <TableCell sx={{ py: 0.75 }}>
+                              <Chip label={`${pair.protocol}/${pair.dst_port}`} size="small" variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />
+                            </TableCell>
                           </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {topSources.filter(s => !srcSearch || s.ip.includes(srcSearch)).map((src) => (
-                            <TableRow key={src.ip} hover>
-                              <TableCell sx={{ py: 0.5, fontFamily: 'monospace', fontSize: '0.8rem' }}>{src.ip}</TableCell>
-                              <TableCell align="right" sx={{ py: 0.5, fontFamily: 'monospace', fontSize: '0.8rem' }}>{formatBytes(src.bytes)}</TableCell>
-                              <TableCell align="right" sx={{ py: 0.5, fontSize: '0.8rem', color: 'text.secondary' }}>{src.flow_count}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </TableContainer>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Top Destinations */}
-              <Card variant="outlined" sx={{ borderRadius: 2 }}>
-                <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-                  <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
-                    <i className="ri-download-2-line" style={{ fontSize: 16, marginRight: 6, color: theme.palette.success.main }} />
-                    {t('networkFlows.topDestinations')}
-                  </Typography>
-                  <TextField
-                    size="small"
-                    placeholder={t('common.search')}
-                    value={dstSearch}
-                    onChange={(e) => setDstSearch(e.target.value)}
-                    sx={{ mb: 1 }}
-                    fullWidth
-                    InputProps={{
-                      startAdornment: <InputAdornment position="start"><i className="ri-search-line" style={{ fontSize: 14, opacity: 0.5 }} /></InputAdornment>,
-                      sx: { fontSize: '0.8rem', height: 32 }
-                    }}
-                  />
-                  {topDestinations.length === 0 ? (
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5, py: 3, opacity: 0.5 }}>
-                      <CircularProgress size={16} />
-                      <Typography variant="body2">{t('networkFlows.waitingForData')}</Typography>
-                    </Box>
-                  ) : (
-                    <TableContainer>
-                      <Table size="small">
-                        <TableHead>
-                          <TableRow>
-                            <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', py: 0.5 }}>IP</TableCell>
-                            <TableCell align="right" sx={{ fontWeight: 600, fontSize: '0.75rem', py: 0.5 }}>Bytes</TableCell>
-                            <TableCell align="right" sx={{ fontWeight: 600, fontSize: '0.75rem', py: 0.5 }}>Flows</TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {topDestinations.filter(d => !dstSearch || d.ip.includes(dstSearch)).map((dst) => (
-                            <TableRow key={dst.ip} hover>
-                              <TableCell sx={{ py: 0.5, fontFamily: 'monospace', fontSize: '0.8rem' }}>{dst.ip}</TableCell>
-                              <TableCell align="right" sx={{ py: 0.5, fontFamily: 'monospace', fontSize: '0.8rem' }}>{formatBytes(dst.bytes)}</TableCell>
-                              <TableCell align="right" sx={{ py: 0.5, fontSize: '0.8rem', color: 'text.secondary' }}>{dst.flow_count}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </TableContainer>
-                  )}
-                </CardContent>
-              </Card>
-            </Box>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                )}
+              </CardContent>
+            </Card>
           </Box>
 
           {/* Top Ports */}
@@ -763,7 +741,7 @@ export default function FlowsTab() {
       )}
 
       {/* VM Detail Dialog */}
-      <Dialog open={!!selectedVM} onClose={() => setSelectedVM(null)} maxWidth="sm" fullWidth>
+      <Dialog open={!!selectedVM} onClose={() => setSelectedVM(null)} maxWidth="md" fullWidth>
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <i className="ri-computer-line" style={{ fontSize: 20 }} />
@@ -861,12 +839,37 @@ export default function FlowsTab() {
                 </Box>
               )}
 
-              {/* Info note */}
-              <Alert severity="info" icon={<i className="ri-information-line" />}>
-                <Typography variant="caption">
-                  {t('networkFlows.vmDetailNote')}
+              {/* Mini Time Series */}
+              <Box>
+                <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
+                  <i className="ri-line-chart-line" style={{ fontSize: 14, marginRight: 6 }} />
+                  {t('networkFlows.timeSeries')} (1h)
                 </Typography>
-              </Alert>
+                {vmTsLoading ? (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}><CircularProgress size={20} /></Box>
+                ) : vmTimeSeries.length === 0 ? (
+                  <Box sx={{ textAlign: 'center', py: 2, opacity: 0.4 }}>
+                    <Typography variant="caption">{t('networkFlows.noTimeSeriesData')}</Typography>
+                  </Box>
+                ) : (
+                  <Box sx={{ height: 160 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={vmTimeSeries.map(p => ({ time: p.time * 1000, in: p.bytes_in || 0, out: p.bytes_out || 0 }))}>
+                        <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
+                        <XAxis dataKey="time" type="number" domain={['dataMin', 'dataMax']} tickFormatter={(v) => new Date(v).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} tick={{ fontSize: 10 }} />
+                        <YAxis tickFormatter={(v) => formatBytes(v)} tick={{ fontSize: 10 }} width={60} />
+                        <RechartsTooltip
+                          labelFormatter={(v) => new Date(v as number).toLocaleTimeString()}
+                          formatter={(value: number, name: string) => [formatBytes(value), name === 'in' ? 'Inbound' : 'Outbound']}
+                          contentStyle={{ fontSize: 11, borderRadius: 8, backgroundColor: theme.palette.background.paper, borderColor: theme.palette.divider, color: theme.palette.text.primary }}
+                        />
+                        <Area type="monotone" dataKey="in" stroke={theme.palette.success.main} fill={`${theme.palette.success.main}30`} strokeWidth={1.5} />
+                        <Area type="monotone" dataKey="out" stroke={theme.palette.warning.main} fill={`${theme.palette.warning.main}30`} strokeWidth={1.5} />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </Box>
+                )}
+              </Box>
             </Box>
           )}
         </DialogContent>
