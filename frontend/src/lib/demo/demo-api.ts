@@ -1784,16 +1784,26 @@ export function demoResponse(req: Request): NextResponse | Response | null {
     }
 
     if (endpoint === 'ip-pairs') {
-      const pairs = []
-      for (let i = 0; i < 25; i++) {
-        const src = demoIPs[Math.floor(Math.random() * demoIPs.length)]
-        let dst = demoIPs[Math.floor(Math.random() * demoIPs.length)]
-        while (dst === src) dst = demoIPs[Math.floor(Math.random() * demoIPs.length)]
-        const protos = [{ p: 'TCP', port: 443 }, { p: 'TCP', port: 22 }, { p: 'TCP', port: 5432 }, { p: 'UDP', port: 53 }, { p: 'TCP', port: 8006 }, { p: 'TCP', port: 80 }]
-        const proto = protos[Math.floor(Math.random() * protos.length)]
-        pairs.push({ src_ip: src, dst_ip: dst, bytes: Math.floor(Math.random() * 2e9 + 1e6), packets: Math.floor(Math.random() * 500000), protocol: proto.p, dst_port: proto.port })
-      }
-      pairs.sort((a, b) => b.bytes - a.bytes)
+      // Deterministic pairs with one dominant flow (web-prod-01 → db-primary via PostgreSQL)
+      const pairs = [
+        // Dominant flow: web server hammering database
+        { src_ip: '10.10.10.10', dst_ip: '10.10.10.20', bytes: 18_500_000_000, packets: 12_000_000, protocol: 'TCP', dst_port: 5432 },
+        { src_ip: '10.10.10.10', dst_ip: '10.10.10.30', bytes: 8_200_000_000, packets: 5_500_000, protocol: 'TCP', dst_port: 443 },
+        { src_ip: '10.10.10.10', dst_ip: '192.168.1.100', bytes: 4_100_000_000, packets: 2_800_000, protocol: 'TCP', dst_port: 443 },
+        // Secondary flows
+        { src_ip: '10.10.10.20', dst_ip: '10.10.10.30', bytes: 2_500_000_000, packets: 1_600_000, protocol: 'TCP', dst_port: 443 },
+        { src_ip: '10.10.10.3', dst_ip: '10.10.10.10', bytes: 1_800_000_000, packets: 1_200_000, protocol: 'TCP', dst_port: 8006 },
+        { src_ip: '192.168.1.100', dst_ip: '10.10.10.10', bytes: 1_500_000_000, packets: 980_000, protocol: 'TCP', dst_port: 80 },
+        { src_ip: '10.10.10.2', dst_ip: '10.10.10.20', bytes: 1_200_000_000, packets: 750_000, protocol: 'TCP', dst_port: 5432 },
+        { src_ip: '10.10.10.30', dst_ip: '10.10.10.1', bytes: 950_000_000, packets: 620_000, protocol: 'TCP', dst_port: 22 },
+        { src_ip: '192.168.1.200', dst_ip: '10.10.10.10', bytes: 800_000_000, packets: 520_000, protocol: 'TCP', dst_port: 443 },
+        { src_ip: '10.10.10.1', dst_ip: '10.10.10.2', bytes: 650_000_000, packets: 430_000, protocol: 'UDP', dst_port: 53 },
+        { src_ip: '10.10.10.10', dst_ip: '10.10.10.1', bytes: 500_000_000, packets: 320_000, protocol: 'TCP', dst_port: 9090 },
+        { src_ip: '10.10.10.3', dst_ip: '10.10.10.20', bytes: 380_000_000, packets: 250_000, protocol: 'TCP', dst_port: 3306 },
+        { src_ip: '10.10.10.2', dst_ip: '10.10.10.3', bytes: 280_000_000, packets: 180_000, protocol: 'TCP', dst_port: 22 },
+        { src_ip: '192.168.1.100', dst_ip: '10.10.10.30', bytes: 220_000_000, packets: 140_000, protocol: 'TCP', dst_port: 443 },
+        { src_ip: '10.10.10.20', dst_ip: '10.10.10.1', bytes: 180_000_000, packets: 115_000, protocol: 'UDP', dst_port: 53 },
+      ]
       return NextResponse.json(pairs, { headers: demoHeaders })
     }
 
