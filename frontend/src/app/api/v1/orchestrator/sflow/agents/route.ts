@@ -19,7 +19,6 @@ interface NodeSFlowStatus {
   sflowTarget: string
   sflowSampling: number
   bridges: string[]
-  noSsh?: boolean
 }
 
 // GET /api/v1/orchestrator/sflow/agents — check sFlow status on all nodes
@@ -29,38 +28,15 @@ export async function GET() {
     if (denied) return denied
 
     const prisma = await getSessionPrisma()
-    // Fetch ALL PVE connections (including those without SSH)
     const connections = await prisma.connection.findMany({
-      where: { type: "pve" },
+      where: { type: "pve", sshEnabled: true },
       include: { hosts: true },
     })
 
     const results: NodeSFlowStatus[] = []
 
     for (const conn of connections) {
-      const hasSSH = conn.sshEnabled && (conn.sshKeyEnc || conn.sshPassEnc)
-
-      // For connections without SSH, add nodes with online=false indicator
-      if (!hasSSH) {
-        for (const host of conn.hosts) {
-          if (!host.enabled || !host.ip) continue
-          results.push({
-            node: host.node,
-            ip: host.ip,
-            connectionId: conn.id,
-            connectionName: conn.name,
-            online: false,
-            hasOvs: false,
-            ovsVersion: "",
-            sflowConfigured: false,
-            sflowTarget: "",
-            sflowSampling: 0,
-            bridges: [],
-            noSsh: true,
-          })
-        }
-        continue
-      }
+      if (!conn.sshKeyEnc && !conn.sshPassEnc) continue
 
       const sshKey = conn.sshKeyEnc ? decryptSecret(conn.sshKeyEnc) : undefined
       const sshPass = conn.sshPassEnc ? decryptSecret(conn.sshPassEnc) : undefined

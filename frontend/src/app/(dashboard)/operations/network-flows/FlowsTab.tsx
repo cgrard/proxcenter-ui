@@ -112,7 +112,7 @@ export default function FlowsTab() {
   // Node sFlow agent status
   const [nodeAgents, setNodeAgents] = useState<Array<{
     node: string; ip: string; connectionId: string; connectionName: string;
-    online: boolean; hasOvs: boolean; ovsVersion: string; sflowConfigured: boolean; sflowTarget: string; sflowSampling: number; bridges: string[]; noSsh?: boolean
+    online: boolean; hasOvs: boolean; ovsVersion: string; sflowConfigured: boolean; sflowTarget: string; sflowSampling: number; bridges: string[]
   }>>([])
   const [agentsLoading, setAgentsLoading] = useState(true)
   const [agentsExpanded, setAgentsExpanded] = useState(true)
