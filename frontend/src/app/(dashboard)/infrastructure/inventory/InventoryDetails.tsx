@@ -1684,8 +1684,8 @@ return
 
   // Charger les mises à jour quand on sélectionne l'onglet Rolling Update
   useEffect(() => {
-    if (selection?.type === 'cluster' && clusterTab === 10 && data?.nodesData?.length > 0) {
-      const connId = selection.id?.split(':')[0] || ''
+    if (selection?.type === 'cluster' && clusterTab === 11 && data?.nodesData?.length > 0) {
+      const connId = selection.id || ''
       // Charger les mises à jour et les VMs locales pour chaque nœud
       data.nodesData.forEach((node: any) => {
         // Charger les mises à jour
@@ -1694,16 +1694,19 @@ return
             ...prev,
             [node.node]: { count: 0, updates: [], version: null, loading: true }
           }))
-          
-          fetch(`/api/v1/connections/${encodeURIComponent(connId)}/nodes/${encodeURIComponent(node.node)}/updates`)
+
+          fetch(`/api/v1/connections/${encodeURIComponent(connId)}/nodes/${encodeURIComponent(node.node)}/apt`)
             .then(res => res.json())
             .then(json => {
+              // Find pve-manager version from the updates list, or use node status data
+              const pvePkg = (json.data || []).find((p: any) => p.package === 'pve-manager')
+              const pveVersion = pvePkg?.currentVersion || node.pveversion || null
               setNodeUpdates(prev => ({
                 ...prev,
                 [node.node]: {
-                  count: json.data?.count || 0,
-                  updates: json.data?.updates || [],
-                  version: json.data?.version || null,
+                  count: json.count || 0,
+                  updates: json.data || [],
+                  version: pveVersion,
                   loading: false
                 }
               }))
