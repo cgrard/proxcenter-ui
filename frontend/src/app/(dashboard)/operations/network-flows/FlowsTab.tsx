@@ -359,6 +359,14 @@ export default function FlowsTab() {
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
 
           {/* sFlow Agents Status */}
+          {agentsLoading && (
+            <Card variant="outlined" sx={{ borderRadius: 2 }}>
+              <CardContent sx={{ p: 2, '&:last-child': { pb: 2 }, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                <CircularProgress size={16} />
+                <Typography variant="body2" color="text.secondary">{t('networkFlows.sflowAgents')}...</Typography>
+              </CardContent>
+            </Card>
+          )}
           {!agentsLoading && nodeAgents.length > 0 && (
             <Card variant="outlined" sx={{ borderRadius: 2 }}>
               <CardContent sx={{ p: 0, '&:last-child': { pb: 0 } }}>
