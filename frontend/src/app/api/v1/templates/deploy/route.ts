@@ -264,6 +264,7 @@ export async function POST(req: Request) {
           // URL-decodes the sshkeys value internally.
           const ciParts: string[] = []
           if (ci.ciuser) ciParts.push(`ciuser=${encodeURIComponent(ci.ciuser)}`)
+          if (ci.cipassword) ciParts.push(`cipassword=${encodeURIComponent(ci.cipassword)}`)
           if (ci.sshKeys) ciParts.push(`sshkeys=${encodeURIComponent(encodeURIComponent(ci.sshKeys))}`)
           if (ci.ipconfig0) {
             // Sanitize: trim spaces around commas (PVE rejects " ip" vs "ip")

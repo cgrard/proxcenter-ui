@@ -104,6 +104,7 @@ export default function DeployWizard({ open, onClose, image, prefillBlueprint }:
 
   // Cloud-init step
   const [ciuser, setCiuser] = useState('')
+  const [cipassword, setCipassword] = useState('')
   const [sshKeys, setSshKeys] = useState('')
   const [ipconfig0, setIpconfig0] = useState('ip=dhcp')
   const [nameserver, setNameserver] = useState('')
@@ -154,6 +155,7 @@ export default function DeployWizard({ open, onClose, image, prefillBlueprint }:
           : null
         if (ci) {
           setCiuser(ci.ciuser || '')
+          setCipassword(ci.cipassword || '')
           setSshKeys(ci.sshKeys || '')
           setIpconfig0(ci.ipconfig0 || 'ip=dhcp')
           setNameserver(ci.nameserver || '')
@@ -259,6 +261,7 @@ export default function DeployWizard({ open, onClose, image, prefillBlueprint }:
         },
         cloudInit: {
           ciuser: ciuser || undefined,
+          cipassword: cipassword || undefined,
           sshKeys: sshKeys || undefined,
           ipconfig0,
           nameserver: nameserver || undefined,
@@ -300,7 +303,7 @@ export default function DeployWizard({ open, onClose, image, prefillBlueprint }:
   }, [
     image, connectionId, node, storage, vmid, vmName, cores, sockets, memory,
     diskSize, scsihw, networkModel, networkBridge, vlanTag, cpu, agent,
-    ciuser, sshKeys, ipconfig0, nameserver, searchdomain,
+    ciuser, cipassword, sshKeys, ipconfig0, nameserver, searchdomain,
     saveAsBlueprint, blueprintName, prefillBlueprint,
   ])
 
@@ -551,6 +554,15 @@ export default function DeployWizard({ open, onClose, image, prefillBlueprint }:
       />
       <TextField
         size="small"
+        label={t('templates.deploy.cloudInit.password')}
+        value={cipassword}
+        onChange={e => setCipassword(e.target.value)}
+        type="password"
+        fullWidth
+        placeholder={t('templates.deploy.cloudInit.passwordPlaceholder')}
+      />
+      <TextField
+        size="small"
         label={t('templates.deploy.cloudInit.sshKeys')}
         value={sshKeys}
         onChange={e => setSshKeys(e.target.value)}
@@ -625,7 +637,9 @@ export default function DeployWizard({ open, onClose, image, prefillBlueprint }:
         <Box>
           <Typography variant="overline" sx={{ opacity: 0.6 }}>{t('templates.deploy.steps.cloudInit')}</Typography>
           <Typography variant="body2">
-            {ciuser ? `${t('templates.deploy.cloudInit.user')}: ${ciuser}` : t('templates.deploy.cloudInit.noUser')} &middot; {ipconfig0}
+            {ciuser ? `${t('templates.deploy.cloudInit.user')}: ${ciuser}` : t('templates.deploy.cloudInit.noUser')}
+            {cipassword ? ` · ${t('templates.deploy.cloudInit.password')}: ••••••` : ''}
+            {' · '}{ipconfig0}
           </Typography>
           {sshKeys && (
             <Typography variant="caption" sx={{ opacity: 0.6 }}>

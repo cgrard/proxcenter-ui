@@ -2898,6 +2898,8 @@
       },
       "cloudInit": {
         "user": "用户名",
+        "password": "密码",
+        "passwordPlaceholder": "Cloud-init 密码（例如 Windows 管理员密码）",
         "sshKeys": "SSH 公钥",
         "ipConfig": "IP 配置",
         "ipConfigHelp": "使用 ip=dhcp 自动获取，或 ip=x.x.x.x/24,gw=y.y.y.y 手动配置",

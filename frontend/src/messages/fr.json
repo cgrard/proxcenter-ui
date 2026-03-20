@@ -2898,6 +2898,8 @@
       },
       "cloudInit": {
         "user": "Nom d'utilisateur",
+        "password": "Mot de passe",
+        "passwordPlaceholder": "Mot de passe cloud-init (ex : administrateur Windows)",
         "sshKeys": "Clés publiques SSH",
         "ipConfig": "Configuration IP",
         "ipConfigHelp": "Utilisez ip=dhcp pour le DHCP, ou ip=x.x.x.x/24,gw=y.y.y.y pour une IP statique",

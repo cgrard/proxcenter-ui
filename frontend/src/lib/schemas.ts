@@ -304,6 +304,7 @@ export const deploySchema = z.object({
   }),
   cloudInit: z.object({
     ciuser: z.string().optional(),
+    cipassword: z.string().optional(),
     sshKeys: z.string().optional(),
     ipconfig0: z.string().default('ip=dhcp'),
     nameserver: z.string().optional(),
