@@ -85,6 +85,18 @@ async function fetchSFlow(endpoint: string, params?: Record<string, string>) {
   return res.json()
 }
 
+// Well-known port → service name
+function portToService(port: number, protocol: string): string {
+  const services: Record<number, string> = {
+    22: 'SSH', 53: 'DNS', 80: 'HTTP', 443: 'HTTPS', 3306: 'MySQL',
+    5432: 'PostgreSQL', 6379: 'Redis', 8006: 'PVE API', 8080: 'HTTP-Alt',
+    25: 'SMTP', 110: 'POP3', 143: 'IMAP', 3389: 'RDP', 5900: 'VNC',
+    6789: 'Ceph MON', 3300: 'Ceph MON', 2049: 'NFS', 445: 'SMB',
+    9090: 'Prometheus', 9100: 'Node Exp', 5044: 'Logstash',
+  }
+  return services[port] || `${port}/${protocol}`
+}
+
 export default function FlowsTab() {
   const t = useTranslations()
   const theme = useTheme()
@@ -100,13 +112,14 @@ export default function FlowsTab() {
   // Node sFlow agent status
   const [nodeAgents, setNodeAgents] = useState<Array<{
     node: string; ip: string; connectionId: string; connectionName: string;
-    online: boolean; hasOvs: boolean; ovsVersion: string; sflowConfigured: boolean; sflowTarget: string; bridges: string[]
+    online: boolean; hasOvs: boolean; ovsVersion: string; sflowConfigured: boolean; sflowTarget: string; sflowSampling: number; bridges: string[]
   }>>([])
   const [agentsLoading, setAgentsLoading] = useState(true)
   const [agentsExpanded, setAgentsExpanded] = useState(true)
   const [configuringNodes, setConfiguringNodes] = useState(false)
   const [configDialogOpen, setConfigDialogOpen] = useState(false)
   const [collectorTarget, setCollectorTarget] = useState('')
+  const [samplingRate, setSamplingRate] = useState(512)
   const [configSingleNode, setConfigSingleNode] = useState<typeof nodeAgents[0] | null>(null)
 
   // VM detail modal
@@ -228,6 +241,7 @@ export default function FlowsTab() {
         body: JSON.stringify({
           nodes: nodesToConfigure.map(n => ({ node: n.node, ip: n.ip, connectionId: n.connectionId })),
           collectorTarget,
+          samplingRate,
         }),
       })
       if (res.ok) {
@@ -398,6 +412,7 @@ export default function FlowsTab() {
                           <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', py: 0.5 }}>OVS</TableCell>
                           <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', py: 0.5 }}>sFlow</TableCell>
                           <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', py: 0.5 }}>Target</TableCell>
+                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', py: 0.5 }}>Sampling</TableCell>
                           <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', py: 0.5 }}></TableCell>
                         </TableRow>
                       </TableHead>
@@ -408,7 +423,7 @@ export default function FlowsTab() {
                           return [
                             multipleConnections && (
                               <TableRow key={`header-${connName}`}>
-                                <TableCell colSpan={6} sx={{ py: 0.5, border: 0, bgcolor: 'action.hover' }}>
+                                <TableCell colSpan={7} sx={{ py: 0.5, border: 0, bgcolor: 'action.hover' }}>
                                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                     <i className="ri-database-2-line" style={{ fontSize: 13, opacity: 0.6 }} />
                                     <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
@@ -450,6 +465,9 @@ export default function FlowsTab() {
                                 </TableCell>
                                 <TableCell sx={{ py: 0.75, fontSize: '0.75rem', fontFamily: 'monospace', color: 'text.secondary' }}>
                                   {agent.sflowTarget || '—'}
+                                </TableCell>
+                                <TableCell sx={{ py: 0.75, fontSize: '0.75rem', fontFamily: 'monospace', color: 'text.secondary' }}>
+                                  {agent.sflowSampling ? `1:${agent.sflowSampling}` : '—'}
                                 </TableCell>
                                 <TableCell sx={{ py: 0.75 }}>
                                   {agent.hasOvs && (
@@ -644,7 +662,7 @@ export default function FlowsTab() {
                               {formatBytes(pair.bytes)}
                             </TableCell>
                             <TableCell sx={{ py: 0.75 }}>
-                              <Chip label={`${pair.protocol}/${pair.dst_port}`} size="small" variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />
+                              <Chip label={portToService(pair.dst_port, pair.protocol)} size="small" variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />
                             </TableCell>
                           </TableRow>
                         ))}
@@ -1034,7 +1052,30 @@ export default function FlowsTab() {
             placeholder="10.0.0.1:6343"
             helperText={t('networkFlows.collectorTargetHelp')}
             InputProps={{ sx: { fontFamily: 'monospace' } }}
+            sx={{ mb: 2 }}
           />
+          <TextField
+            fullWidth
+            size="small"
+            type="number"
+            label="Sampling Rate"
+            value={samplingRate}
+            onChange={(e) => setSamplingRate(Math.max(1, parseInt(e.target.value) || 512))}
+            InputProps={{ sx: { fontFamily: 'monospace' } }}
+          />
+          <Box sx={{ mt: 1, p: 1.5, borderRadius: 1, bgcolor: 'action.hover' }}>
+            <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>
+              <i className="ri-information-line" style={{ fontSize: 12, marginRight: 4 }} />
+              1 paquet sur <strong>{samplingRate}</strong> sera échantillonné
+            </Typography>
+            <Typography variant="caption" color="text.secondary" display="block">
+              {samplingRate <= 128 && '⚠️ Très précis mais forte charge CPU/réseau — recommandé uniquement pour le debug'}
+              {samplingRate > 128 && samplingRate <= 256 && '⚡ Haute précision — adapté aux réseaux < 1 Gbps'}
+              {samplingRate > 256 && samplingRate <= 512 && '✓ Bon compromis précision/performance — recommandé pour la plupart des cas'}
+              {samplingRate > 512 && samplingRate <= 1024 && '✓ Léger — adapté aux réseaux 10 Gbps+'}
+              {samplingRate > 1024 && '📉 Très léger — peut manquer des flux de faible volume'}
+            </Typography>
+          </Box>
           <Box sx={{ mt: 2 }}>
             <Typography variant="caption" fontWeight={600} sx={{ mb: 0.5, display: 'block' }}>
               {t('networkFlows.nodesToConfigure')}

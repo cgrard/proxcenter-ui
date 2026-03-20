@@ -17,6 +17,7 @@ interface NodeSFlowStatus {
   ovsVersion: string
   sflowConfigured: boolean
   sflowTarget: string
+  sflowSampling: number
   bridges: string[]
 }
 
@@ -62,6 +63,7 @@ export async function GET() {
           ovsVersion: "",
           sflowConfigured: false,
           sflowTarget: "",
+          sflowSampling: 0,
           bridges: [],
         }
 
@@ -110,7 +112,7 @@ export async function GET() {
             // Check if sFlow is configured on the first bridge
             const sflowResult = await executeSSHDirect({
               ...sshOpts,
-              command: "ovs-vsctl list sflow 2>/dev/null | grep -E 'targets|agent' || true",
+              command: "ovs-vsctl list sflow 2>/dev/null | grep -E 'targets|agent|sampling' || true",
             })
 
             if (sflowResult.success && sflowResult.output?.includes("targets")) {
@@ -118,6 +120,10 @@ export async function GET() {
               const targetMatch = sflowResult.output.match(/targets\s*:\s*\["?([^"\]]+)/)
               if (targetMatch) {
                 nodeStatus.sflowTarget = targetMatch[1]
+              }
+              const samplingMatch = sflowResult.output.match(/sampling\s*:\s*(\d+)/)
+              if (samplingMatch) {
+                nodeStatus.sflowSampling = parseInt(samplingMatch[1], 10)
               }
             }
           }

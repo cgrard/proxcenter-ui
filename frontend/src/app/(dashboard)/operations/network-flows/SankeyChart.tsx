@@ -435,12 +435,9 @@ export default function SankeyChart() {
                 </text>
               ))}
 
-              {/* Binary flow animation */}
+              {/* Flow animation */}
               <defs>
-                {layoutLinks.map((link: any, idx: number) => {
-                  const p = linkPathGenerator(link)
-                  return p ? <path key={`def-${idx}`} id={`flow-path-${idx}`} d={p} fill="none" /> : null
-                })}
+                <style>{`@keyframes flowDash { to { stroke-dashoffset: -40; } }`}</style>
               </defs>
 
               <g transform={`translate(${margin.left},${margin.top})`}>
@@ -455,11 +452,8 @@ export default function SankeyChart() {
 
                   // Animation speed based on flow volume — bigger flow = faster
                   const maxValue = Math.max(...layoutLinks.map((l: any) => l.value || 1))
-                  const ratio = (link.value || 1) / maxValue // 0..1
-                  const animDuration = Math.max(3, 15 - ratio * 12) // 3s (fast) to 15s (slow)
-
-                  // Generate a pseudo-random binary string seeded by index
-                  const binaryStr = Array.from({ length: 80 }, (_, i) => ((idx * 7 + i * 13) % 3 === 0 ? '0' : '1')).join('')
+                  const ratio = (link.value || 1) / maxValue
+                  const animDuration = Math.max(0.5, 3 - ratio * 2.5)
 
                   return (
                     <g key={idx}>
@@ -469,25 +463,26 @@ export default function SankeyChart() {
                         fill="none"
                         stroke={color}
                         strokeWidth={linkWidth}
-                        strokeOpacity={hoveredLink === null && hoveredNode === null ? 0.25 : isHovered ? 0.5 : 0.06}
+                        strokeOpacity={hoveredLink === null && hoveredNode === null ? 0.3 : isHovered ? 0.6 : 0.08}
                         onMouseEnter={() => setHoveredLink(idx)}
                         onMouseLeave={() => setHoveredLink(null)}
                         onClick={() => handleLinkClick(link, idx)}
                         style={{ cursor: 'pointer', transition: 'stroke-opacity 0.2s' }}
                       />
-                      {/* Animated binary text flowing along the path */}
-                      <text
-                        fill={color}
-                        fontSize={Math.min(Math.max(7, linkWidth * 0.6), 11)}
-                        fontFamily="JetBrains Mono, monospace"
-                        opacity={hoveredLink === null && hoveredNode === null ? 0.5 : isHovered ? 0.85 : 0.1}
-                        style={{ pointerEvents: 'none', transition: 'opacity 0.2s' }}
-                      >
-                        <textPath href={`#flow-path-${idx}`} startOffset="0%">
-                          <animate attributeName="startOffset" from="-50%" to="100%" dur={`${animDuration}s`} repeatCount="indefinite" />
-                          {binaryStr}
-                        </textPath>
-                      </text>
+                      {/* Animated flow particles (dashes) */}
+                      <path
+                        d={path}
+                        fill="none"
+                        stroke={color}
+                        strokeWidth={Math.min(linkWidth * 0.5, 6)}
+                        strokeOpacity={hoveredLink === null && hoveredNode === null ? 0.6 : isHovered ? 0.9 : 0.15}
+                        strokeDasharray="8 32"
+                        style={{
+                          animation: `flowDash ${animDuration}s linear infinite`,
+                          transition: 'stroke-opacity 0.2s',
+                          pointerEvents: 'none',
+                        }}
+                      />
                       <title>
                         {`${(link.source as any).name} → ${(link.target as any).name}\n${formatBytes(link.value)} · ${(link.packets || 0).toLocaleString()} pkts`}
                       </title>
