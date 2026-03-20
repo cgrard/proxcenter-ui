@@ -191,22 +191,27 @@ export default function TimeSeriesChart() {
             <TextField {...params} label={t('networkFlows.selectVms')} placeholder={t('common.search')} />
           )}
           renderTags={(value, getTagProps) =>
-            value.map((vm, idx) => (
-              <Chip
-                {...getTagProps({ index: idx })}
-                key={vm.vmid}
-                label={vm.vm_name || `VM ${vm.vmid}`}
-                size="small"
-                sx={{
-                  height: 24,
-                  bgcolor: `${VM_COLORS[idx % VM_COLORS.length]}20`,
-                  borderColor: VM_COLORS[idx % VM_COLORS.length],
-                  borderRadius: 'calc(var(--proxcenter-button-radius, 12px) * 2)',
-                  '& .MuiChip-label': { fontSize: '0.75rem' },
-                }}
-                variant="outlined"
-              />
-            ))
+            value.map((vm, idx) => {
+              // Use position in selectedVMs for stable color mapping
+              const colorIdx = selectedVMs.findIndex(s => s.vmid === vm.vmid)
+              const color = VM_COLORS[(colorIdx >= 0 ? colorIdx : idx) % VM_COLORS.length]
+              return (
+                <Chip
+                  {...getTagProps({ index: idx })}
+                  key={vm.vmid}
+                  label={vm.vm_name || `VM ${vm.vmid}`}
+                  size="small"
+                  sx={{
+                    height: 24,
+                    bgcolor: `${color}20`,
+                    borderColor: color,
+                    borderRadius: 'calc(var(--proxcenter-button-radius, 12px) * 2)',
+                    '& .MuiChip-label': { fontSize: '0.75rem' },
+                  }}
+                  variant="outlined"
+                />
+              )
+            })
           }
           renderOption={(props, vm) => (
             <Box component="li" {...props} sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
@@ -367,19 +372,24 @@ export default function TimeSeriesChart() {
                     }}
                     wrapperStyle={{ fontSize: 11 }}
                   />
-                  {multiData.map((vm, idx) => (
-                    <Area
-                      key={vm.vmid}
-                      type="monotone"
-                      dataKey={`vm_${vm.vmid}_total`}
-                      name={`vm_${vm.vmid}_total`}
-                      stroke={VM_COLORS[idx % VM_COLORS.length]}
-                      fill={VM_COLORS[idx % VM_COLORS.length]}
-                      fillOpacity={0.15}
-                      strokeWidth={2}
-                      isAnimationActive={false}
-                    />
-                  ))}
+                  {multiData.map((vm) => {
+                    // Match color to selectedVMs order (same as chips)
+                    const colorIdx = selectedVMs.findIndex(s => s.vmid === vm.vmid)
+                    const color = VM_COLORS[(colorIdx >= 0 ? colorIdx : 0) % VM_COLORS.length]
+                    return (
+                      <Area
+                        key={vm.vmid}
+                        type="monotone"
+                        dataKey={`vm_${vm.vmid}_total`}
+                        name={`vm_${vm.vmid}_total`}
+                        stroke={color}
+                        fill={color}
+                        fillOpacity={0.15}
+                        strokeWidth={2}
+                        isAnimationActive={false}
+                      />
+                    )
+                  })}
                 </AreaChart>
               </ResponsiveContainer>
             </Box>
