@@ -701,7 +701,7 @@ export default function DeployWizard({ open, onClose, image, prefillBlueprint }:
   }, [
     activeStep, image, connections, connectionId, nodes, node, storages, storage,
     vmid, vmName, cores, sockets, memory, diskSize, scsihw, networkModel,
-    networkBridge, vlanTag, cpu, agent, ciuser, sshKeys, ipconfig0, nameserver,
+    networkBridge, vlanTag, cpu, agent, ciuser, cipassword, sshKeys, ipconfig0, nameserver,
     searchdomain, saveAsBlueprint, blueprintName, deploymentId, deployError, deploying, t,
   ])
 
