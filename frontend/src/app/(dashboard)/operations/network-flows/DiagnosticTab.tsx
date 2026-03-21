@@ -3,8 +3,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useTranslations } from 'next-intl'
 import {
-  AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip,
-  ResponsiveContainer, CartesianGrid, Cell,
+  AreaChart, Area, XAxis, YAxis, Tooltip as RechartsTooltip,
+  ResponsiveContainer, CartesianGrid,
 } from 'recharts'
 
 import {
@@ -47,19 +47,12 @@ interface TopTalker {
 interface IPPair {
   src_ip: string
   dst_ip: string
+  src_vmid?: number
+  dst_vmid?: number
   bytes: number
   packets: number
   protocol: string
   dst_port: number
-}
-
-interface TopEndpoint {
-  ip: string
-  vmid?: number
-  vm_name?: string
-  bytes: number
-  packets: number
-  flow_count: number
 }
 
 interface TimeSeriesPoint {
@@ -112,7 +105,6 @@ export default function DiagnosticTab() {
   const [vms, setVMs] = useState<TopTalker[]>([])
   const [selectedVMs, setSelectedVMs] = useState<TopTalker[]>([])
   const [ipPairs, setIPPairs] = useState<IPPair[]>([])
-  const [ipToVM, setIpToVM] = useState<Map<string, { vmid: number; vm_name: string }>>(new Map())
 
   // Filters
   const [protocolFilter, setProtocolFilter] = useState<string>('all')
@@ -137,29 +129,14 @@ export default function DiagnosticTab() {
     try {
       setError(null)
 
-      const [talkersData, pairsData, srcData, dstData] = await Promise.all([
+      const [talkersData, ipPairsData] = await Promise.all([
         fetchSFlow('top-talkers', { n: '100' }),
         fetchSFlow('ip-pairs', { n: '500' }),
-        fetchSFlow('top-sources', { n: '200' }),
-        fetchSFlow('top-destinations', { n: '200' }),
       ])
 
       const talkers: TopTalker[] = Array.isArray(talkersData) ? talkersData : []
       setVMs(talkers)
-      setIPPairs(Array.isArray(pairsData) ? pairsData : [])
-
-      // Build IP → VM mapping
-      const map = new Map<string, { vmid: number; vm_name: string }>()
-      const allEndpoints: TopEndpoint[] = [
-        ...(Array.isArray(srcData) ? srcData : []),
-        ...(Array.isArray(dstData) ? dstData : []),
-      ]
-      for (const ep of allEndpoints) {
-        if (ep.vmid && ep.ip) {
-          map.set(ep.ip, { vmid: ep.vmid, vm_name: ep.vm_name || `VM ${ep.vmid}` })
-        }
-      }
-      setIpToVM(map)
+      setIPPairs(Array.isArray(ipPairsData) ? ipPairsData : [])
 
       if (selectedVMs.length === 0 && talkers.length > 0) {
         setSelectedVMs([talkers[0]])
@@ -199,7 +176,10 @@ export default function DiagnosticTab() {
   }, [])
 
   const handleRowClick = (pair: IPPair) => {
-    if (selectedPair?.src_ip === pair.src_ip && selectedPair?.dst_ip === pair.dst_ip && selectedPair?.dst_port === pair.dst_port) {
+    const isSame = selectedPair?.src_ip === pair.src_ip &&
+                   selectedPair?.dst_ip === pair.dst_ip &&
+                   selectedPair?.dst_port === pair.dst_port
+    if (isSame) {
       setSelectedPair(null)
       setTimelineData([])
     } else {
@@ -208,7 +188,17 @@ export default function DiagnosticTab() {
     }
   }
 
-  // ── Build filtered & sorted conversations ──────────────────────────────────
+  // ── Build VM name map from top-talkers ─────────────────────────────────────
+
+  const vmNameMap = useMemo(() => {
+    const map = new Map<number, string>()
+    for (const vm of vms) {
+      map.set(vm.vmid, vm.vm_name || `VM ${vm.vmid}`)
+    }
+    return map
+  }, [vms])
+
+  // ── Filter ip-pairs by selected VMIDs ──────────────────────────────────────
 
   const selectedVMIDs = useMemo(() => new Set(selectedVMs.map(v => v.vmid)), [selectedVMs])
 
@@ -217,16 +207,11 @@ export default function DiagnosticTab() {
 
     return ipPairs.filter(pair => {
       // At least one side must belong to a selected VM
-      const srcVM = ipToVM.get(pair.src_ip)
-      const dstVM = ipToVM.get(pair.dst_ip)
-      const srcMatch = srcVM && selectedVMIDs.has(srcVM.vmid)
-      const dstMatch = dstVM && selectedVMIDs.has(dstVM.vmid)
+      const srcMatch = pair.src_vmid && selectedVMIDs.has(pair.src_vmid)
+      const dstMatch = pair.dst_vmid && selectedVMIDs.has(pair.dst_vmid)
       if (!srcMatch && !dstMatch) return false
 
-      // Protocol filter
       if (protocolFilter !== 'all' && pair.protocol !== protocolFilter) return false
-
-      // Port filter
       if (portFilter) {
         const pNum = parseInt(portFilter, 10)
         if (!isNaN(pNum) && pair.dst_port !== pNum) return false
@@ -241,7 +226,17 @@ export default function DiagnosticTab() {
       if (sortKey === 'protocol') return mul * a.protocol.localeCompare(b.protocol)
       return 0
     })
-  }, [ipPairs, selectedVMs, selectedVMIDs, ipToVM, protocolFilter, portFilter, sortKey, sortDir])
+  }, [ipPairs, selectedVMs, selectedVMIDs, protocolFilter, portFilter, sortKey, sortDir])
+
+  // ── Resolve display info for an IP ─────────────────────────────────────────
+
+  const resolveIP = useCallback((ip: string, vmid?: number) => {
+    if (vmid && vmid > 0) {
+      const name = vmNameMap.get(vmid)
+      return { label: name || `VM ${vmid}`, isVM: true }
+    }
+    return { label: ip, isVM: false }
+  }, [vmNameMap])
 
   // ── KPI ────────────────────────────────────────────────────────────────────
 
@@ -261,6 +256,7 @@ export default function DiagnosticTab() {
   const topPorts = useMemo(() => {
     const portMap = new Map<string, { port: number; protocol: string; bytes: number }>()
     for (const p of filteredPairs) {
+      if (p.dst_port === 0) continue
       const key = `${p.dst_port}/${p.protocol}`
       const existing = portMap.get(key)
       if (existing) {
@@ -290,13 +286,6 @@ export default function DiagnosticTab() {
       setSortKey(key)
       setSortDir('desc')
     }
-  }
-
-  // ── Resolve IP to display ──────────────────────────────────────────────────
-
-  const resolveIP = (ip: string) => {
-    const vm = ipToVM.get(ip)
-    return vm ? { label: vm.vm_name, vmid: vm.vmid, ip, isVM: true } : { label: ip, vmid: null, ip, isVM: false }
   }
 
   // ── Format time ────────────────────────────────────────────────────────────
@@ -488,8 +477,8 @@ export default function DiagnosticTab() {
                   </TableHead>
                   <TableBody>
                     {filteredPairs.map((pair, idx) => {
-                      const src = resolveIP(pair.src_ip)
-                      const dst = resolveIP(pair.dst_ip)
+                      const src = resolveIP(pair.src_ip, pair.src_vmid)
+                      const dst = resolveIP(pair.dst_ip, pair.dst_vmid)
                       const service = portToService(pair.dst_port)
                       const isSelected = selectedPair?.src_ip === pair.src_ip && selectedPair?.dst_ip === pair.dst_ip && selectedPair?.dst_port === pair.dst_port
 
@@ -513,7 +502,7 @@ export default function DiagnosticTab() {
                                 </Box>
                               )}
                               <Typography variant="caption" color="text.secondary" fontFamily="JetBrains Mono, monospace" fontSize="0.7rem">
-                                {src.ip}
+                                {pair.src_ip}
                               </Typography>
                             </Box>
                           </TableCell>
@@ -531,7 +520,7 @@ export default function DiagnosticTab() {
                                 </Box>
                               )}
                               <Typography variant="caption" color="text.secondary" fontFamily="JetBrains Mono, monospace" fontSize="0.7rem">
-                                {dst.ip}
+                                {pair.dst_ip}
                               </Typography>
                             </Box>
                           </TableCell>
@@ -580,7 +569,7 @@ export default function DiagnosticTab() {
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
               <Typography variant="subtitle2" fontWeight={700}>
                 <i className="ri-line-chart-line" style={{ fontSize: 16, marginRight: 6 }} />
-                {resolveIP(selectedPair.src_ip).label} → {resolveIP(selectedPair.dst_ip).label}
+                {resolveIP(selectedPair.src_ip, selectedPair.src_vmid).label} → {resolveIP(selectedPair.dst_ip, selectedPair.dst_vmid).label}
                 {selectedPair.dst_port > 0 && (
                   <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 1 }}>
                     :{selectedPair.dst_port} {portToService(selectedPair.dst_port) && `(${portToService(selectedPair.dst_port)})`}
