@@ -38,20 +38,48 @@ export async function PUT(req: Request, ctx: Ctx) {
     const body = await req.json()
 
     const params = new URLSearchParams()
+    const type = body.type
     // Required field
-    params.append('type', body.type)
+    params.append('type', type)
 
-    // Optional fields
-    const fields = [
+    // Common fields for all types
+    const commonFields = [
       'address', 'netmask', 'gateway', 'address6', 'netmask6', 'gateway6',
-      'cidr', 'cidr6', 'autostart', 'mtu', 'comments',
-      'bridge_ports', 'bridge_stp', 'bridge_fd', 'bridge_vlan_aware',
-      'bond_mode', 'bond_primary', 'bond-xmit-hash-policy', 'slaves',
-      'vlan-id', 'vlan-raw-device',
-      'ovs_bridge', 'ovs_options', 'ovs_tag', 'ovs_bonds', 'ovs_ports',
+      'cidr', 'cidr6', 'mtu', 'comments',
     ]
+
+    // Type-specific fields
+    const bridgeFields = ['bridge_ports', 'bridge_stp', 'bridge_fd', 'bridge_vlan_aware']
+    const bondFields = ['bond_mode', 'bond_primary', 'bond-xmit-hash-policy', 'slaves']
+    const vlanFields = ['vlan-id', 'vlan-raw-device']
+    const ovsFields = ['ovs_bridge', 'ovs_options', 'ovs_tag', 'ovs_bonds', 'ovs_ports']
+
+    const isBridge = type === 'bridge' || type === 'OVSBridge'
+    const isBond = type === 'bond' || type === 'OVSBond'
+    const isVlan = type === 'vlan' || type === 'OVSIntPort'
+    const isOvs = type?.startsWith('OVS')
+
+    const fields = [
+      ...commonFields,
+      ...(isBridge ? bridgeFields : []),
+      ...(isBond ? bondFields : []),
+      ...(isVlan ? vlanFields : []),
+      ...(isOvs ? ovsFields : []),
+    ]
+
+    // Boolean fields that PVE expects as 0/1
+    const booleanFields = ['autostart', 'bridge_vlan_aware']
+
+    // Handle autostart separately (always valid)
+    if (body.autostart !== undefined) {
+      params.append('autostart', body.autostart ? '1' : '0')
+    }
+
     for (const f of fields) {
-      if (body[f] !== undefined && body[f] !== '') {
+      if (body[f] === undefined || body[f] === '') continue
+      if (booleanFields.includes(f)) {
+        params.append(f, body[f] ? '1' : '0')
+      } else {
         params.append(f, String(body[f]))
       }
     }
