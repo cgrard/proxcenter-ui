@@ -175,13 +175,12 @@ export default function FlowsTab() {
       const results = await Promise.all(
         toFetch.map(async (talker) => {
           try {
-            const data = await fetchSFlow('timeseries/vm', {
-              vmid: String(talker.vmid),
-              from: String(from),
-              to: String(now),
-            })
-            const points = Array.isArray(data)
-              ? data.map((d: any) => ({ time: d.time ?? d.t ?? 0, total: (d.bytes_in ?? 0) + (d.bytes_out ?? 0) }))
+            if (!talker.connection_id || !talker.node) return [talker.vmid, []] as [number, { time: number; total: number }[]]
+            const path = `/nodes/${talker.node}/qemu/${talker.vmid}`
+            const res = await fetch(`/api/v1/connections/${talker.connection_id}/rrd?path=${encodeURIComponent(path)}&timeframe=hour`)
+            const d = await res.json()
+            const points = Array.isArray(d?.data)
+              ? d.data.filter((p: any) => p.netin != null || p.netout != null).map((p: any) => ({ time: p.time || 0, total: (p.netin || 0) + (p.netout || 0) }))
               : []
             return [talker.vmid, points] as [number, { time: number; total: number }[]]
           } catch {
