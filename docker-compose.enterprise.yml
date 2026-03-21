@@ -63,13 +63,9 @@ services:
       - LOG_LEVEL=info
       - LOG_FORMAT=json
       - TZ=${TZ:-Europe/Paris}
-      # sFlow + InfluxDB (auto-configured with defaults)
+      # sFlow collector
       - PROXCENTER_SFLOW_ENABLED=true
       - PROXCENTER_SFLOW_LISTEN_ADDRESS=0.0.0.0:6343
-      - PROXCENTER_SFLOW_INFLUXDB_URL=http://influxdb:8086
-      - PROXCENTER_SFLOW_INFLUXDB_TOKEN=${INFLUXDB_TOKEN:-proxcenter-influx-token}
-      - PROXCENTER_SFLOW_INFLUXDB_ORG=proxcenter
-      - PROXCENTER_SFLOW_INFLUXDB_BUCKET=sflow
       #
       # Docker Secrets support (Swarm / file-based):
       # - APP_SECRET_FILE=/run/secrets/app_secret
@@ -84,41 +80,12 @@ services:
     #   - license_key
     networks:
       - proxcenter
-    depends_on:
-      influxdb:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8080/api/v1/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 15s
-
-  # ========================================
-  # InfluxDB (Time Series for sFlow)
-  # ========================================
-  influxdb:
-    image: influxdb:2.7
-    container_name: proxcenter-influxdb
-    restart: unless-stopped
-    environment:
-      - DOCKER_INFLUXDB_INIT_MODE=setup
-      - DOCKER_INFLUXDB_INIT_USERNAME=proxcenter
-      - DOCKER_INFLUXDB_INIT_PASSWORD=${INFLUXDB_PASSWORD:-proxcenter-sflow}
-      - DOCKER_INFLUXDB_INIT_ORG=proxcenter
-      - DOCKER_INFLUXDB_INIT_BUCKET=sflow
-      - DOCKER_INFLUXDB_INIT_RETENTION=30d
-      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${INFLUXDB_TOKEN:-proxcenter-influx-token}
-    volumes:
-      - influxdb_data:/var/lib/influxdb2
-    networks:
-      - proxcenter
-    healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8086/health || exit 1"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
 
 # ========================================
 # Networks
@@ -149,5 +116,3 @@ volumes:
   orchestrator_data:
     name: orchestrator_data
     external: true
-  influxdb_data:
-    name: proxcenter_influxdb_data

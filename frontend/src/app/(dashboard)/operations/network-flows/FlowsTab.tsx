@@ -38,7 +38,6 @@ import { formatBytes } from '@/utils/format'
 import dynamic from 'next/dynamic'
 
 const SankeyChart = dynamic(() => import('./SankeyChart'), { ssr: false })
-const TimeSeriesChart = dynamic(() => import('./TimeSeriesChart'), { ssr: false })
 
 
 interface SFlowStatus {
@@ -413,12 +412,6 @@ export default function FlowsTab() {
           icon={<i className="ri-git-branch-line" style={{ fontSize: 16 }} />}
           iconPosition="start"
           label={t('networkFlows.flowDiagram')}
-          sx={{ textTransform: 'none', fontSize: 13 }}
-        />
-        <Tab
-          icon={<i className="ri-line-chart-line" style={{ fontSize: 16 }} />}
-          iconPosition="start"
-          label={t('networkFlows.timeSeries')}
           sx={{ textTransform: 'none', fontSize: 13 }}
         />
       </Tabs>
@@ -839,12 +832,6 @@ export default function FlowsTab() {
       {subTab === 1 && (
         <SankeyChart />
       )}
-
-      {/* Time Series sub-tab */}
-      {subTab === 2 && (
-        <TimeSeriesChart />
-      )}
-
 
 
       {/* VM Detail Dialog */}
