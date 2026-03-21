@@ -57,6 +57,7 @@ interface TopTalker {
   bytes_in: number
   bytes_out: number
   packets: number
+  connection_id: string
 }
 
 interface IPPair {
@@ -213,14 +214,22 @@ export default function FlowsTab() {
     }
   }, [topTalkers])
 
-  // Fetch VM time-series when VM dialog opens
+  // Fetch VM network RRD when VM dialog opens
   useEffect(() => {
     if (!selectedVM) { setVmTimeSeries([]); return }
+    if (!selectedVM.connection_id || !selectedVM.node) { setVmTimeSeries([]); return }
     setVmTsLoading(true)
-    const now = new Date()
-    const from = new Date(now.getTime() - 60 * 60 * 1000) // last 1h
-    fetchSFlow('timeseries/vm', { vmid: String(selectedVM.vmid), from: from.toISOString(), to: now.toISOString() })
-      .then(d => setVmTimeSeries(Array.isArray(d) ? d : []))
+    const path = `/nodes/${selectedVM.node}/qemu/${selectedVM.vmid}`
+    fetch(`/api/v1/connections/${selectedVM.connection_id}/rrd?path=${encodeURIComponent(path)}&timeframe=hour`)
+      .then(r => r.json())
+      .then(d => {
+        const points = Array.isArray(d?.data) ? d.data : []
+        setVmTimeSeries(points.filter((p: any) => p.netin != null || p.netout != null).map((p: any) => ({
+          time: p.time || 0,
+          bytes_in: p.netin || 0,
+          bytes_out: p.netout || 0,
+        })))
+      })
       .catch(() => setVmTimeSeries([]))
       .finally(() => setVmTsLoading(false))
   }, [selectedVM])
@@ -877,7 +886,7 @@ export default function FlowsTab() {
               <Box>
                 <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
                   <i className="ri-line-chart-line" style={{ fontSize: 14, marginRight: 6 }} />
-                  {t('networkFlows.timeSeries')} (1h)
+                  {t('networkFlows.bandwidthRate')} (1h)
                 </Typography>
                 {vmTsLoading ? (
                   <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}><CircularProgress size={20} /></Box>
@@ -891,14 +900,14 @@ export default function FlowsTab() {
                       <AreaChart data={vmTimeSeries.map(p => ({ time: p.time * 1000, in: p.bytes_in || 0, out: p.bytes_out || 0 }))}>
                         <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
                         <XAxis dataKey="time" type="number" domain={['dataMin', 'dataMax']} tickFormatter={(v) => new Date(v).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} tick={{ fontSize: 10 }} />
-                        <YAxis tickFormatter={(v) => formatBytes(v)} tick={{ fontSize: 10 }} width={60} />
+                        <YAxis tickFormatter={(v) => `${formatBytes(v)}/s`} tick={{ fontSize: 10 }} width={70} />
                         <RechartsTooltip
                           labelFormatter={(v) => new Date(v as number).toLocaleTimeString()}
-                          formatter={(value: number, name: string) => [formatBytes(value), name === 'in' ? 'Inbound' : 'Outbound']}
+                          formatter={(value: number, name: string) => [`${formatBytes(value)}/s`, name === 'in' ? '↓ Inbound' : '↑ Outbound']}
                           contentStyle={{ fontSize: 11, borderRadius: 8, backgroundColor: theme.palette.background.paper, borderColor: theme.palette.divider, color: theme.palette.text.primary }}
                         />
-                        <Area type="monotone" dataKey="in" stroke={theme.palette.success.main} fill={`${theme.palette.success.main}30`} strokeWidth={1.5} />
-                        <Area type="monotone" dataKey="out" stroke={theme.palette.warning.main} fill={`${theme.palette.warning.main}30`} strokeWidth={1.5} />
+                        <Area type="monotone" dataKey="in" stroke={theme.palette.success.main} fill={`${theme.palette.success.main}30`} strokeWidth={1.5} isAnimationActive={false} />
+                        <Area type="monotone" dataKey="out" stroke={theme.palette.warning.main} fill={`${theme.palette.warning.main}30`} strokeWidth={1.5} isAnimationActive={false} />
                       </AreaChart>
                     </ResponsiveContainer>
                   </Box>
@@ -969,7 +978,7 @@ export default function FlowsTab() {
               <Box>
                 <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
                   <i className="ri-line-chart-line" style={{ fontSize: 14, marginRight: 6 }} />
-                  {t('networkFlows.timeSeries')} (1h)
+                  {t('networkFlows.bandwidthRate')} (1h)
                 </Typography>
                 {pairTsLoading ? (
                   <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}><CircularProgress size={20} /></Box>
