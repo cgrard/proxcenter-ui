@@ -341,48 +341,13 @@ export default function TimeSeriesChart() {
         )
       })()}
 
-      {/* Single VM Chart — In/Out */}
-      {selectedVMs.length === 1 && singleData.length > 0 && (
-        <Card variant="outlined" sx={{ borderRadius: 2 }}>
-          <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
-              <Typography variant="subtitle2" fontWeight={700}>
-                <i className="ri-line-chart-line" style={{ fontSize: 16, marginRight: 6 }} />
-                {selectedVMs[0].vm_name || `VM ${selectedVMs[0].vmid}`} — {t('networkFlows.trafficVolume')}
-              </Typography>
-              <Box sx={{ display: 'flex', gap: 1 }}>
-                <Chip label="↓ In" size="small" sx={{ height: 20, fontSize: '0.65rem', bgcolor: `${theme.palette.success.main}20`, color: theme.palette.success.main }} />
-                <Chip label="↑ Out" size="small" sx={{ height: 20, fontSize: '0.65rem', bgcolor: `${theme.palette.warning.main}20`, color: theme.palette.warning.main }} />
-              </Box>
-            </Box>
-
-            <Box sx={{ height: 350 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={singleData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#334155' : '#e2e8f0'} />
-                  <XAxis dataKey="time" tickFormatter={formatTime} tick={{ fontSize: 10 }} stroke={theme.palette.text.secondary} />
-                  <YAxis tickFormatter={(v) => formatBytes(v)} tick={{ fontSize: 10 }} width={70} stroke={theme.palette.text.secondary} />
-                  <RechartsTooltip
-                    labelFormatter={(v) => new Date(Number(v) * 1000).toLocaleString()}
-                    formatter={(v: number, name: string) => [formatBytes(v), name === 'bytes_in' ? '↓ Inbound' : '↑ Outbound']}
-                    contentStyle={{ backgroundColor: theme.palette.background.paper, borderColor: theme.palette.divider, color: theme.palette.text.primary, fontSize: 12, borderRadius: 8 }}
-                  />
-                  <Area type="monotone" dataKey="bytes_in" stroke={theme.palette.success.main} fill={theme.palette.success.main} fillOpacity={0.2} strokeWidth={2} isAnimationActive={false} />
-                  <Area type="monotone" dataKey="bytes_out" stroke={theme.palette.warning.main} fill={theme.palette.warning.main} fillOpacity={0.2} strokeWidth={2} isAnimationActive={false} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </Box>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Single VM Bandwidth Chart — bytes/s */}
       {selectedVMs.length === 1 && singleBandwidthData.length > 0 && (
         <Card variant="outlined" sx={{ borderRadius: 2 }}>
           <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
               <Typography variant="subtitle2" fontWeight={700}>
-                <i className="ri-speed-line" style={{ fontSize: 16, marginRight: 6 }} />
+                <i className="ri-line-chart-line" style={{ fontSize: 16, marginRight: 6 }} />
                 {selectedVMs[0].vm_name || `VM ${selectedVMs[0].vmid}`} — {t('networkFlows.bandwidthRate')}
               </Typography>
               <Box sx={{ display: 'flex', gap: 1 }}>
@@ -411,70 +376,13 @@ export default function TimeSeriesChart() {
         </Card>
       )}
 
-      {/* Multi VM Volume Chart — Total bytes per VM */}
-      {selectedVMs.length > 1 && mergedMultiData.length > 0 && (
-        <Card variant="outlined" sx={{ borderRadius: 2 }}>
-          <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
-              <Typography variant="subtitle2" fontWeight={700}>
-                <i className="ri-line-chart-line" style={{ fontSize: 16, marginRight: 6 }} />
-                {t('networkFlows.multiVmBandwidth')} ({selectedVMs.length} VMs)
-              </Typography>
-            </Box>
-
-            <Box sx={{ height: 350 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={mergedMultiData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#334155' : '#e2e8f0'} />
-                  <XAxis dataKey="time" tickFormatter={formatTime} tick={{ fontSize: 10 }} stroke={theme.palette.text.secondary} />
-                  <YAxis tickFormatter={(v) => formatBytes(v)} tick={{ fontSize: 10 }} width={70} stroke={theme.palette.text.secondary} />
-                  <RechartsTooltip
-                    labelFormatter={(v) => new Date(Number(v) * 1000).toLocaleString()}
-                    formatter={(v: number, name: string) => {
-                      const vm = multiData.find(m => `vm_${m.vmid}_total` === name)
-                      return [formatBytes(v), vm?.vm_name || name]
-                    }}
-                    contentStyle={{ backgroundColor: theme.palette.background.paper, borderColor: theme.palette.divider, color: theme.palette.text.primary, fontSize: 12, borderRadius: 8 }}
-                  />
-                  <Legend
-                    formatter={(value: string) => {
-                      const vm = multiData.find(m => `vm_${m.vmid}_total` === value)
-                      return vm?.vm_name || value
-                    }}
-                    wrapperStyle={{ fontSize: 11 }}
-                  />
-                  {multiData.map((vm) => {
-                    // Match color to selectedVMs order (same as chips)
-                    const colorIdx = selectedVMs.findIndex(s => s.vmid === vm.vmid)
-                    const color = VM_COLORS[(colorIdx >= 0 ? colorIdx : 0) % VM_COLORS.length]
-                    return (
-                      <Area
-                        key={vm.vmid}
-                        type="monotone"
-                        dataKey={`vm_${vm.vmid}_total`}
-                        name={`vm_${vm.vmid}_total`}
-                        stroke={color}
-                        fill={color}
-                        fillOpacity={0.15}
-                        strokeWidth={2}
-                        isAnimationActive={false}
-                      />
-                    )
-                  })}
-                </AreaChart>
-              </ResponsiveContainer>
-            </Box>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Multi VM Bandwidth Chart — bytes/s per VM */}
       {selectedVMs.length > 1 && mergedMultiBandwidthData.length > 0 && (
         <Card variant="outlined" sx={{ borderRadius: 2 }}>
           <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
               <Typography variant="subtitle2" fontWeight={700}>
-                <i className="ri-speed-line" style={{ fontSize: 16, marginRight: 6 }} />
+                <i className="ri-line-chart-line" style={{ fontSize: 16, marginRight: 6 }} />
                 {t('networkFlows.multiVmBandwidthRate')} ({selectedVMs.length} VMs)
               </Typography>
             </Box>

@@ -5179,6 +5179,15 @@
     "port": "Port",
     "shareOfTotal": "Anteil am Gesamtverkehr",
     "packets": "Pakete",
-    "noSsh": "Kein SSH"
+    "noSsh": "Kein SSH",
+    "diagnostic": "Diagnose",
+    "selectVmToDiagnose": "Wählen Sie eine oder mehrere VMs aus, um deren Netzwerkverbindungen zu analysieren",
+    "conversations": "Verbindungen",
+    "noConversations": "Keine Verbindungen entsprechen den aktuellen Filtern",
+    "totalPackets": "Pakete",
+    "uniquePeers": "Eindeutige Peers",
+    "external": "Extern",
+    "portFilter": "Port",
+    "noTimelineData": "Keine Zeitreihendaten für dieses Paar verfügbar (erfordert InfluxDB)"
   }
 }

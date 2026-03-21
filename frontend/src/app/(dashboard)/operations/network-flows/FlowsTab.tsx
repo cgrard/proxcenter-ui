@@ -39,6 +39,7 @@ import dynamic from 'next/dynamic'
 
 const SankeyChart = dynamic(() => import('./SankeyChart'), { ssr: false })
 const TimeSeriesChart = dynamic(() => import('./TimeSeriesChart'), { ssr: false })
+const DiagnosticTab = dynamic(() => import('./DiagnosticTab'), { ssr: false })
 
 
 interface SFlowStatus {
@@ -350,6 +351,12 @@ export default function FlowsTab() {
           icon={<i className="ri-line-chart-line" style={{ fontSize: 16 }} />}
           iconPosition="start"
           label={t('networkFlows.timeSeries')}
+          sx={{ textTransform: 'none', fontSize: 13 }}
+        />
+        <Tab
+          icon={<i className="ri-stethoscope-line" style={{ fontSize: 16 }} />}
+          iconPosition="start"
+          label={t('networkFlows.diagnostic')}
           sx={{ textTransform: 'none', fontSize: 13 }}
         />
       </Tabs>
@@ -749,6 +756,11 @@ export default function FlowsTab() {
       {/* Time Series sub-tab */}
       {subTab === 2 && (
         <TimeSeriesChart />
+      )}
+
+      {/* Diagnostic sub-tab */}
+      {subTab === 3 && (
+        <DiagnosticTab />
       )}
 
 

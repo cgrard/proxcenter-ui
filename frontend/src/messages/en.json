@@ -5183,6 +5183,15 @@
     "port": "Port",
     "shareOfTotal": "Share of total traffic",
     "packets": "Packets",
-    "noSsh": "No SSH"
+    "noSsh": "No SSH",
+    "diagnostic": "Diagnostic",
+    "selectVmToDiagnose": "Select one or more VMs to analyze their network conversations",
+    "conversations": "Conversations",
+    "noConversations": "No conversations match the current filters",
+    "totalPackets": "Packets",
+    "uniquePeers": "Unique Peers",
+    "external": "External",
+    "portFilter": "Port",
+    "noTimelineData": "No timeline data available for this pair (requires InfluxDB)"
   }
 }

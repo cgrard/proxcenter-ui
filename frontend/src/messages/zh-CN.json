@@ -5183,6 +5183,15 @@
     "port": "端口",
     "shareOfTotal": "占总流量比例",
     "packets": "数据包",
-    "noSsh": "无 SSH"
+    "noSsh": "无 SSH",
+    "diagnostic": "诊断",
+    "selectVmToDiagnose": "选择一个或多个 VM 来分析其网络会话",
+    "conversations": "会话",
+    "noConversations": "没有匹配当前筛选条件的会话",
+    "totalPackets": "数据包",
+    "uniquePeers": "唯一对端",
+    "external": "外部",
+    "portFilter": "端口",
+    "noTimelineData": "此对端没有可用的时间线数据（需要 InfluxDB）"
   }
 }
