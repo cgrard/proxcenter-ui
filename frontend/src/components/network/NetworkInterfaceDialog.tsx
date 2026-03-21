@@ -90,6 +90,8 @@ export default function NetworkInterfaceDialog({
         setForm({ type: 'bridge', autostart: true })
         setEditing(true)
       } else if (iface) {
+        const isPhysicalIface = iface.type === 'eth'
+
         setForm({
           iface: iface.iface,
           type: iface.type,
@@ -114,7 +116,8 @@ export default function NetworkInterfaceDialog({
           'vlan-id': iface.vlan_id || '',
           'vlan-raw-device': iface.vlan_raw_device || '',
         })
-        setEditing(false)
+        // Physical interfaces (eth) open in view mode; others open directly in edit mode
+        setEditing(mode === 'edit' && !isPhysicalIface)
       }
     }
   }, [open, mode, iface])

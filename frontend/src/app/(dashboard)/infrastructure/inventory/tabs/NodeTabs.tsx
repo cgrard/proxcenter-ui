@@ -214,6 +214,7 @@ export default function NodeTabs(props: any) {
   const [networkApplying, setNetworkApplying] = useState(false)
   const [networkReverting, setNetworkReverting] = useState(false)
   const [networkError, setNetworkError] = useState('')
+  const [networkPendingChanges, setNetworkPendingChanges] = useState(false)
 
   // Ceph OSD Flags state for Node Ceph OSD sub-tab
   const [nodeCephOsdFlags, setNodeCephOsdFlags] = useState<string[]>([])
@@ -1301,7 +1302,7 @@ export default function NodeTabs(props: any) {
                                     <Button
                                       size="small"
                                       variant="outlined"
-                                      disabled={networkReverting}
+                                      disabled={networkReverting || !networkPendingChanges}
                                       startIcon={networkReverting ? <CircularProgress size={14} /> : <i className="ri-refresh-line" style={{ fontSize: 14 }} />}
                                       onClick={async () => {
                                         const { connId, node } = parseNodeId(selection?.id || '')
@@ -1311,6 +1312,7 @@ export default function NodeTabs(props: any) {
                                           const res = await fetch(`/api/v1/connections/${encodeURIComponent(connId)}/nodes/${encodeURIComponent(node)}/network`, { method: 'DELETE' })
                                           if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j.error || 'Failed to revert') }
                                           setNodeSystemLoaded(false)
+                                          setNetworkPendingChanges(false)
                                         } catch (e: any) { setNetworkError(e?.message || 'Revert failed') }
                                         finally { setNetworkReverting(false) }
                                       }}
@@ -1320,7 +1322,7 @@ export default function NodeTabs(props: any) {
                                     <Button
                                       size="small"
                                       variant="outlined"
-                                      disabled={networkApplying}
+                                      disabled={networkApplying || !networkPendingChanges}
                                       startIcon={networkApplying ? <CircularProgress size={14} /> : <i className="ri-check-line" style={{ fontSize: 14 }} />}
                                       onClick={async () => {
                                         const { connId, node } = parseNodeId(selection?.id || '')
@@ -1330,6 +1332,7 @@ export default function NodeTabs(props: any) {
                                           const res = await fetch(`/api/v1/connections/${encodeURIComponent(connId)}/nodes/${encodeURIComponent(node)}/network`, { method: 'PUT' })
                                           if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j.error || 'Failed to apply') }
                                           setNodeSystemLoaded(false)
+                                          setNetworkPendingChanges(false)
                                         } catch (e: any) { setNetworkError(e?.message || 'Apply failed') }
                                         finally { setNetworkApplying(false) }
                                       }}
@@ -1418,12 +1421,14 @@ export default function NodeTabs(props: any) {
                                       if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j.error || 'Failed to update') }
                                     }
                                     setNodeSystemLoaded(false)
+                                    setNetworkPendingChanges(true)
                                   }}
                                   onDelete={async (ifaceName) => {
                                     const { connId, node } = parseNodeId(selection?.id || '')
                                     const res = await fetch(`/api/v1/connections/${encodeURIComponent(connId)}/nodes/${encodeURIComponent(node)}/network/${encodeURIComponent(ifaceName)}`, { method: 'DELETE' })
                                     if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j.error || 'Failed to delete') }
                                     setNodeSystemLoaded(false)
+                                    setNetworkPendingChanges(true)
                                   }}
                                 />
                               </CardContent>
